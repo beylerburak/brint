@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "echo 'todo: dev'",
+    "test": "echo \"no api tests yet\"",
     "build": "echo 'todo: build'",
     "lint": "echo 'todo: lint'"
   },

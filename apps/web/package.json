@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "echo 'todo: dev'",
+    "dev": "echo \"web dev not implemented yet\"",
+    "test": "echo \"no web tests yet\"",
     "build": "echo 'todo: build'",
     "lint": "echo 'todo: lint'"
   },

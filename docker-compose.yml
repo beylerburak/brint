@@ -1,0 +1,58 @@
+# Docker Compose configuration for development environment
+# Services: Postgres, Redis, Adminer
+#
+# Usage:
+#   docker compose up -d    # Start all services in detached mode
+#   docker compose down     # Stop and remove all services
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: brint-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: brint_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - brint-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: brint-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - brint-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: brint-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - brint-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  brint-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+

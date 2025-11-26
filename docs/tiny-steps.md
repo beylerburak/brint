@@ -580,3 +580,119 @@ Projede AI ile nasıl çalışılacağını, Tiny Step metodolojisini ve test di
   - Bu dosyaları referans alarak çalışmaya başlıyor mu?
 
 ---
+
+M-01 – Storage config & env vars (S3)
+	•	env.ts + config/index.ts içine sadece config tanımları:
+	•	AWS_REGION
+	•	AWS_ACCESS_KEY_ID
+	•	AWS_SECRET_ACCESS_KEY
+	•	S3_MEDIA_BUCKET
+	•	(opsiyonel) S3_PUBLIC_CDN_URL
+	•	storageConfig objesi:
+	•	bucket, region, baseUrl vs.
+	•	Kod içinde “bucket name string” asla yazılmayacak, hep storageConfig kullanılacak.
+
+M-02 – Storage interface (no implementation yet)
+	•	apps/api/src/lib/storage.ts içinde bir interface:
+
+export type PresignedUploadRequest = {
+  workspaceId: string;
+  brandId?: string;
+  contentType: string;
+  fileName: string;
+  sizeBytes: number;
+};
+
+export type PresignedUploadResponse = {
+  uploadUrl: string;
+  method: 'PUT';
+  expiresInSeconds: number;
+  objectKey: string;
+};
+
+export interface StorageService {
+  getPresignedUploadUrl(req: PresignedUploadRequest): Promise<PresignedUploadResponse>;
+  getPresignedDownloadUrl(objectKey: string, opts?: { expiresInSeconds?: number }): Promise<string>;
+  deleteObject(objectKey: string): Promise<void>;
+}
+
+
+	•	Şimdilik sadece interface & TODO; gerçek S3 implementation’ı daha sonra.
+
+M-03 – Key naming strategy (dokümantasyon)
+	•	docs/backend-architecture.md altına küçük bir bölüm:
+	•	Örn:
+/{workspaceId}/{brandId or _}/media/{YYYY}/{MM}/{fileId}-{slug}.{ext}
+	•	Sadece doküman; migration yok, kod yok.
+
+Bunlar şu an koşulması gerekmeyen ama planın sonunda durması gereken maddeler.
+Ne zaman “media zamanı” dersen, o zaman bunları TS-MEDIA-01, 02, 03 diye Cursor’a verip koştururuz.
+
+⸻
+
+Phase 3 – Search & Command Palette
+
+S-01 – SearchService interface (domain abstraction)
+	•	apps/api/src/modules/search/search.service.ts gibi bir yerde:
+
+export type SearchEntityType =
+  | 'workspace'
+  | 'brand'
+  | 'content'
+  | 'media'
+  | 'task';
+
+export type SearchResultItem = {
+  type: SearchEntityType;
+  id: string;
+  workspaceId: string;
+  brandId?: string;
+  title: string;
+  snippet?: string;
+  url: string;
+  score: number;
+};
+
+export interface SearchService {
+  search(query: string, options: {
+    workspaceId: string;
+    brandId?: string;
+    limit?: number;
+  }): Promise<SearchResultItem[]>;
+}
+
+
+	•	İlk implementasyon Postgres olabilir, sonra istersen Elasticsearch/Meilisearch.
+
+S-02 – Global search API kontratı (command menu)
+	•	Dokümana yazılacak sadece:
+	•	Endpoint: GET /search/global?query=...
+	•	Response örneği:
+
+{
+  "groups": [
+    {
+      "label": "Brands",
+      "items": [ /* SearchResultItem mapped */ ]
+    },
+    {
+      "label": "Contents",
+      "items": [ /* ... */ ]
+    }
+  ]
+}
+
+
+	•	Bu JSON kontratını bilmek, frontend command menüyü tasarlarken işine yarayacak.
+
+S-03 – Engine seçimi (later decision)
+	•	Dokümanda not:
+	•	“İlk sürüm: Postgres full-text search”
+	•	“SCALE sinyali gelirse: Meilisearch / Elasticsearch değerlendirmesi”
+	•	Şu anda hiçbir engine kurulmayacak.
+
+⸻
+
+## Diğer
+
+TS-11 (full health) için DB + Prisma geldiğinde geri döneriz.

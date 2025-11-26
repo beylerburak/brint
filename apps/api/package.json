@@ -1,0 +1,15 @@
+{
+  "name": "@brint/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "echo 'todo: dev'",
+    "build": "echo 'todo: build'",
+    "lint": "echo 'todo: lint'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+

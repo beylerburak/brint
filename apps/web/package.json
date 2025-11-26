@@ -1,0 +1,13 @@
+{
+  "name": "@brint/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'todo: dev'",
+    "build": "echo 'todo: build'",
+    "lint": "echo 'todo: lint'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+

@@ -1,0 +1,17 @@
+{
+  "name": "brint",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "echo 'todo: lint'",
+    "build": "echo 'todo: build'"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
+

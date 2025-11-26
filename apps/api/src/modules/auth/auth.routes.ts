@@ -1,16 +1,21 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { redis } from '../../lib/redis.js';
-import { oauthConfig } from '../../config/index.js';
+import { oauthConfig, authConfig } from '../../config/index.js';
 import { loginOrRegisterWithGoogle, type GoogleProfile } from './google-oauth.service.js';
-import { setAuthCookies } from '../../core/auth/auth.cookies.js';
+import { setAuthCookies, clearAuthCookies } from '../../core/auth/auth.cookies.js';
+import { tokenService } from '../../core/auth/token.service.js';
+import { sessionService } from '../../core/auth/session.service.js';
+import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 
 /**
  * Registers authentication routes
  * - GET /auth/google - Generate Google OAuth URL
  * - GET /auth/google/callback - Handle Google OAuth callback
+ * - POST /auth/refresh - Refresh access token using refresh token
+ * - POST /auth/logout - Logout and revoke session
  */
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   // GET /auth/google - Generate OAuth URL
@@ -251,6 +256,279 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
       });
     }
+  });
+
+  // POST /auth/refresh - Refresh access token
+  app.post('/auth/refresh', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Refresh access token',
+      description: 'Generates new access and refresh tokens using the existing refresh token from cookie. Implements token rotation.',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            accessToken: { type: 'string' },
+            expiresIn: { type: 'number' },
+          },
+          required: ['success', 'accessToken', 'expiresIn'],
+        },
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    // 1. Get refresh token from cookie
+    const refreshToken = request.cookies['refresh_token'];
+
+    if (!refreshToken) {
+      logger.warn(
+        {
+          reason: 'missing-token',
+        },
+        'Refresh attempt without token'
+      );
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'AUTH_REFRESH_MISSING_TOKEN',
+          message: 'Refresh token not found in cookies',
+        },
+      });
+    }
+
+    try {
+      // 2. Verify refresh token
+      const payload = tokenService.verifyRefreshToken(refreshToken);
+      const { sub: userId, tid: oldTid } = payload;
+
+      logger.debug(
+        {
+          userId,
+          oldTid,
+        },
+        'Refresh token verified'
+      );
+
+      // 3. Find session in DB
+      const session = await prisma.session.findUnique({
+        where: { id: oldTid },
+      });
+
+      if (!session) {
+        logger.warn(
+          {
+            userId,
+            oldTid,
+            reason: 'session-not-found',
+          },
+          'Refresh attempt with non-existent session'
+        );
+        clearAuthCookies(reply);
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'AUTH_REFRESH_SESSION_NOT_FOUND',
+            message: 'Session not found',
+          },
+        });
+      }
+
+      // 4. Check if session is expired
+      const now = new Date();
+      if (session.expiresAt <= now) {
+        logger.warn(
+          {
+            userId,
+            oldTid,
+            reason: 'session-expired',
+            expiresAt: session.expiresAt.toISOString(),
+          },
+          'Refresh attempt with expired session'
+        );
+        // Best-effort revoke
+        await sessionService.revokeSession(oldTid).catch((err) => {
+          logger.error({ error: err, oldTid }, 'Failed to revoke expired session during refresh');
+        });
+        clearAuthCookies(reply);
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'AUTH_REFRESH_SESSION_EXPIRED',
+            message: 'Session expired',
+          },
+        });
+      }
+
+      // 5. Token rotation: Create new session
+      const newTid = randomUUID();
+      await sessionService.createSession({
+        userId,
+        tid: newTid,
+        userAgent: request.headers['user-agent'] ?? null,
+        ipAddress: request.ip ?? null,
+      });
+
+      // 6. Revoke old session (best-effort, don't fail if it errors)
+      await sessionService.revokeSession(oldTid).catch((err) => {
+        logger.error(
+          {
+            error: err,
+            userId,
+            oldTid,
+            newTid,
+          },
+          'Failed to revoke old session during rotation (non-fatal)'
+        );
+      });
+
+      // 7. Generate new tokens
+      const accessToken = tokenService.signAccessToken({ sub: userId });
+      const newRefreshToken = tokenService.signRefreshToken({ sub: userId, tid: newTid });
+
+      // 8. Set new cookies
+      setAuthCookies(reply, {
+        accessToken,
+        refreshToken: newRefreshToken,
+      });
+
+      logger.info(
+        {
+          userId,
+          oldTid,
+          newTid,
+          reason: 'ok',
+        },
+        'Token refresh successful with rotation'
+      );
+
+      // 9. Return response
+      return reply.status(200).send({
+        success: true,
+        accessToken,
+        expiresIn: authConfig.accessToken.expiresInMinutes,
+      });
+    } catch (error: any) {
+      // Handle TokenError from verifyRefreshToken
+      if (error?.name === 'TokenError' || error?.message?.includes('Token')) {
+        logger.warn(
+          {
+            error: error.message,
+            reason: 'invalid-token',
+          },
+          'Refresh attempt with invalid token'
+        );
+        clearAuthCookies(reply);
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'AUTH_REFRESH_INVALID_TOKEN',
+            message: 'Invalid or expired refresh token',
+          },
+        });
+      }
+
+      // Unexpected error
+      logger.error(
+        {
+          error,
+        },
+        'Unexpected error during token refresh'
+      );
+      clearAuthCookies(reply);
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'AUTH_REFRESH_FAILED',
+          message: 'Token refresh failed',
+        },
+      });
+    }
+  });
+
+  // POST /auth/logout - Logout and revoke session
+  app.post('/auth/logout', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Logout user',
+      description: 'Revokes the current session and clears authentication cookies',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+          },
+          required: ['success'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const refreshToken = request.cookies['refresh_token'];
+
+    if (refreshToken) {
+      try {
+        // Try to decode and revoke session
+        const payload = tokenService.verifyRefreshToken(refreshToken);
+        const { tid } = payload;
+
+        // Best-effort revoke (don't fail if it errors)
+        await sessionService.revokeSession(tid).catch((err) => {
+          logger.error(
+            {
+              error: err,
+              tid,
+            },
+            'Failed to revoke session during logout (non-fatal)'
+          );
+        });
+
+        logger.info(
+          {
+            userId: payload.sub,
+            tid,
+            reason: 'ok',
+          },
+          'Logout successful'
+        );
+      } catch (error: any) {
+        // If token is invalid/expired, just log and continue (still return success)
+        logger.warn(
+          {
+            error: error.message,
+            reason: 'invalid-token',
+          },
+          'Logout with invalid refresh token (non-fatal)'
+        );
+      }
+    } else {
+      logger.debug(
+        {
+          reason: 'no-token',
+        },
+        'Logout without refresh token'
+      );
+    }
+
+    // Always clear cookies
+    clearAuthCookies(reply);
+
+    return reply.status(200).send({
+      success: true,
+    });
   });
 }
 

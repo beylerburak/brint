@@ -1,10 +1,17 @@
 import Fastify from 'fastify';
 import { appConfig } from './config/index.js';
 import { logger } from './lib/logger.js';
+import { globalErrorHandler, notFoundHandler } from './lib/error-handler.js';
 
 const fastify = Fastify({
   logger,
 });
+
+// Register global error handler
+fastify.setErrorHandler(globalErrorHandler);
+
+// Register 404 handler
+fastify.setNotFoundHandler(notFoundHandler);
 
 // Health check endpoint
 fastify.get('/health/basic', async (request, reply) => {

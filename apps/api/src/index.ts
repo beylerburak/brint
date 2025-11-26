@@ -1,8 +1,9 @@
 import Fastify from 'fastify';
 import { appConfig } from './config/index.js';
+import { logger } from './lib/logger.js';
 
 const fastify = Fastify({
-  logger: true,
+  logger,
 });
 
 // Health check endpoint
@@ -13,9 +14,9 @@ fastify.get('/health/basic', async (request, reply) => {
 const start = async () => {
   try {
     await fastify.listen({ port: appConfig.port, host: appConfig.host });
-    console.log(`Server listening on http://${appConfig.host}:${appConfig.port}`);
+    logger.info({ host: appConfig.host, port: appConfig.port }, 'API server started');
   } catch (err) {
-    fastify.log.error(err);
+    logger.error(err, 'Failed to start server');
     process.exit(1);
   }
 };

@@ -1,7 +1,5 @@
 import Fastify from 'fastify';
-
-// TODO: TS-06/TS-07 ile env/config'e taşınacak
-const PORT = 4000;
+import { env } from './config/env.js';
 
 const fastify = Fastify({
   logger: true,
@@ -14,8 +12,8 @@ fastify.get('/health/basic', async (request, reply) => {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: PORT });
-    console.log(`Server listening on http://localhost:${PORT}`);
+    await fastify.listen({ port: env.API_PORT, host: env.API_HOST });
+    console.log(`Server listening on http://${env.API_HOST}:${env.API_PORT}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

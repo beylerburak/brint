@@ -24,11 +24,22 @@ export function ThemeToggle() {
     )
   }
 
+  const handleToggle = () => {
+    if (theme === "light") {
+      setTheme("dark")
+    } else if (theme === "dark") {
+      setTheme("light")
+    } else {
+      // system veya undefined durumunda light'a geç
+      setTheme("light")
+    }
+  }
+
   return (
     <Button
       variant="outline"
       size="icon"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      onClick={handleToggle}
     >
       {theme === "dark" ? (
         <Sun className="size-4" />

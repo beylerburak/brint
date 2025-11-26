@@ -323,6 +323,91 @@ Endpoint seviyesinde permission kontrolünü standartlaştırmak.
 
 ---
 
+### TS-21.5 – DB’de Session tablosu + session service
+
+1. Önce genel fikir: Ne yapıyoruz, neyi yapmıyoruz?
+	•	Google OAuth primary, magic link fallback → Buna ben de katılıyorum. B2B için cuk oturuyor.
+	•	Refresh / access token → Biz zaten TS-16 ile bunu hazırladık:
+	•	Access token payload: { sub, wid?, bid?, type: 'access' }
+	•	Refresh token payload: { sub, tid, type: 'refresh' }
+	•	Claude’un dediği permissions[] payload’a gömmeyi önermiyorum:
+	•	Zaten TS-20 ile permissionService + requirePermission yazdık.
+	•	Permission’ı DB’den hesaplıyoruz; JWT içine permission list itmeye gerek yok (cache’lemek istersen ayrı story).
+	•	Bizim stack’te kritik olan şu:
+	•	Refresh token payload’ında tid var → bu aslında Session ID gibi.
+	•	Yani Session modelini buna göre kurarsak hem temiz hem minimum refactor ile ilerleriz.
+
+Bu nedenle TS-21.5’te:
+	•	Sadece backend tarafında Session modeli + session service + repository yapıyoruz.
+	•	Henüz:
+	•	/auth/google
+	•	/auth/refresh
+	•	/auth/logout
+	•	/auth/login/magic-link
+yok → onlar TS-22’den sonra gelecek ayrı tiny steps (TS-AUTH-0x gibi).
+
+Özet:
+TS-21.5 = “DB’de Session tablosu + session service”
+Login/OAuth flow’u sonra.
+
+⸻
+
+2. Modeli netleştirelim (bizim gerçek kurgumuz)
+
+Session nasıl olsun?
+
+Benim önerim (mevcut koduna göre en uyumlu hali):
+	•	Session.id = refresh token içindeki tid
+	•	Yani refresh token payload’ındaki tid ile DB’deki Session id birebir eşleşsin.
+	•	Ayrıca token’ı komple DB’ye yazmıyoruz → sadece id ve meta bilgiler.
+	•	Şimdilik token hash eklemiyoruz:
+	•	İleride istersen ekleriz (tokenHash column).
+	•	Şu anki tasarımda JWT signature + tid + DB check zaten çok güvenli.
+	•	Ömür yönetimi:
+	•	expiresAt → now + REFRESH_TOKEN_EXPIRES_IN_DAYS
+	•	Bu config zaten var: authConfig.refreshToken.expiresInDays.
+
+Prisma modeli önerisi
+
+model Session {
+  id           String   @id            // refresh token payload'daki `tid` ile birebir
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt    DateTime
+  userAgent    String?
+  ipAddress    String?
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@map("sessions")
+  @@index([userId, expiresAt])
+}
+
+Ve User modeline:
+
+model User {
+  // ...
+  sessions      Session[]
+}
+
+Not: googleId, avatar gibi alanları şimdi eklemiyoruz. Onlar Google OAuth tiny steps’te gelecek; TS-21.5’i küçük tutuyoruz.
+
+
+---
+
+### TS-21.x – Auth & Session Extensions
+
+- TS-21.5 – Session model & service
+- TS-21.6 – Brand & Brand Studio domain skeleton (backend only)
+- TS-21.7 – Google OAuth endpoints (auth/google, auth/google/callback)
+- TS-21.8 – Refresh & Logout endpoints (auth/refresh, auth/logout)
+- TS-21.9 – Magic link fallback (Redis + email stub)
+
+
+---
+
+
 ### TS-22 – Brand & Brand Studio domain skeleton
 
 **Amaç:**  

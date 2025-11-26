@@ -21,10 +21,9 @@ export const dbConfig = {
 
 /**
  * Cache configuration (Redis)
- * Will be populated in future TS steps
  */
 export const cacheConfig = {
-  redisUrl: null as string | null,
+  redisUrl: env.REDIS_URL,
 };
 
 /**

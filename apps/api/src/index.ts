@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { appConfig } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { globalErrorHandler, notFoundHandler } from './lib/error-handler.js';
+import { redis } from './lib/redis.js';
 
 const fastify = Fastify({
   logger,
@@ -16,6 +17,15 @@ fastify.setNotFoundHandler(notFoundHandler);
 // Health check endpoint
 fastify.get('/health/basic', async (request, reply) => {
   return { status: 'ok' };
+});
+
+// Redis health check endpoint
+fastify.get('/health/redis', async (request, reply) => {
+  const ping = await redis.ping();
+  return reply.status(200).send({
+    status: ping === 'PONG' ? 'ok' : 'degraded',
+    redis: { ping },
+  });
 });
 
 const start = async () => {

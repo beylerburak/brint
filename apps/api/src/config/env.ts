@@ -17,6 +17,7 @@ const envSchema = z.object({
   API_PORT: z.string().min(1, 'API_PORT is required'),
   API_HOST: z.string().default('0.0.0.0'),
   API_LOG_LEVEL: z.string().default('info'),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -39,6 +40,7 @@ export const env = {
   API_PORT: parseInt(rawEnv.API_PORT, 10),
   API_HOST: rawEnv.API_HOST,
   API_LOG_LEVEL: rawEnv.API_LOG_LEVEL,
+  REDIS_URL: rawEnv.REDIS_URL,
 } as const;
 
 export type Env = typeof env;

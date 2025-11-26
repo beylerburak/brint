@@ -33,6 +33,7 @@ model Workspace {
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
   roles     Role[]
+  brands    Brand[]
 
   @@map("workspaces")
 }
@@ -100,5 +101,20 @@ model Session {
 
   @@map("sessions")
   @@index([userId, expiresAt])
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("brands")
+  @@unique([workspaceId, slug])
 }
 

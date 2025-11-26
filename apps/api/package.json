@@ -5,12 +5,17 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "echo 'todo: dev'",
+    "dev": "tsx watch src/index.ts",
     "test": "echo \"no api tests yet\"",
     "build": "echo 'todo: build'",
     "lint": "echo 'todo: lint'"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "fastify": "^4.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0"
+  }
 }
 

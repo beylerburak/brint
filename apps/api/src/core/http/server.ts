@@ -7,6 +7,7 @@ import authContextPlugin from '../auth/auth.context.js';
 import { registerHealthRoutes } from '../../modules/health/health.routes.js';
 import { registerDebugRoutes } from '../../modules/debug/debug.routes.js';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
+import { registerStudioRoutes } from '../../modules/studio/studio.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -38,6 +39,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerDebugRoutes(app);
   await registerAuthRoutes(app);
+  await app.register(registerStudioRoutes, { prefix: '/studio' });
 
   return app;
 }

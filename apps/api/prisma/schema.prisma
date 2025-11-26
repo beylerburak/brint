@@ -28,6 +28,7 @@ model Workspace {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
+  roles     Role[]
 
   @@map("workspaces")
 }
@@ -43,5 +44,43 @@ model WorkspaceMember {
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
+}
+
+model Role {
+  id           String   @id @default(cuid())
+  workspaceId  String?  // null ise global role, doluysa workspace-specific role
+  key          String   // örn: "workspace-owner", "content-manager"
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+  @@unique([workspaceId, key]) // aynı workspace içinde aynı key iki kez olmasın, global roller için workspaceId null
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // örn: "workspace:settings.view"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@map("role_permissions")
+  @@unique([roleId, permissionId])
 }
 

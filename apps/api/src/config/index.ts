@@ -41,3 +41,18 @@ export const uploadConfig = {
   maxUploadSizeMb: 10,
 };
 
+/**
+ * Authentication configuration
+ */
+export const authConfig = {
+  issuer: 'brint-api',
+  accessToken: {
+    secret: env.ACCESS_TOKEN_SECRET,
+    expiresInMinutes: env.ACCESS_TOKEN_EXPIRES_IN_MINUTES,
+  },
+  refreshToken: {
+    secret: env.REFRESH_TOKEN_SECRET,
+    expiresInDays: env.REFRESH_TOKEN_EXPIRES_IN_DAYS,
+  },
+} as const;
+

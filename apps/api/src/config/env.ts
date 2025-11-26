@@ -19,6 +19,10 @@ const envSchema = z.object({
   API_LOG_LEVEL: z.string().default('info'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
+  ACCESS_TOKEN_SECRET: z.string().min(32, 'ACCESS_TOKEN_SECRET must be at least 32 characters'),
+  REFRESH_TOKEN_SECRET: z.string().min(32, 'REFRESH_TOKEN_SECRET must be at least 32 characters'),
+  ACCESS_TOKEN_EXPIRES_IN_MINUTES: z.coerce.number().int().positive().default(15),
+  REFRESH_TOKEN_EXPIRES_IN_DAYS: z.coerce.number().int().positive().default(30),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -43,6 +47,10 @@ export const env = {
   API_LOG_LEVEL: rawEnv.API_LOG_LEVEL,
   REDIS_URL: rawEnv.REDIS_URL,
   DATABASE_URL: rawEnv.DATABASE_URL,
+  ACCESS_TOKEN_SECRET: rawEnv.ACCESS_TOKEN_SECRET,
+  REFRESH_TOKEN_SECRET: rawEnv.REFRESH_TOKEN_SECRET,
+  ACCESS_TOKEN_EXPIRES_IN_MINUTES: rawEnv.ACCESS_TOKEN_EXPIRES_IN_MINUTES,
+  REFRESH_TOKEN_EXPIRES_IN_DAYS: rawEnv.REFRESH_TOKEN_EXPIRES_IN_DAYS,
 } as const;
 
 export type Env = typeof env;

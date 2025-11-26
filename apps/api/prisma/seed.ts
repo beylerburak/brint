@@ -1,0 +1,169 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 Starting seed...');
+
+  // 1. User
+  const user = await prisma.user.upsert({
+    where: { email: 'owner@example.com' },
+    update: {},
+    create: {
+      email: 'owner@example.com',
+      name: 'Seed Owner',
+    },
+  });
+  console.log('✅ User:', user.email);
+
+  // 2. Workspace
+  const workspace = await prisma.workspace.upsert({
+    where: { slug: 'demo-workspace' },
+    update: {},
+    create: {
+      slug: 'demo-workspace',
+      name: 'Demo Workspace',
+    },
+  });
+  console.log('✅ Workspace:', workspace.slug);
+
+  // 3. WorkspaceMember
+  await prisma.workspaceMember.upsert({
+    where: {
+      userId_workspaceId: {
+        userId: user.id,
+        workspaceId: workspace.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: user.id,
+      workspaceId: workspace.id,
+      role: 'owner',
+    },
+  });
+  console.log('✅ WorkspaceMember created');
+
+  // 4. Permissions
+  const permissionKeys = [
+    'workspace:settings.view',
+    'workspace:members.manage',
+    'studio:brand.view',
+    'studio:brand.create',
+    'studio:content.create',
+    'studio:content.publish',
+  ];
+
+  const permissionDescriptions: Record<string, string> = {
+    'workspace:settings.view': 'View workspace settings',
+    'workspace:members.manage': 'Manage workspace members',
+    'studio:brand.view': 'View brands in studio',
+    'studio:brand.create': 'Create new brands',
+    'studio:content.create': 'Create content',
+    'studio:content.publish': 'Publish content',
+  };
+
+  const permissions = [];
+  for (const key of permissionKeys) {
+    const permission = await prisma.permission.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        description: permissionDescriptions[key],
+      },
+    });
+    permissions.push(permission);
+  }
+  console.log(`✅ Created ${permissions.length} permissions`);
+
+  // 5. Roles
+  // workspace-owner role (all permissions)
+  const ownerRole = await prisma.role.upsert({
+    where: {
+      workspaceId_key: {
+        workspaceId: workspace.id,
+        key: 'workspace-owner',
+      },
+    },
+    update: {},
+    create: {
+      workspaceId: workspace.id,
+      key: 'workspace-owner',
+      name: 'Workspace Owner',
+      description: 'Full access to all workspace features',
+    },
+  });
+  console.log('✅ Role: workspace-owner');
+
+  // content-manager role (limited permissions)
+  const contentManagerRole = await prisma.role.upsert({
+    where: {
+      workspaceId_key: {
+        workspaceId: workspace.id,
+        key: 'content-manager',
+      },
+    },
+    update: {},
+    create: {
+      workspaceId: workspace.id,
+      key: 'content-manager',
+      name: 'Content Manager',
+      description: 'Can manage content and view brands',
+    },
+  });
+  console.log('✅ Role: content-manager');
+
+  // 6. RolePermission
+  // workspace-owner → all permissions
+  for (const permission of permissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: ownerRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: ownerRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+  console.log(`✅ workspace-owner → ${permissions.length} permissions`);
+
+  // content-manager → only: studio:brand.view, studio:content.create, studio:content.publish
+  const contentManagerPermissions = permissions.filter((p) =>
+    ['studio:brand.view', 'studio:content.create', 'studio:content.publish'].includes(p.key)
+  );
+
+  for (const permission of contentManagerPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: contentManagerRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: contentManagerRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+  console.log(`✅ content-manager → ${contentManagerPermissions.length} permissions`);
+
+  console.log('🎉 Seed completed successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Seed failed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+

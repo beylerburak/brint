@@ -11,12 +11,16 @@ generator client {
 }
 
 model User {
-  id        String            @id @default(cuid())
-  email     String            @unique
-  name      String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id            String            @id @default(cuid())
+  email         String            @unique
+  name          String?
+  emailVerified DateTime?
+  avatarUrl     String?
+  googleId      String?           @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   workspaceMembers WorkspaceMember[]
+  sessions      Session[]
 
   @@map("users")
 }
@@ -82,5 +86,19 @@ model RolePermission {
 
   @@map("role_permissions")
   @@unique([roleId, permissionId])
+}
+
+model Session {
+  id           String   @id            // refresh token payload'daki `tid` ile birebir
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  userAgent    String?
+  ipAddress    String?
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@map("sessions")
+  @@index([userId, expiresAt])
 }
 

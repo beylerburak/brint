@@ -56,3 +56,17 @@ export const authConfig = {
   },
 } as const;
 
+/**
+ * OAuth configuration
+ */
+export const oauthConfig = {
+  google: {
+    clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+    clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri: env.GOOGLE_OAUTH_REDIRECT_URI,
+    authBaseUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    scopes: ['openid', 'email', 'profile'] as const,
+  },
+} as const;
+

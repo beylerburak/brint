@@ -20,6 +20,9 @@ importers:
       '@fastify/swagger-ui':
         specifier: ^2.1.0
         version: 2.1.0
+      '@prisma/client':
+        specifier: 5.19.0
+        version: 5.19.0(prisma@5.19.0)
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
@@ -42,6 +45,9 @@ importers:
       '@types/node':
         specifier: ^20.10.5
         version: 20.19.25
+      prisma:
+        specifier: 5.19.0
+        version: 5.19.0
       tsx:
         specifier: ^4.7.0
         version: 4.20.6
@@ -243,6 +249,30 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@prisma/client@5.19.0':
+    resolution: {integrity: sha512-CzOpau+q1kEWQyoQMvlnXIHqPvwmWbh48xZ4n8KWbAql0p8PC0BIgSTYW5ncxXa4JSEff0tcoxSZB874wDstdg==}
+    engines: {node: '>=16.13'}
+    peerDependencies:
+      prisma: '*'
+    peerDependenciesMeta:
+      prisma:
+        optional: true
+
+  '@prisma/debug@5.19.0':
+    resolution: {integrity: sha512-+b/G0ubAZlrS+JSiDhXnYV5DF/aTJ3pinktkiV/L4TtLRLZO6SVGyFELgxBsicCTWJ2ZMu5vEV/jTtYCdjFTRA==}
+
+  '@prisma/engines-version@5.19.0-31.5fe21811a6ba0b952a3bc71400666511fe3b902f':
+    resolution: {integrity: sha512-GimI9aZIFy/yvvR11KfXRn3pliFn1QAkdebVlsXlnoh5uk0YhLblVmeYiHfsu+wDA7BeKqYT4sFfzg8mutzuWw==}
+
+  '@prisma/engines@5.19.0':
+    resolution: {integrity: sha512-UtW+0m4HYoRSSR3LoDGKF3Ud4BSMWYlLEt4slTnuP1mI+vrV3zaDoiAPmejdAT76vCN5UqnWURbkXxf66nSylQ==}
+
+  '@prisma/fetch-engine@5.19.0':
+    resolution: {integrity: sha512-oOiPNtmJX0cP/ebu7BBEouJvCw8T84/MFD/Hf2zlqjxkK4ojl38bB9i9J5LAxotL6WlYVThKdxc7HqoWnPOhqQ==}
+
+  '@prisma/get-platform@5.19.0':
+    resolution: {integrity: sha512-s9DWkZKnuP4Y8uy6yZfvqQ/9X3/+2KYf3IZUVZz5OstJdGBJrBlbmIuMl81917wp5TuK/1k2TpHNCEdpYLPKmg==}
 
   '@types/node@20.19.25':
     resolution: {integrity: sha512-ZsJzA5thDQMSQO788d7IocwwQbI8B5OPzmqNvpf3NY/+MHDAS759Wo0gd2WQeXYt5AAAQjzcrTVC6SKCuYgoCQ==}
@@ -484,6 +514,11 @@ packages:
 
   pino@9.14.0:
     resolution: {integrity: sha512-8OEwKp5juEvb/MjpIc4hjqfgCNysrS94RIOMXYvpYCdm/jglrKEiAYmiumbmGhCvs+IcInsphYDFwqrjr7398w==}
+    hasBin: true
+
+  prisma@5.19.0:
+    resolution: {integrity: sha512-Pu7lUKpVyTx8cVwM26dYh8NdvMOkMnJXzE8L6cikFuR4JwyMU5NKofQkWyxJKlTT4fNjmcnibTvklV8oVMrn+g==}
+    engines: {node: '>=16.13'}
     hasBin: true
 
   process-warning@3.0.0:
@@ -768,6 +803,31 @@ snapshots:
   '@lukeed/ms@2.0.2': {}
 
   '@pinojs/redact@0.4.0': {}
+
+  '@prisma/client@5.19.0(prisma@5.19.0)':
+    optionalDependencies:
+      prisma: 5.19.0
+
+  '@prisma/debug@5.19.0': {}
+
+  '@prisma/engines-version@5.19.0-31.5fe21811a6ba0b952a3bc71400666511fe3b902f': {}
+
+  '@prisma/engines@5.19.0':
+    dependencies:
+      '@prisma/debug': 5.19.0
+      '@prisma/engines-version': 5.19.0-31.5fe21811a6ba0b952a3bc71400666511fe3b902f
+      '@prisma/fetch-engine': 5.19.0
+      '@prisma/get-platform': 5.19.0
+
+  '@prisma/fetch-engine@5.19.0':
+    dependencies:
+      '@prisma/debug': 5.19.0
+      '@prisma/engines-version': 5.19.0-31.5fe21811a6ba0b952a3bc71400666511fe3b902f
+      '@prisma/get-platform': 5.19.0
+
+  '@prisma/get-platform@5.19.0':
+    dependencies:
+      '@prisma/debug': 5.19.0
 
   '@types/node@20.19.25':
     dependencies:
@@ -1060,6 +1120,12 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.0
       thread-stream: 3.1.0
+
+  prisma@5.19.0:
+    dependencies:
+      '@prisma/engines': 5.19.0
+    optionalDependencies:
+      fsevents: 2.3.3
 
   process-warning@3.0.0: {}
 

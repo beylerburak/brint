@@ -18,6 +18,7 @@ const envSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
   API_LOG_LEVEL: z.string().default('info'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
+  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -41,6 +42,7 @@ export const env = {
   API_HOST: rawEnv.API_HOST,
   API_LOG_LEVEL: rawEnv.API_LOG_LEVEL,
   REDIS_URL: rawEnv.REDIS_URL,
+  DATABASE_URL: rawEnv.DATABASE_URL,
 } as const;
 
 export type Env = typeof env;

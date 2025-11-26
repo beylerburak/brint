@@ -13,10 +13,9 @@ export const appConfig = {
 
 /**
  * Database configuration
- * Will be populated in future TS steps
  */
 export const dbConfig = {
-  databaseUrl: null as string | null,
+  databaseUrl: env.DATABASE_URL,
 };
 
 /**

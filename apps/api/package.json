@@ -8,11 +8,14 @@
     "dev": "tsx watch src/index.ts",
     "test": "echo \"no api tests yet\"",
     "build": "echo 'todo: build'",
-    "lint": "echo 'todo: lint'"
+    "lint": "echo 'todo: lint'",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^2.1.0",
+    "@prisma/client": "5.19.0",
     "dotenv": "^16.3.1",
     "fastify": "^4.24.3",
     "fastify-plugin": "^4.5.1",
@@ -22,7 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.5",
+    "prisma": "5.19.0",
     "tsx": "^4.7.0"
   }
 }
-

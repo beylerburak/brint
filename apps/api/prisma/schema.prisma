@@ -1,0 +1,47 @@
+// Prisma Schema File
+// This file defines the database schema using Prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String            @id @default(cuid())
+  email     String            @unique
+  name      String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  workspaceMembers WorkspaceMember[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String   // ileride enum'a çevrilebilir: 'owner' | 'admin' | 'member' vb.
+  createdAt   DateTime @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+  @@map("workspace_members")
+}
+

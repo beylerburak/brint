@@ -26,6 +26,7 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().url(),
+  APP_URL: z.string().url().optional(),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -57,6 +58,7 @@ export const env = {
   GOOGLE_OAUTH_CLIENT_ID: rawEnv.GOOGLE_OAUTH_CLIENT_ID,
   GOOGLE_OAUTH_CLIENT_SECRET: rawEnv.GOOGLE_OAUTH_CLIENT_SECRET,
   GOOGLE_OAUTH_REDIRECT_URI: rawEnv.GOOGLE_OAUTH_REDIRECT_URI,
+  APP_URL: rawEnv.APP_URL,
 } as const;
 
 export type Env = typeof env;

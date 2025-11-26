@@ -2,13 +2,15 @@ import { randomBytes, randomUUID } from 'crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { redis } from '../../lib/redis.js';
-import { oauthConfig, authConfig } from '../../config/index.js';
+import { oauthConfig, authConfig, appUrlConfig } from '../../config/index.js';
 import { loginOrRegisterWithGoogle, type GoogleProfile } from './google-oauth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../../core/auth/auth.cookies.js';
 import { tokenService } from '../../core/auth/token.service.js';
 import { sessionService } from '../../core/auth/session.service.js';
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
+import { magicLinkService } from './magic-link.service.js';
+import { sendMagicLinkEmailStub } from './email.stub.js';
 
 /**
  * Registers authentication routes
@@ -16,6 +18,8 @@ import { logger } from '../../lib/logger.js';
  * - GET /auth/google/callback - Handle Google OAuth callback
  * - POST /auth/refresh - Refresh access token using refresh token
  * - POST /auth/logout - Logout and revoke session
+ * - POST /auth/magic-link - Request magic link email
+ * - GET /auth/magic-link/verify - Verify magic link token and login
  */
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   // GET /auth/google - Generate OAuth URL
@@ -529,6 +533,256 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(200).send({
       success: true,
     });
+  });
+
+  // POST /auth/magic-link - Request magic link email
+  app.post('/auth/magic-link', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Request magic link email',
+      description: 'Generates a magic link token and sends it via email (stub)',
+      body: {
+        type: 'object',
+        properties: {
+          email: { type: 'string' },
+          redirectTo: { type: 'string' },
+        },
+        required: ['email'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+          required: ['success', 'message'],
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { email: string; redirectTo?: string } }>, reply: FastifyReply) => {
+    const { email, redirectTo } = request.body;
+
+    if (!email || typeof email !== 'string' || email.trim().length === 0) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'AUTH_MAGIC_LINK_INVALID_EMAIL',
+          message: 'Email is required',
+        },
+      });
+    }
+
+    try {
+      // Create magic link
+      const result = await magicLinkService.createMagicLink({
+        email,
+        redirectTo: redirectTo ?? null,
+      });
+
+      // Generate magic link URL
+      const magicLinkUrl = `${appUrlConfig.baseUrl}/auth/magic-link/verify?token=${result.token}`;
+
+      // Send email stub
+      await sendMagicLinkEmailStub({
+        to: result.payload.email,
+        magicLinkUrl,
+      });
+
+      // Return generic success (don't leak user existence)
+      return reply.status(200).send({
+        success: true,
+        message: 'If an account exists for this email, a magic link has been sent.',
+      });
+    } catch (error: any) {
+      logger.error(
+        {
+          error,
+          email,
+        },
+        'Error creating magic link'
+      );
+
+      // Return generic error to avoid leaking information
+      return reply.status(200).send({
+        success: true,
+        message: 'If an account exists for this email, a magic link has been sent.',
+      });
+    }
+  });
+
+  // GET /auth/magic-link/verify - Verify magic link token and login
+  app.get('/auth/magic-link/verify', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify magic link token',
+      description: 'Verifies magic link token and creates user session',
+      querystring: {
+        type: 'object',
+        properties: {
+          token: { type: 'string' },
+        },
+        required: ['token'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                name: { type: ['string', 'null'] },
+              },
+              required: ['id', 'email'],
+            },
+            workspace: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                slug: { type: 'string' },
+                name: { type: 'string' },
+              },
+              required: ['id', 'slug', 'name'],
+            },
+            redirectTo: { type: 'string' },
+          },
+          required: ['success', 'user', 'workspace', 'redirectTo'],
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Querystring: { token?: string } }>, reply: FastifyReply) => {
+    const { token } = request.query;
+
+    if (!token) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'AUTH_MAGIC_LINK_TOKEN_REQUIRED',
+          message: 'Token is required',
+        },
+      });
+    }
+
+    try {
+      // Consume magic link
+      const result = await magicLinkService.consumeMagicLink(token, {
+        ipAddress: request.ip ?? null,
+        userAgent: request.headers['user-agent'] ?? null,
+      });
+
+      // Set auth cookies
+      setAuthCookies(reply, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+
+      // Determine redirectTo
+      // Use payload redirectTo if it's a relative path (starts with /), otherwise use default
+      let redirectTo: string;
+      if (result.redirectTo && result.redirectTo.startsWith('/')) {
+        redirectTo = result.redirectTo;
+      } else {
+        redirectTo = `/${result.workspace.slug}/dashboard`;
+      }
+
+      // Return success response
+      return reply.status(200).send({
+        success: true,
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+        },
+        workspace: {
+          id: result.workspace.id,
+          slug: result.workspace.slug,
+          name: result.workspace.name,
+        },
+        redirectTo,
+      });
+    } catch (error: any) {
+      // Handle MagicLinkError
+      if (error?.name === 'MagicLinkError' || error?.message?.includes('Magic link')) {
+        logger.warn(
+          {
+            error: error.message,
+            token: token.substring(0, 8) + '...',
+          },
+          'Magic link verification failed'
+        );
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'AUTH_MAGIC_LINK_INVALID_OR_EXPIRED',
+            message: 'Magic link invalid or expired',
+          },
+        });
+      }
+
+      // Unexpected error
+      logger.error(
+        {
+          error,
+          token: token.substring(0, 8) + '...',
+        },
+        'Unexpected error during magic link verification'
+      );
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred during magic link verification',
+        },
+      });
+    }
   });
 }
 

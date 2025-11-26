@@ -70,3 +70,11 @@ export const oauthConfig = {
   },
 } as const;
 
+/**
+ * Application URL configuration
+ * Used for generating absolute URLs (e.g., magic link URLs)
+ */
+export const appUrlConfig = {
+  baseUrl: env.APP_URL ?? `http://localhost:${appConfig.port}`,
+} as const;
+

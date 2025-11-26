@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { PERMISSIONS, getAllPermissionKeys } from '../src/core/auth/permissions.registry.js';
 
 const prisma = new PrismaClient();
 
@@ -45,22 +46,16 @@ async function main() {
   console.log('✅ WorkspaceMember created');
 
   // 4. Permissions
-  const permissionKeys = [
-    'workspace:settings.view',
-    'workspace:members.manage',
-    'studio:brand.view',
-    'studio:brand.create',
-    'studio:content.create',
-    'studio:content.publish',
-  ];
+  // Use registry to ensure consistency between code and database
+  const permissionKeys = getAllPermissionKeys();
 
   const permissionDescriptions: Record<string, string> = {
-    'workspace:settings.view': 'View workspace settings',
-    'workspace:members.manage': 'Manage workspace members',
-    'studio:brand.view': 'View brands in studio',
-    'studio:brand.create': 'Create new brands',
-    'studio:content.create': 'Create content',
-    'studio:content.publish': 'Publish content',
+    [PERMISSIONS.WORKSPACE_SETTINGS_VIEW]: 'View workspace settings',
+    [PERMISSIONS.WORKSPACE_MEMBERS_MANAGE]: 'Manage workspace members',
+    [PERMISSIONS.STUDIO_BRAND_VIEW]: 'View brands in studio',
+    [PERMISSIONS.STUDIO_BRAND_CREATE]: 'Create new brands',
+    [PERMISSIONS.STUDIO_CONTENT_CREATE]: 'Create content',
+    [PERMISSIONS.STUDIO_CONTENT_PUBLISH]: 'Publish content',
   };
 
   const permissions = [];
@@ -70,7 +65,7 @@ async function main() {
       update: {},
       create: {
         key,
-        description: permissionDescriptions[key],
+        description: permissionDescriptions[key] || `Permission: ${key}`,
       },
     });
     permissions.push(permission);
@@ -134,8 +129,13 @@ async function main() {
   console.log(`✅ workspace-owner → ${permissions.length} permissions`);
 
   // content-manager → only: studio:brand.view, studio:content.create, studio:content.publish
+  const contentManagerPermissionKeys = new Set([
+    PERMISSIONS.STUDIO_BRAND_VIEW,
+    PERMISSIONS.STUDIO_CONTENT_CREATE,
+    PERMISSIONS.STUDIO_CONTENT_PUBLISH,
+  ]);
   const contentManagerPermissions = permissions.filter((p) =>
-    ['studio:brand.view', 'studio:content.create', 'studio:content.publish'].includes(p.key)
+    contentManagerPermissionKeys.has(p.key)
   );
 
   for (const permission of contentManagerPermissions) {

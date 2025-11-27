@@ -14,6 +14,7 @@ import { workspaceInviteRoutes } from '../../modules/workspace/workspace-invite.
 import { registerSubscriptionRoutes } from '../../modules/workspace/subscription.routes.js';
 import { registerWorkspaceMemberRoutes } from '../../modules/workspace/workspace-member.routes.js';
 import { appConfig } from '../../config/index.js';
+import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -80,6 +81,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerSubscriptionRoutes(app);
   await registerWorkspaceMemberRoutes(app);
   await workspaceInviteRoutes(app);
+  await registerMediaRoutes(app);
 
   return app;
 }

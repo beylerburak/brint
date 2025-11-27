@@ -55,6 +55,7 @@ export function NavUser() {
   const [profileUser, setProfileUser] = useState<{
     name: string | null
     email: string
+    avatarUrl: string | null | undefined
   } | null>(null)
 
   // Use auth context user as primary source, try to enhance with profile data
@@ -68,6 +69,7 @@ export function NavUser() {
     setProfileUser({
       name: authUser.name || null,
       email: authUser.email,
+      avatarUrl: null,
     })
 
     // Try to fetch full profile from backend to get updated name/avatar
@@ -77,6 +79,7 @@ export function NavUser() {
         setProfileUser({
           name: profile.name,
           email: profile.email,
+          avatarUrl: profile.avatarUrl,
         })
       } catch (error) {
         // Silently fail - we'll use auth context user instead
@@ -91,6 +94,7 @@ export function NavUser() {
   const user = profileUser || (authUser ? {
     name: authUser.name || null,
     email: authUser.email,
+    avatarUrl: null,
   } : null)
 
   const handleLogout = async () => {
@@ -129,6 +133,9 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
+                {user.avatarUrl && (
+                  <AvatarImage src={user.avatarUrl} alt={displayName} />
+                )}
                 <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -147,6 +154,9 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
+                  {user.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt={displayName} />
+                  )}
                   <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">

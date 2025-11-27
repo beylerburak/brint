@@ -24,10 +24,12 @@ model User {
   timezone      String            @default("UTC")
   phone         String?
   status        String            @default("active")
+  avatarMediaId String?           @unique
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   workspaceMembers WorkspaceMember[]
   sessions      Session[]
+  avatarMedia   Media?            @relation(fields: [avatarMediaId], references: [id])
 
   @@map("users")
 }
@@ -44,6 +46,7 @@ model Workspace {
   brands    Brand[]
   subscription Subscription? @relation("WorkspaceSubscription")
   invites   WorkspaceInvite[]
+  media     Media[]
 
   @@map("workspaces")
 }
@@ -133,6 +136,7 @@ model Brand {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  media       Media[]
 
   @@map("brands")
   @@unique([workspaceId, slug])
@@ -191,4 +195,24 @@ enum InviteStatus {
   PENDING
   ACCEPTED
   EXPIRED
+}
+
+model Media {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  brandId      String?
+  objectKey    String   @unique
+  originalName String
+  contentType  String
+  sizeBytes    Int
+  isPublic     Boolean  @default(false)
+  variants     Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  Workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  Brand     Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  userAvatar User?
+
+  @@map("media")
 }

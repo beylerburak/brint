@@ -1,5 +1,10 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { userRepository } from "./user.repository.js";
+import { prisma } from "../../lib/prisma.js";
+import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
+import { storageConfig } from "../../config/index.js";
+
+const storage = new S3StorageService();
 
 export async function registerUserRoutes(app: FastifyInstance) {
   app.get("/users/me", {
@@ -25,6 +30,8 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 locale: { type: "string" },
                 timezone: { type: "string" },
                 phone: { type: ["string", "null"] },
+                avatarMediaId: { type: ["string", "null"] },
+                avatarUrl: { type: ["string", "null"] },
                 status: { type: "string" },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
@@ -52,7 +59,17 @@ export async function registerUserRoutes(app: FastifyInstance) {
       });
     }
 
-    return reply.send({ success: true, data: user.toJSON() });
+    let avatarUrl: string | null = null;
+    if (user.avatarMediaId) {
+      const media = await prisma.media.findUnique({ where: { id: user.avatarMediaId } });
+      if (media) {
+        avatarUrl = await storage.getPresignedDownloadUrl(media.objectKey, {
+          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+        });
+      }
+    }
+
+    return reply.send({ success: true, data: { ...user.toJSON(), avatarMediaId: user.avatarMediaId, avatarUrl } });
   });
 
   app.patch("/users/me", {
@@ -68,6 +85,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
           locale: { type: "string" },
           timezone: { type: "string" },
           phone: { type: ["string", "null"] },
+          avatarMediaId: { type: ["string", "null"] },
           completedOnboarding: { type: "boolean" },
         },
       },
@@ -89,6 +107,8 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 locale: { type: "string" },
                 timezone: { type: "string" },
                 phone: { type: ["string", "null"] },
+                avatarMediaId: { type: ["string", "null"] },
+                avatarUrl: { type: ["string", "null"] },
                 status: { type: "string" },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
@@ -117,10 +137,21 @@ export async function registerUserRoutes(app: FastifyInstance) {
       locale: body.locale,
       timezone: body.timezone,
       phone: body.phone,
+      avatarMediaId: body.avatarMediaId,
       completedOnboarding,
       firstOnboardedAt: completedOnboarding ? new Date() : undefined,
     });
 
-    return reply.send({ success: true, data: updated?.toJSON() });
+    let avatarUrl: string | null = null;
+    if (updated?.avatarMediaId) {
+      const media = await prisma.media.findUnique({ where: { id: updated.avatarMediaId } });
+      if (media) {
+        avatarUrl = await storage.getPresignedDownloadUrl(media.objectKey, {
+          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+        });
+      }
+    }
+
+    return reply.send({ success: true, data: { ...updated?.toJSON(), avatarMediaId: updated?.avatarMediaId ?? null, avatarUrl } });
   });
 }

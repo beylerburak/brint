@@ -17,6 +17,7 @@ export type UserProps = {
   timezone?: string;
   phone?: string | null;
   status?: string;
+  avatarMediaId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -33,6 +34,7 @@ export class UserEntity {
   public readonly timezone: string | undefined;
   public readonly phone: string | null;
   public readonly status: string | undefined;
+  public readonly avatarMediaId: string | null;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -48,6 +50,7 @@ export class UserEntity {
     this.timezone = props.timezone;
     this.phone = props.phone ?? null;
     this.status = props.status;
+    this.avatarMediaId = props.avatarMediaId ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -83,6 +86,7 @@ export class UserEntity {
     status: string;
     createdAt: Date;
     updatedAt: Date;
+    avatarMediaId: string | null;
   }): UserEntity {
     return new UserEntity({
       id: prismaUser.id,
@@ -96,6 +100,7 @@ export class UserEntity {
       timezone: prismaUser.timezone,
       phone: prismaUser.phone,
       status: prismaUser.status,
+      avatarMediaId: prismaUser.avatarMediaId,
       createdAt: prismaUser.createdAt,
       updatedAt: prismaUser.updatedAt,
     });
@@ -117,6 +122,7 @@ export class UserEntity {
       timezone: this.timezone,
       phone: this.phone,
       status: this.status,
+      avatarMediaId: this.avatarMediaId,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

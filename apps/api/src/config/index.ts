@@ -1,4 +1,5 @@
 import { env } from './env.js';
+import { storageConfig } from './storage.config.js';
 
 /**
  * Application-level configuration
@@ -78,6 +79,11 @@ export const oauthConfig = {
 export const appUrlConfig = {
   baseUrl: env.APP_URL ?? `http://localhost:${appConfig.port}`,
 } as const;
+
+/**
+ * Storage configuration (S3 + variants)
+ */
+export { storageConfig };
 
 /**
  * Email configuration (SMTP)

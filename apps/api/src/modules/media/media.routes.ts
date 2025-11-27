@@ -1,0 +1,217 @@
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { prisma } from '../../lib/prisma.js';
+import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
+import { MediaUploadService } from './application/media-upload.service.js';
+import { storageConfig } from '../../config/index.js';
+
+const storage = new S3StorageService();
+const mediaUploadService = new MediaUploadService(storage);
+
+export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
+  if (!prisma.media) {
+    app.log.error('Prisma client does not have media model (did you run prisma generate?)');
+    throw new Error('PRISMA_MEDIA_MODEL_MISSING');
+  }
+  // POST /media/presign-upload
+  app.post('/media/presign-upload', {
+    schema: {
+      tags: ['Media'],
+      body: {
+        type: 'object',
+        required: ['workspaceId', 'fileName', 'contentType', 'sizeBytes'],
+        properties: {
+          workspaceId: { type: 'string', description: 'Workspace ID or slug' },
+          brandId: { type: 'string' },
+          fileName: { type: 'string' },
+          contentType: { type: 'string' },
+          sizeBytes: { type: 'number' },
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { workspaceId: string; brandId?: string; fileName: string; contentType: string; sizeBytes: number } }>, reply: FastifyReply) => {
+    try {
+      // Look up workspace by ID or slug
+      const workspace = await prisma.workspace.findFirst({
+        where: {
+          OR: [
+            { id: request.body.workspaceId },
+            { slug: request.body.workspaceId },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!workspace) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'WORKSPACE_NOT_FOUND',
+            message: 'Workspace not found',
+          },
+        });
+      }
+
+      const presign = await storage.getPresignedUploadUrl({
+        workspaceId: workspace.id,
+        brandId: request.body.brandId,
+        fileName: request.body.fileName,
+        contentType: request.body.contentType,
+        sizeBytes: request.body.sizeBytes,
+      });
+
+      return reply.send({ success: true, data: presign });
+    } catch (error: any) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: error?.message ?? 'MEDIA_PRESIGN_ERROR',
+          message: 'Failed to create presigned upload URL',
+        },
+      });
+    }
+  });
+
+  // POST /media/finalize
+  app.post('/media/finalize', {
+    schema: {
+      tags: ['Media'],
+      body: {
+        type: 'object',
+        required: ['objectKey', 'workspaceId', 'originalName'],
+        properties: {
+          objectKey: { type: 'string' },
+          workspaceId: { type: 'string', description: 'Workspace ID or slug' },
+          brandId: { type: 'string' },
+          originalName: { type: 'string' },
+          contentType: { type: 'string' },
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { objectKey: string; workspaceId: string; brandId?: string; originalName: string; contentType?: string } }>, reply: FastifyReply) => {
+    try {
+      const { media, variants } = await mediaUploadService.finalizeUpload({
+        objectKey: request.body.objectKey,
+        workspaceId: request.body.workspaceId,
+        brandId: request.body.brandId,
+        originalName: request.body.originalName,
+        contentType: request.body.contentType,
+      });
+
+      return reply.send({ success: true, data: { media, variants } });
+    } catch (error: any) {
+      request.log.error({ 
+        error, 
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        objectKey: request.body.objectKey, 
+        workspaceId: request.body.workspaceId 
+      }, 'Media finalize failed');
+      
+      // Map specific error codes to appropriate responses
+      let code = 'MEDIA_FINALIZE_ERROR';
+      let status = 500;
+      let message = 'Failed to finalize media upload';
+      let details: any = undefined;
+
+      if (error?.message === 'MEDIA_OBJECT_NOT_FOUND') {
+        code = 'MEDIA_OBJECT_NOT_FOUND';
+        status = 404;
+        message = 'Original file not found in S3. Possible causes: 1) PUT request failed (check CORS/bucket policy), 2) Upload not completed, 3) Wrong objectKey. Check browser console for CORS errors.';
+        details = {
+          objectKey: request.body.objectKey,
+          suggestion: 'Verify S3 bucket CORS configuration allows PUT from your frontend origin, and bucket policy allows presigned URL uploads'
+        };
+      } else if (error?.message === 'WORKSPACE_NOT_FOUND') {
+        code = 'WORKSPACE_NOT_FOUND';
+        status = 404;
+        message = 'Workspace not found';
+        details = { workspaceId: request.body.workspaceId };
+      } else if (error?.message === 'BRAND_NOT_FOUND') {
+        code = 'BRAND_NOT_FOUND';
+        status = 404;
+        message = 'Brand not found';
+        details = { brandId: request.body.brandId };
+      } else if (error?.message === 'BRAND_WORKSPACE_MISMATCH') {
+        code = 'BRAND_WORKSPACE_MISMATCH';
+        status = 400;
+        message = 'Brand does not belong to the specified workspace';
+      } else if (error?.message === 'FOREIGN_KEY_CONSTRAINT_VIOLATION') {
+        code = 'FOREIGN_KEY_CONSTRAINT_VIOLATION';
+        status = 400;
+        message = 'Invalid workspace or brand reference';
+        details = error.details;
+      } else if (error?.message === 'MEDIA_OBJECT_KEY_ALREADY_EXISTS') {
+        code = 'MEDIA_OBJECT_KEY_ALREADY_EXISTS';
+        status = 409;
+        message = 'Media with this object key already exists';
+        details = error.details;
+      }
+      
+      return reply.status(status).send({
+        success: false,
+        error: {
+          code,
+          message,
+          ...(details && { details }),
+        },
+      });
+    }
+  });
+
+  // GET /media/:id
+  app.get('/media/:id', {
+    schema: {
+      tags: ['Media'],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
+        required: ['id'],
+      },
+    },
+  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const media = await prisma.media.findUnique({ where: { id: request.params.id } });
+    if (!media) {
+      return reply.status(404).send({ success: false, error: { code: 'MEDIA_NOT_FOUND', message: 'Media not found' } });
+    }
+
+    const url = await storage.getPresignedDownloadUrl(media.objectKey, {
+      expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+    });
+
+    return reply.send({ success: true, data: { media, url } });
+  });
+
+  // GET /media/:id/variants
+  app.get('/media/:id/variants', {
+    schema: {
+      tags: ['Media'],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+        },
+        required: ['id'],
+      },
+    },
+  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const media = await prisma.media.findUnique({ where: { id: request.params.id } });
+    if (!media) {
+      return reply.status(404).send({ success: false, error: { code: 'MEDIA_NOT_FOUND', message: 'Media not found' } });
+    }
+
+    const variants = media.variants as Record<string, { key: string }> | null;
+    const variantUrls: Record<string, string> = {};
+
+    if (variants) {
+      for (const [name, meta] of Object.entries(variants)) {
+        if (!meta?.key) continue;
+        variantUrls[name] = await storage.getPresignedDownloadUrl(meta.key, {
+          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+        });
+      }
+    }
+
+    return reply.send({ success: true, data: { mediaId: media.id, variants: variantUrls } });
+  });
+}

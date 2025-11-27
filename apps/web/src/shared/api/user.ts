@@ -11,6 +11,8 @@ export interface UserProfile {
   locale: string;
   timezone: string;
   phone: string | null;
+  avatarMediaId: string | null;
+  avatarUrl?: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -34,3 +36,27 @@ export async function getUserProfile(): Promise<UserProfile> {
   return response.data.data;
 }
 
+export interface UpdateUserProfileRequest {
+  name?: string | null;
+  username?: string | null;
+  locale?: string;
+  timezone?: string;
+  phone?: string | null;
+  completedOnboarding?: boolean;
+  avatarMediaId?: string | null;
+}
+
+export async function updateUserProfile(
+  payload: UpdateUserProfileRequest
+): Promise<UserProfile> {
+  const response = await httpClient.patch<{ success: boolean; data: UserProfile }>(
+    "/users/me",
+    payload
+  );
+
+  if (!response.ok) {
+    throw new Error(response.message || "Failed to update profile");
+  }
+
+  return response.data.data;
+}

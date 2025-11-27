@@ -26,7 +26,10 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().url(),
-  APP_URL: z.string().url().optional(),
+  APP_URL: z.preprocess((val) => val === '' ? undefined : val, z.string().url().optional()),
+  AWS_REGION: z.string().min(1, 'AWS_REGION is required'),
+  S3_MEDIA_BUCKET: z.string().min(1, 'S3_MEDIA_BUCKET is required'),
+  S3_PUBLIC_CDN_URL: z.preprocess((val) => val === '' ? undefined : val, z.string().url().optional()),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_SECURE: z.string().optional(),
@@ -65,6 +68,9 @@ export const env = {
   GOOGLE_OAUTH_CLIENT_SECRET: rawEnv.GOOGLE_OAUTH_CLIENT_SECRET,
   GOOGLE_OAUTH_REDIRECT_URI: rawEnv.GOOGLE_OAUTH_REDIRECT_URI,
   APP_URL: rawEnv.APP_URL,
+  AWS_REGION: rawEnv.AWS_REGION,
+  S3_MEDIA_BUCKET: rawEnv.S3_MEDIA_BUCKET,
+  S3_PUBLIC_CDN_URL: rawEnv.S3_PUBLIC_CDN_URL,
   SMTP_HOST: rawEnv.SMTP_HOST,
   SMTP_PORT: rawEnv.SMTP_PORT,
   SMTP_SECURE: rawEnv.SMTP_SECURE,
@@ -74,4 +80,3 @@ export const env = {
 } as const;
 
 export type Env = typeof env;
-

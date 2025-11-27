@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { AvatarUploadDemo } from "./avatar-upload-demo";
 
 export default async function DashboardPage({
   params,
@@ -30,6 +31,7 @@ export default async function DashboardPage({
               </p>
             </div>
             <Button>Sample Button</Button>
+            <AvatarUploadDemo workspaceSlug={workspace} />
           </div>
         </div>
       </div>

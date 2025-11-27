@@ -52,6 +52,7 @@ export class UserRepository {
     email: string;
     name?: string | null;
     username?: string | null;
+    avatarMediaId?: string | null;
   }): Promise<UserEntity> {
     try {
       const user = await prisma.user.create({
@@ -59,6 +60,7 @@ export class UserRepository {
           email: data.email,
           name: data.name ?? null,
           username: data.username ?? null,
+          avatarMediaId: data.avatarMediaId ?? null,
         },
       });
 
@@ -82,6 +84,7 @@ export class UserRepository {
     phone?: string | null;
     completedOnboarding?: boolean;
     firstOnboardedAt?: Date | null;
+    avatarMediaId?: string | null;
   }): Promise<UserEntity | null> {
     const user = await prisma.user.update({
       where: { id },
@@ -93,6 +96,7 @@ export class UserRepository {
         phone: data.phone ?? undefined,
         completedOnboarding: data.completedOnboarding ?? undefined,
         firstOnboardedAt: data.firstOnboardedAt ?? undefined,
+        avatarMediaId: data.avatarMediaId ?? undefined,
       },
     });
 

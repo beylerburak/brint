@@ -78,3 +78,22 @@ export const appUrlConfig = {
   baseUrl: env.APP_URL ?? `http://localhost:${appConfig.port}`,
 } as const;
 
+/**
+ * Email configuration (SMTP)
+ */
+export const emailConfig = {
+  smtp: {
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE === 'true' || env.SMTP_SECURE === '1',
+    auth: env.SMTP_USER && env.SMTP_PASS
+      ? {
+          user: env.SMTP_USER,
+          pass: env.SMTP_PASS,
+        }
+      : undefined,
+  },
+  from: env.SMTP_FROM ?? 'EPRU <no-reply@epru.app>',
+  enabled: !!env.SMTP_HOST,
+} as const;
+

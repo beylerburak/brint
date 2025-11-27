@@ -22,7 +22,9 @@ export interface CreateMagicLinkResult {
 
 export interface ConsumeMagicLinkResult {
   user: User;
-  workspace: Workspace;
+  workspace: Workspace | null; // null for new users (they go to onboarding) - kept for backward compatibility
+  ownerWorkspaces: Workspace[]; // Workspaces where user is owner
+  memberWorkspaces: Workspace[]; // Workspaces where user is member (not owner)
   accessToken: string;
   refreshToken: string;
   redirectTo?: string | null;
@@ -128,34 +130,27 @@ export const magicLinkService = {
       });
     }
 
-    // Find or create workspace
-    let workspace: Workspace | null = null;
-
-    // Check if user has existing workspace memberships
-    const existingMembership = await prisma.workspaceMember.findFirst({
+    // Get all workspace memberships (owner and member)
+    const allMemberships = await prisma.workspaceMember.findMany({
       where: { userId: user.id },
       include: { workspace: true },
-      orderBy: { createdAt: 'asc' },
     });
 
-    if (existingMembership) {
-      workspace = existingMembership.workspace;
-    } else {
-      // Create new workspace with owner
-      const result = await workspaceRepository.createWorkspaceWithOwner({
-        userEmail: user.email,
-        userName: user.name,
-        workspaceName: `${email}'s Workspace`,
-        workspaceSlug: `workspace-${user.id.substring(0, 8)}`,
-      });
-      // Get workspace from Prisma using the entity's id
-      workspace = await prisma.workspace.findUnique({
-        where: { id: result.workspace.id },
-      });
-      if (!workspace) {
-        throw new Error('Failed to create workspace');
-      }
-    }
+    // Sort by workspace updatedAt (most recently updated first)
+    allMemberships.sort((a, b) => 
+      b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
+    );
+
+    // Separate owner and member workspaces
+    const ownerWorkspaces = allMemberships
+      .filter((m) => m.role === 'owner')
+      .map((m) => m.workspace);
+    const memberWorkspaces = allMemberships
+      .filter((m) => m.role !== 'owner')
+      .map((m) => m.workspace);
+
+    // For backward compatibility, keep the first workspace (most recently updated)
+    const workspace = allMemberships.length > 0 ? allMemberships[0].workspace : null;
 
     // Create session
     const tid = randomUUID();
@@ -167,10 +162,15 @@ export const magicLinkService = {
     });
 
     // Generate tokens
-    const accessToken = tokenService.signAccessToken({
+    // If workspace exists, include wid in access token, otherwise omit it
+    const accessTokenPayload: { sub: string; wid?: string } = {
       sub: user.id,
-      wid: workspace.id,
-    });
+    };
+    if (workspace) {
+      accessTokenPayload.wid = workspace.id;
+    }
+
+    const accessToken = tokenService.signAccessToken(accessTokenPayload);
 
     const refreshToken = tokenService.signRefreshToken({
       sub: user.id,
@@ -180,15 +180,18 @@ export const magicLinkService = {
     logger.info(
       {
         userId: user.id,
-        workspaceId: workspace.id,
+        workspaceId: workspace?.id ?? null,
         email,
+        isNewUser: !workspace,
       },
       'Magic link consumed successfully'
     );
 
     return {
       user,
-      workspace,
+      workspace, // Can be null for new users - kept for backward compatibility
+      ownerWorkspaces,
+      memberWorkspaces,
       accessToken,
       refreshToken,
       redirectTo: payload.redirectTo,

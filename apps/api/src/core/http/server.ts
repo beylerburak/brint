@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import { logger } from '../../lib/logger.js';
 import { globalErrorHandler, notFoundHandler } from '../../lib/error-handler.js';
 import swaggerPlugin from '../../plugins/swagger.js';
@@ -8,6 +9,7 @@ import { registerHealthRoutes } from '../../modules/health/health.routes.js';
 import { registerDebugRoutes } from '../../modules/debug/debug.routes.js';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerStudioRoutes } from '../../modules/studio/studio.routes.js';
+import { appConfig } from '../../config/index.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -25,6 +27,36 @@ export async function createServer(): Promise<FastifyInstance> {
 
   // Register 404 handler
   app.setNotFoundHandler(notFoundHandler);
+
+  // Register CORS plugin (must be before other plugins)
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return cb(null, true);
+      }
+
+      // In development, allow localhost on any port
+      if (appConfig.env === 'development') {
+        const hostname = new URL(origin).hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return cb(null, true);
+        }
+      }
+
+      // In production, you would check against a whitelist
+      // For now, allow all origins in development
+      if (appConfig.env === 'development') {
+        return cb(null, true);
+      }
+
+      // Reject in production if not whitelisted
+      cb(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true, // Allow cookies to be sent
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
+  });
 
   // Register Swagger plugin BEFORE defining routes
   await app.register(swaggerPlugin);

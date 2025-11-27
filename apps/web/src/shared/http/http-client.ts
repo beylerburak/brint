@@ -1,12 +1,39 @@
 import { appConfig } from "../config";
 import type { HttpMethod, HttpResponse } from "./types";
+import { getAccessToken, setAccessToken, clearAccessToken } from "../auth/token-storage";
+import { refreshToken } from "../api/auth";
 
 interface RequestOptions extends RequestInit {
   method?: HttpMethod;
+  skipAuth?: boolean; // Skip adding Authorization header
+  skipRefresh?: boolean; // Skip automatic refresh on 401
+}
+
+// Global event emitter for auth events
+type AuthEventListener = () => void;
+const authEventListeners: Set<AuthEventListener> = new Set();
+
+export function onUnauthenticated(listener: AuthEventListener): () => void {
+  authEventListeners.add(listener);
+  return () => {
+    authEventListeners.delete(listener);
+  };
+}
+
+function emitUnauthenticated(): void {
+  authEventListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (error) {
+      console.error("Error in auth event listener:", error);
+    }
+  });
 }
 
 class HttpClient {
   private baseUrl: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.baseUrl = appConfig.apiBaseUrl;
@@ -22,13 +49,64 @@ class HttpClient {
     return `${this.baseUrl}/${cleanPath}`;
   }
 
+  private async attemptRefresh(): Promise<string | null> {
+    // If already refreshing, wait for the existing promise
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const result = await refreshToken();
+        setAccessToken(result.accessToken);
+        return result.accessToken;
+      } catch (error) {
+        // Refresh failed - clear token and emit logout event
+        clearAccessToken();
+        emitUnauthenticated();
+        return null;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
   private async request<T>(
     method: HttpMethod,
     url: string,
     body?: any,
-    options?: RequestOptions
+    options?: RequestOptions,
+    retryCount = 0
   ): Promise<HttpResponse<T>> {
     const fullUrl = this.buildUrl(url);
+    const skipAuth = options?.skipAuth ?? false;
+    const skipRefresh = options?.skipRefresh ?? false;
+    const maxRetries = 1; // Only retry once after refresh
+
+    // Get access token if not skipping auth
+    let accessToken: string | null = null;
+    if (!skipAuth) {
+      accessToken = getAccessToken();
+    }
+
+    // Build headers
+    const headers: Record<string, string> = {
+      ...(options?.headers as Record<string, string> | undefined),
+    };
+
+    // Only add Content-Type if we have a body
+    if (body !== undefined && body !== null) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    // Add Authorization header if we have a token
+    if (accessToken && !skipAuth) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
 
     // Log request
     console.log(`[HTTP] ${method} ${fullUrl}`);
@@ -36,11 +114,9 @@ class HttpClient {
     try {
       const response = await fetch(fullUrl, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-        body: body ? JSON.stringify(body) : undefined,
+        headers,
+        body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
+        credentials: "include", // Include cookies for refresh token
         ...options,
       });
 
@@ -56,6 +132,37 @@ class HttpClient {
         // For non-JSON responses, try to parse as text
         const text = await response.text();
         data = text as unknown as T;
+      }
+
+      // Handle 401 Unauthorized - attempt refresh
+      if (response.status === 401 && !skipRefresh && retryCount < maxRetries) {
+        // Don't retry refresh endpoint itself
+        if (url.includes("/auth/refresh")) {
+          clearAccessToken();
+          emitUnauthenticated();
+          return {
+            ok: false,
+            status: 401,
+            message: "Authentication failed",
+            details: data,
+          };
+        }
+
+        // Attempt to refresh token
+        const newToken = await this.attemptRefresh();
+
+        if (newToken) {
+          // Retry the original request with new token
+          return this.request<T>(method, url, body, options, retryCount + 1);
+        } else {
+          // Refresh failed
+          return {
+            ok: false,
+            status: 401,
+            message: "Authentication failed - please login again",
+            details: data,
+          };
+        }
       }
 
       if (!response.ok) {

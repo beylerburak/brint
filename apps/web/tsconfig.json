@@ -20,7 +20,10 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@/shared/*": ["./src/shared/*"]
+      "@/shared/*": ["./src/shared/*"],
+      "@/contexts/*": ["./src/contexts/*"],
+      "@/permissions": ["./src/permissions/index"],
+      "@/permissions/*": ["./src/permissions/*"]
     }
   },
   "include": [

@@ -1,8 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import { GalleryVerticalEnd } from "lucide-react"
 import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -14,6 +18,14 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { requestMagicLink } from "@/shared/api/auth"
+import { useToast } from "@/components/ui/use-toast"
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+})
+
+type LoginFormData = z.infer<typeof loginSchema>
 
 export function LoginForm({
   className,
@@ -22,10 +34,39 @@ export function LoginForm({
   const t = useTranslations("common")
   const locale = useLocale()
   const signupPath = locale === "en" ? "/signup" : `/${locale}/signup`
+  const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
+
+  const onSubmit = async (data: LoginFormData) => {
+    setIsSubmitting(true)
+    try {
+      await requestMagicLink(data.email)
+      toast({
+        title: "Magic link sent",
+        description: "Check your email for the magic link to sign in.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send magic link",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
             <a
@@ -48,11 +89,17 @@ export function LoginForm({
               id="email"
               type="email"
               placeholder="m@example.com"
-              required
+              {...register("email")}
+              aria-invalid={errors.email ? "true" : "false"}
             />
+            {errors.email && (
+              <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
+            )}
           </Field>
           <Field>
-            <Button type="submit">{t("signIn")}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Sending..." : t("signIn")}
+            </Button>
           </Field>
           <FieldSeparator>Or</FieldSeparator>
           <Field className="grid gap-4 sm:grid-cols-2">

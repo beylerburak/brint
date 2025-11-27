@@ -10,7 +10,7 @@ import { sessionService } from '../../core/auth/session.service.js';
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { magicLinkService } from './magic-link.service.js';
-import { sendMagicLinkEmailStub } from './email.stub.js';
+import { sendMagicLinkEmail } from '../../core/email/email.service.js';
 
 /**
  * Registers authentication routes
@@ -20,6 +20,7 @@ import { sendMagicLinkEmailStub } from './email.stub.js';
  * - POST /auth/logout - Logout and revoke session
  * - POST /auth/magic-link - Request magic link email
  * - GET /auth/magic-link/verify - Verify magic link token and login
+ * - GET /auth/me - Get current user and workspace information
  */
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   // GET /auth/google - Generate OAuth URL
@@ -595,14 +596,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         redirectTo: redirectTo ?? null,
       });
 
-      // Generate magic link URL
+      // Generate magic link URL (frontend domain)
+      // Note: Frontend handles locale routing, so we use the base URL
       const magicLinkUrl = `${appUrlConfig.baseUrl}/auth/magic-link/verify?token=${result.token}`;
 
-      // Send email stub
-      await sendMagicLinkEmailStub({
-        to: result.payload.email,
-        magicLinkUrl,
-      });
+      // Send email via SMTP (or log if SMTP not configured)
+      await sendMagicLinkEmail(result.payload.email, magicLinkUrl);
 
       // Return generic success (don't leak user existence)
       return reply.status(200).send({
@@ -622,6 +621,168 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(200).send({
         success: true,
         message: 'If an account exists for this email, a magic link has been sent.',
+      });
+    }
+  });
+
+  // GET /auth/me - Get current user and workspace information
+  app.get('/auth/me', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Get current user information',
+      description: 'Returns current authenticated user and their workspace memberships',
+        response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            data: {
+              type: 'object',
+              properties: {
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    name: { type: ['string', 'null'] },
+                  },
+                  required: ['id', 'email'],
+                },
+                ownerWorkspaces: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      slug: { type: 'string' },
+                      name: { type: 'string' },
+                      updatedAt: { type: 'string' },
+                    },
+                    required: ['id', 'slug', 'name', 'updatedAt'],
+                  },
+                },
+                memberWorkspaces: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      slug: { type: 'string' },
+                      name: { type: 'string' },
+                      updatedAt: { type: 'string' },
+                    },
+                    required: ['id', 'slug', 'name', 'updatedAt'],
+                  },
+                },
+              },
+              required: ['user', 'ownerWorkspaces', 'memberWorkspaces'],
+            },
+          },
+          required: ['success', 'data'],
+        },
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    // Check if user is authenticated
+    if (!request.auth || !request.auth.userId) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        },
+      });
+    }
+
+    const userId = request.auth.userId;
+
+    try {
+      // Get user
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User not found',
+          },
+        });
+      }
+
+      // Get all workspace memberships
+      const allMemberships = await prisma.workspaceMember.findMany({
+        where: { userId },
+        include: { workspace: true },
+      });
+
+      // Sort by workspace updatedAt (most recently updated first)
+      allMemberships.sort((a, b) => 
+        b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
+      );
+
+      // Separate owner and member workspaces
+      const ownerWorkspaces = allMemberships
+        .filter((m) => m.role === 'owner')
+        .map((m) => ({
+          id: m.workspace.id,
+          slug: m.workspace.slug,
+          name: m.workspace.name,
+          updatedAt: m.workspace.updatedAt.toISOString(),
+        }));
+
+      const memberWorkspaces = allMemberships
+        .filter((m) => m.role !== 'owner')
+        .map((m) => ({
+          id: m.workspace.id,
+          slug: m.workspace.slug,
+          name: m.workspace.name,
+          updatedAt: m.workspace.updatedAt.toISOString(),
+        }));
+
+      return reply.status(200).send({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          },
+          ownerWorkspaces,
+          memberWorkspaces,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          userId,
+        },
+        'Error getting user information'
+      );
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred',
+        },
       });
     }
   });
@@ -654,13 +815,39 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
               required: ['id', 'email'],
             },
             workspace: {
-              type: 'object',
+              type: ['object', 'null'],
               properties: {
                 id: { type: 'string' },
                 slug: { type: 'string' },
                 name: { type: 'string' },
               },
               required: ['id', 'slug', 'name'],
+            },
+            ownerWorkspaces: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  slug: { type: 'string' },
+                  name: { type: 'string' },
+                  updatedAt: { type: 'string' },
+                },
+                required: ['id', 'slug', 'name', 'updatedAt'],
+              },
+            },
+            memberWorkspaces: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  slug: { type: 'string' },
+                  name: { type: 'string' },
+                  updatedAt: { type: 'string' },
+                },
+                required: ['id', 'slug', 'name', 'updatedAt'],
+              },
             },
             redirectTo: { type: 'string' },
           },
@@ -724,30 +911,38 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         refreshToken: result.refreshToken,
       });
 
-      // Determine redirectTo
-      // Use payload redirectTo if it's a relative path (starts with /), otherwise use default
-      let redirectTo: string;
-      if (result.redirectTo && result.redirectTo.startsWith('/')) {
-        redirectTo = result.redirectTo;
-      } else {
-        redirectTo = `/${result.workspace.slug}/dashboard`;
-      }
-
-      // Return success response
-      return reply.status(200).send({
+      // Return success response with all workspace information
+      // Frontend will decide redirect based on workspace ownership and membership
+      const response = {
         success: true,
         user: {
           id: result.user.id,
           email: result.user.email,
           name: result.user.name,
         },
-        workspace: {
-          id: result.workspace.id,
-          slug: result.workspace.slug,
-          name: result.workspace.name,
-        },
-        redirectTo,
-      });
+        workspace: result.workspace
+          ? {
+              id: result.workspace.id,
+              slug: result.workspace.slug,
+              name: result.workspace.name,
+            }
+          : null,
+        ownerWorkspaces: result.ownerWorkspaces.map((w) => ({
+          id: w.id,
+          slug: w.slug,
+          name: w.name,
+          updatedAt: w.updatedAt.toISOString(),
+        })),
+        memberWorkspaces: result.memberWorkspaces.map((w) => ({
+          id: w.id,
+          slug: w.slug,
+          name: w.name,
+          updatedAt: w.updatedAt.toISOString(),
+        })),
+        redirectTo: result.redirectTo ?? null,
+      };
+
+      return reply.status(200).send(response);
     } catch (error: any) {
       // Handle MagicLinkError
       if (error?.name === 'MagicLinkError' || error?.message?.includes('Magic link')) {

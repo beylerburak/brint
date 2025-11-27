@@ -22,11 +22,12 @@ export interface EffectivePermissionsResult {
 
 /**
  * Maps WorkspaceMember.role values to Role.key values
- * Based on seed scenario: 'owner' -> 'workspace-owner', 'content-manager' -> 'content-manager'
+ * Based on seed scenario: OWNER -> workspace-owner, ADMIN -> workspace-admin, MEMBER -> workspace-member
  */
 const MEMBER_ROLE_TO_ROLE_KEY = {
-  owner: 'workspace-owner',
-  'content-manager': 'content-manager',
+  OWNER: 'workspace-owner',
+  ADMIN: 'workspace-admin',
+  MEMBER: 'workspace-member',
 } as const;
 
 type MemberRole = keyof typeof MEMBER_ROLE_TO_ROLE_KEY;
@@ -166,4 +167,3 @@ export const permissionService = {
   getEffectivePermissionsForUserWorkspace,
   hasPermission,
 };
-

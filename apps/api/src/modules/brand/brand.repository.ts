@@ -15,6 +15,8 @@ export interface CreateBrandInput {
   name: string;
   slug: string;
   description?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
 }
 
 export class BrandRepository {
@@ -87,6 +89,7 @@ export class BrandRepository {
       slug: input.slug,
       description: input.description,
       isActive: true,
+      createdBy: input.createdBy ?? null,
     });
 
     try {
@@ -120,4 +123,3 @@ export class BrandRepository {
 
 // Export singleton instance
 export const brandRepository = new BrandRepository();
-

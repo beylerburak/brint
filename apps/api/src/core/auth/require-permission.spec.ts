@@ -100,61 +100,61 @@ async function main() {
     console.log('   ✅ Body: success: true');
     console.log('   ✅ Message correct\n');
 
-    // 6. Create content-manager user for forbidden test
-    console.log('📋 Test 2: Forbidden case - Content manager accessing /debug/protected');
+    // 6. Create workspace-admin user for forbidden test
+    console.log('📋 Test 2: Forbidden case - Workspace admin accessing /debug/protected');
     
     // Create test user
     const testUser = await prisma.user.create({
       data: {
-        email: 'test-content-manager@example.com',
-        name: 'Test Content Manager',
+        email: 'test-workspace-admin@example.com',
+        name: 'Test Workspace Admin',
       },
     });
     testUserId = testUser.id;
 
-    // Create WorkspaceMember with content-manager role
+    // Create WorkspaceMember with ADMIN role
     const testMember = await prisma.workspaceMember.create({
       data: {
         userId: testUser.id,
         workspaceId: demoWorkspace.id,
-        role: 'content-manager',
+        role: 'ADMIN',
       },
     });
     testWorkspaceMemberId = testMember.id;
 
     console.log(`   ✅ Created test user: ${testUser.email}`);
-    console.log(`   ✅ Created workspace member with role: content-manager`);
+    console.log(`   ✅ Created workspace member with role: ADMIN`);
 
-    // Verify content-manager does NOT have workspace:settings.view
-    const contentManagerHasPermission = await permissionService.hasPermission({
+    // Verify admin does NOT have workspace:settings.view
+    const adminHasPermission = await permissionService.hasPermission({
       userId: testUser.id,
       workspaceId: demoWorkspace.id,
       permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
     });
 
-    if (contentManagerHasPermission) {
+    if (adminHasPermission) {
       throw new Error(
-        'Content manager should NOT have workspace:settings.view permission'
+        'Workspace admin should NOT have workspace:settings.view permission'
       );
     }
 
-    console.log('   ✅ Verified: Content manager does NOT have workspace:settings.view\n');
+    console.log('   ✅ Verified: Workspace admin does NOT have workspace:settings.view\n');
 
-    // 7. Generate access token for content-manager
-    console.log('📋 Generating access token for content-manager...');
-    const contentManagerToken = tokenService.signAccessToken({
+    // 7. Generate access token for workspace-admin
+    console.log('📋 Generating access token for workspace-admin...');
+    const adminToken = tokenService.signAccessToken({
       sub: testUser.id,
       wid: demoWorkspace.id,
     });
-    console.log('   ✅ Content manager token generated\n');
+    console.log('   ✅ Workspace admin token generated\n');
 
-    // 8. Test forbidden case: Content manager accessing /debug/protected
-    console.log('📋 Test 2 (continued): Forbidden case - Content manager accessing /debug/protected');
+    // 8. Test forbidden case: Workspace admin accessing /debug/protected
+    console.log('📋 Test 2 (continued): Forbidden case - Workspace admin accessing /debug/protected');
     const forbiddenResponse = await app.inject({
       method: 'GET',
       url: '/debug/protected',
       headers: {
-        Authorization: `Bearer ${contentManagerToken}`,
+        Authorization: `Bearer ${adminToken}`,
         'X-Workspace-Id': demoWorkspace.id,
       },
     });
@@ -293,4 +293,3 @@ main().catch((error) => {
   console.error('❌ Test script failed:', error);
   process.exit(1);
 });
-

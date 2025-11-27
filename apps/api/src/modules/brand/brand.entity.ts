@@ -30,6 +30,8 @@ export type BrandProps = {
   slug: string;
   description?: string | null;
   isActive: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -41,6 +43,8 @@ export class BrandEntity {
   public readonly slug: string;
   public readonly description: string | null;
   public readonly isActive: boolean;
+  public readonly createdBy: string | null;
+  public readonly updatedBy: string | null;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -51,6 +55,8 @@ export class BrandEntity {
     this.slug = props.slug;
     this.description = props.description ?? null;
     this.isActive = props.isActive;
+    this.createdBy = props.createdBy ?? null;
+    this.updatedBy = props.updatedBy ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -65,6 +71,7 @@ export class BrandEntity {
     slug: string;
     description?: string | null;
     isActive?: boolean;
+    createdBy?: string | null;
   }): BrandEntity {
     // Name validation: non-empty and trimmed
     const trimmedName = props.name.trim();
@@ -93,6 +100,8 @@ export class BrandEntity {
       slug: normalizedSlug,
       description: props.description ?? null,
       isActive: props.isActive ?? true,
+      createdBy: props.createdBy ?? null,
+      updatedBy: props.createdBy ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -108,6 +117,8 @@ export class BrandEntity {
     slug: string;
     description: string | null;
     isActive: boolean;
+    createdBy: string | null;
+    updatedBy: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): BrandEntity {
@@ -118,6 +129,8 @@ export class BrandEntity {
       slug: prismaBrand.slug,
       description: prismaBrand.description,
       isActive: prismaBrand.isActive,
+      createdBy: prismaBrand.createdBy,
+      updatedBy: prismaBrand.updatedBy,
       createdAt: prismaBrand.createdAt,
       updatedAt: prismaBrand.updatedAt,
     });
@@ -132,6 +145,8 @@ export class BrandEntity {
     slug: string;
     description?: string | null;
     isActive: boolean;
+    createdBy?: string | null;
+    updatedBy?: string | null;
   } {
     return {
       workspaceId: this.workspaceId,
@@ -139,6 +154,8 @@ export class BrandEntity {
       slug: this.slug,
       description: this.description,
       isActive: this.isActive,
+      createdBy: this.createdBy ?? undefined,
+      updatedBy: this.updatedBy ?? undefined,
     };
   }
 
@@ -153,9 +170,10 @@ export class BrandEntity {
       slug: this.slug,
       description: this.description,
       isActive: this.isActive,
+      createdBy: this.createdBy,
+      updatedBy: this.updatedBy,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
   }
 }
-

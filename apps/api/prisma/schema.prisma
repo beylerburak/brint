@@ -13,10 +13,17 @@ generator client {
 model User {
   id            String            @id @default(cuid())
   email         String            @unique
+  username      String?           @unique
   name          String?
   emailVerified DateTime?
-  avatarUrl     String?
   googleId      String?           @unique
+  firstOnboardedAt DateTime?
+  completedOnboarding Boolean     @default(false)
+  lastLoginAt   DateTime?
+  locale        String            @default("en")
+  timezone      String            @default("UTC")
+  phone         String?
+  status        String            @default("active")
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   workspaceMembers WorkspaceMember[]
@@ -29,11 +36,14 @@ model Workspace {
   id        String            @id @default(cuid())
   name      String
   slug      String            @unique
+  isActive  Boolean           @default(true)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
   roles     Role[]
   brands    Brand[]
+  subscription Subscription? @relation("WorkspaceSubscription")
+  invites   WorkspaceInvite[]
 
   @@map("workspaces")
 }
@@ -42,7 +52,11 @@ model WorkspaceMember {
   id          String   @id @default(cuid())
   userId      String
   workspaceId String
-  role        String   // ileride enum'a çevrilebilir: 'owner' | 'admin' | 'member' vb.
+  role        WorkspaceRole @default(MEMBER)
+  invitedBy   String?
+  invitedAt   DateTime?
+  joinedAt    DateTime?
+  status      String   @default("active")
   createdAt   DateTime @default(now())
   user      User      @relation(fields: [userId], references: [id])
   workspace Workspace @relation(fields: [workspaceId], references: [id])
@@ -57,6 +71,8 @@ model Role {
   key          String   // örn: "workspace-owner", "content-manager"
   name         String
   description  String?
+  builtIn      Boolean  @default(false)
+  order        Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
@@ -97,6 +113,8 @@ model Session {
   userAgent    String?
   ipAddress    String?
   lastActiveAt DateTime @default(now())
+  refreshTokenHash String?
+  revokedAt    DateTime?
   createdAt    DateTime @default(now())
 
   @@map("sessions")
@@ -110,11 +128,67 @@ model Brand {
   slug        String
   description String?
   isActive    Boolean   @default(true)
+  createdBy   String?
+  updatedBy   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("brands")
   @@unique([workspaceId, slug])
+  @@index([workspaceId, updatedAt])
 }
 
+model Subscription {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  plan        SubscriptionPlan   @default(FREE)
+  status      SubscriptionStatus @default(ACTIVE)
+  periodStart DateTime?
+  periodEnd   DateTime?
+  cancelAt    DateTime?
+
+  workspace   Workspace @relation("WorkspaceSubscription", fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkspaceInvite {
+  id           String   @id @default(cuid())
+  email        String
+  workspaceId  String
+  invitedBy    String
+  token        String @unique
+  status       InviteStatus @default(PENDING)
+  expiresAt    DateTime
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}

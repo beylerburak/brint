@@ -24,6 +24,7 @@
   "dashboard": "Dashboard",
   "team": "Team",
   "workspaceSlug": "Workspace slug",
-  "sampleButton": "Sample Button"
+  "sampleButton": "Sample Button",
+  "logOut": "Log out"
 }
 

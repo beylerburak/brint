@@ -117,7 +117,7 @@ export class WorkspaceRepository {
         data: {
           userId: user.id,
           workspaceId: workspace.id,
-          role: 'owner',
+          role: 'OWNER',
         },
       });
 
@@ -139,4 +139,3 @@ export class WorkspaceRepository {
 
 // Export singleton instance
 export const workspaceRepository = new WorkspaceRepository();
-

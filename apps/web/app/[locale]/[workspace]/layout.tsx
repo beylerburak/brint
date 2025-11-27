@@ -1,3 +1,7 @@
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { WorkspaceHeader } from "@/components/workspace-header";
+
 export default async function WorkspaceLayout({
   children,
   params,
@@ -8,14 +12,15 @@ export default async function WorkspaceLayout({
   const { workspace } = await params;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="p-4 border-b">
-        <p className="text-sm text-muted-foreground">
-          Workspace: <span className="font-semibold">{workspace}</span>
-        </p>
-      </div>
-      {children}
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <WorkspaceHeader workspace={workspace} />
+        <div className="flex flex-1 flex-col">
+          {children}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

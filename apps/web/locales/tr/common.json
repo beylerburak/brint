@@ -24,5 +24,6 @@
   "dashboard": "Dashboard",
   "team": "Takım",
   "workspaceSlug": "Çalışma alanı slug",
-  "sampleButton": "Örnek Buton"
+  "sampleButton": "Örnek Buton",
+  "logOut": "Çıkış Yap"
 }

@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function TeamPage({
   params,
@@ -9,17 +8,14 @@ export default async function TeamPage({
   const { workspace } = await params;
 
   return (
-    <div className="p-8">
-      <div className="absolute top-8 right-8">
-        <ThemeToggle />
-      </div>
-      <div className="flex flex-col gap-6">
-        <h1 className="text-3xl font-semibold">Team</h1>
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold">Team</h1>
         <p className="text-muted-foreground">
           Workspace slug: <span className="font-semibold">{workspace}</span>
         </p>
-        <Button>Sample Button</Button>
       </div>
+      <Button>Sample Button</Button>
     </div>
   );
 }

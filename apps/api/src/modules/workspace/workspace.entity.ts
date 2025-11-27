@@ -9,6 +9,7 @@ export type WorkspaceProps = {
   id: string;
   name: string;
   slug: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -17,6 +18,7 @@ export class WorkspaceEntity {
   public readonly id: string;
   public readonly name: string;
   public readonly slug: string;
+  public readonly isActive: boolean;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -24,6 +26,7 @@ export class WorkspaceEntity {
     this.id = props.id;
     this.name = props.name;
     this.slug = props.slug;
+    this.isActive = props.isActive;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -56,6 +59,7 @@ export class WorkspaceEntity {
     id: string;
     name: string;
     slug: string;
+    isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
   }): WorkspaceEntity {
@@ -63,6 +67,7 @@ export class WorkspaceEntity {
       id: prismaWorkspace.id,
       name: prismaWorkspace.name,
       slug: prismaWorkspace.slug,
+      isActive: prismaWorkspace.isActive,
       createdAt: prismaWorkspace.createdAt,
       updatedAt: prismaWorkspace.updatedAt,
     });
@@ -76,9 +81,9 @@ export class WorkspaceEntity {
       id: this.id,
       name: this.name,
       slug: this.slug,
+      isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
   }
 }
-

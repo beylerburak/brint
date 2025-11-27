@@ -10,8 +10,11 @@ export default function DebugBrandPage() {
   const { brand } = useBrand();
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
-      <h1 style={{ marginBottom: "2rem" }}>Brand Context Debug</h1>
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold">Brand Context Debug</h1>
+      </div>
+      <div className="max-w-[800px]">
 
       <div style={{ marginBottom: "2rem" }}>
         <h2 style={{ marginBottom: "1rem" }}>Auth State</h2>
@@ -72,6 +75,7 @@ export default function DebugBrandPage() {
             2
           )}
         </pre>
+      </div>
       </div>
     </div>
   );

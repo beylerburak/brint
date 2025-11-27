@@ -40,7 +40,7 @@ async function main() {
     create: {
       userId: user.id,
       workspaceId: workspace.id,
-      role: 'owner',
+      role: 'OWNER',
     },
   });
   console.log('✅ WorkspaceMember created');
@@ -91,23 +91,23 @@ async function main() {
   });
   console.log('✅ Role: workspace-owner');
 
-  // content-manager role (limited permissions)
-  const contentManagerRole = await prisma.role.upsert({
+  // workspace-admin role (limited permissions)
+  const adminRole = await prisma.role.upsert({
     where: {
       workspaceId_key: {
         workspaceId: workspace.id,
-        key: 'content-manager',
+        key: 'workspace-admin',
       },
     },
     update: {},
     create: {
       workspaceId: workspace.id,
-      key: 'content-manager',
-      name: 'Content Manager',
+      key: 'workspace-admin',
+      name: 'Workspace Admin',
       description: 'Can manage content and view brands',
     },
   });
-  console.log('✅ Role: content-manager');
+  console.log('✅ Role: workspace-admin');
 
   // 6. RolePermission
   // workspace-owner → all permissions
@@ -128,32 +128,32 @@ async function main() {
   }
   console.log(`✅ workspace-owner → ${permissions.length} permissions`);
 
-  // content-manager → only: studio:brand.view, studio:content.create, studio:content.publish
-  const contentManagerPermissionKeys = new Set([
+  // workspace-admin → only: studio:brand.view, studio:content.create, studio:content.publish
+  const adminPermissionKeys = new Set([
     PERMISSIONS.STUDIO_BRAND_VIEW,
     PERMISSIONS.STUDIO_CONTENT_CREATE,
     PERMISSIONS.STUDIO_CONTENT_PUBLISH,
   ]);
-  const contentManagerPermissions = permissions.filter((p) =>
-    contentManagerPermissionKeys.has(p.key)
+  const adminPermissions = permissions.filter((p) =>
+    adminPermissionKeys.has(p.key)
   );
 
-  for (const permission of contentManagerPermissions) {
+  for (const permission of adminPermissions) {
     await prisma.rolePermission.upsert({
       where: {
         roleId_permissionId: {
-          roleId: contentManagerRole.id,
+          roleId: adminRole.id,
           permissionId: permission.id,
         },
       },
       update: {},
       create: {
-        roleId: contentManagerRole.id,
+        roleId: adminRole.id,
         permissionId: permission.id,
       },
     });
   }
-  console.log(`✅ content-manager → ${contentManagerPermissions.length} permissions`);
+  console.log(`✅ workspace-admin → ${adminPermissions.length} permissions`);
 
   console.log('🎉 Seed completed successfully!');
 }
@@ -166,4 +166,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

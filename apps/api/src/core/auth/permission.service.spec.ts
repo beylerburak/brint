@@ -87,76 +87,76 @@ async function main() {
 
     console.log('   ✅ Unknown user has 0 permissions\n');
 
-    // Test 3: Create content-manager member and test
-    console.log('📋 Test 3: Content-manager member → limited permissions');
+    // Test 3: Create workspace-admin member and test
+    console.log('📋 Test 3: Workspace-admin member → limited permissions');
     
     // Create test user
     const testUser = await prisma.user.create({
       data: {
-        email: 'content-manager@example.com',
-        name: 'Test Content Manager',
+        email: 'workspace-admin@example.com',
+        name: 'Test Workspace Admin',
       },
     });
     testUserId = testUser.id;
 
-    // Create WorkspaceMember with content-manager role
+    // Create WorkspaceMember with admin role
     const testMember = await prisma.workspaceMember.create({
       data: {
         userId: testUser.id,
         workspaceId: demoWorkspace.id,
-        role: 'content-manager',
+        role: 'ADMIN',
       },
     });
     testWorkspaceMemberId = testMember.id;
 
     console.log(`   ✅ Created test user: ${testUser.email}`);
-    console.log(`   ✅ Created workspace member with role: content-manager\n`);
+    console.log(`   ✅ Created workspace member with role: ADMIN\n`);
 
-    // Get permissions for content-manager
-    const contentManagerPermissions = await permissionService.getEffectivePermissionsForUserWorkspace({
+    // Get permissions for admin
+    const adminPermissions = await permissionService.getEffectivePermissionsForUserWorkspace({
       userId: testUser.id,
       workspaceId: demoWorkspace.id,
     });
 
-    // Expected permissions for content-manager (from seed)
-    const expectedContentManagerPermissions = new Set([
+    // Expected permissions for admin (from seed)
+    const expectedAdminPermissions = new Set([
       PERMISSIONS.STUDIO_BRAND_VIEW,
       PERMISSIONS.STUDIO_CONTENT_CREATE,
       PERMISSIONS.STUDIO_CONTENT_PUBLISH,
     ]);
 
-    const actualContentManagerPermissions = new Set(contentManagerPermissions.permissions);
+    const actualAdminPermissions = new Set(adminPermissions.permissions);
 
     // Check that all expected permissions are present
-    for (const expectedPerm of expectedContentManagerPermissions) {
-      if (!actualContentManagerPermissions.has(expectedPerm)) {
+    for (const expectedPerm of expectedAdminPermissions) {
+      if (!actualAdminPermissions.has(expectedPerm)) {
         throw new Error(
-          `Content manager should have ${expectedPerm}, but it's missing`
+          `Workspace admin should have ${expectedPerm}, but it's missing`
         );
       }
     }
 
-    // Check that content-manager has fewer permissions than owner
-    if (contentManagerPermissions.permissions.length >= ownerPermissions.permissions.length) {
+    // Check that admin has fewer permissions than owner
+    if (adminPermissions.permissions.length >= ownerPermissions.permissions.length) {
       throw new Error(
-        `Content manager should have fewer permissions than owner, but has ${contentManagerPermissions.permissions.length} (owner has ${ownerPermissions.permissions.length})`
+        `Workspace admin should have fewer permissions than owner, but has ${adminPermissions.permissions.length} (owner has ${ownerPermissions.permissions.length})`
       );
     }
 
-    // Check that content-manager does NOT have workspace permissions
-    if (actualContentManagerPermissions.has(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)) {
+    // Check that admin does NOT have workspace permissions
+    if (actualAdminPermissions.has(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)) {
       throw new Error(
-        'Content manager should NOT have workspace:settings.view permission'
+        'Workspace admin should NOT have workspace:settings.view permission'
       );
     }
 
-    if (actualContentManagerPermissions.has(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)) {
+    if (actualAdminPermissions.has(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)) {
       throw new Error(
-        'Content manager should NOT have workspace:members.manage permission'
+        'Workspace admin should NOT have workspace:members.manage permission'
       );
     }
 
-    console.log(`   ✅ Content manager has ${contentManagerPermissions.permissions.length} permissions`);
+    console.log(`   ✅ Workspace admin has ${adminPermissions.permissions.length} permissions`);
     console.log(`   ✅ All expected permissions present`);
     console.log(`   ✅ Has fewer permissions than owner\n`);
 
@@ -245,4 +245,3 @@ main().catch((error) => {
   console.error('❌ Test script failed:', error);
   process.exit(1);
 });
-

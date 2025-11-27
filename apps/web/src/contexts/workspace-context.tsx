@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { locales, defaultLocale } from "@/lib/i18n/locales";
 
 export type Workspace = {
   id: string;
@@ -59,25 +60,30 @@ function deriveWorkspace(paramSlug?: string, pathname?: string | null): Workspac
   if (!pathname) return null;
 
   const segments = pathname.split("/").filter(Boolean);
-  if (segments.length >= 2) {
-    const workspaceSlug = segments[1];
-    const reservedRoutes = [
-      "login",
-      "signup",
-      "sign-up",
-      "debug-context",
-      "config-debug",
-      "http-debug",
-      "onboarding",
-      "invites",
-      "auth",
-    ];
-    if (!reservedRoutes.includes(workspaceSlug)) {
-      return { id: workspaceSlug, slug: workspaceSlug };
-    }
-  }
+  if (segments.length === 0) return null;
 
-  return null;
+  const reservedRoutes = [
+    "login",
+    "signup",
+    "sign-up",
+    "debug-context",
+    "config-debug",
+    "http-debug",
+    "onboarding",
+    "invites",
+    "auth",
+  ];
+
+  // Determine locale prefix
+  const first = segments[0];
+  const firstIsLocale = (locales as readonly string[]).includes(first);
+
+  const workspaceSlug = firstIsLocale ? segments[1] : first;
+
+  if (!workspaceSlug) return null;
+  if (reservedRoutes.includes(workspaceSlug)) return null;
+
+  return { id: workspaceSlug, slug: workspaceSlug };
 }
 
 export function useWorkspace() {

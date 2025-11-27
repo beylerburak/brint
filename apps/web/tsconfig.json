@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/*": ["./*"],
+      "@/app-config/*": ["./src/app-config/*"],
       "@/shared/*": ["./src/shared/*"],
       "@/contexts/*": ["./src/contexts/*"],
       "@/permissions": ["./src/permissions/index"],

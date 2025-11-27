@@ -78,3 +78,5 @@ docker-compose.override.yml
 .vercel
 .netlify
 .cursorrules
+.taskrules
+docs

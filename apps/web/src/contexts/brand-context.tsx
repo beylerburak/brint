@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { locales } from "@/lib/i18n/locales";
 
 export type Brand = {
   id: string;
@@ -38,18 +39,23 @@ export function BrandProvider({
     }
 
     // Otherwise, extract from pathname
-    // Pathname format: /[locale]/[workspace]/studio/[brand]/... or /[locale]/[workspace]/studio
+    // Pathname format: /[locale]/[workspace]/studio/[brand]/... or /[workspace]/studio/...
     if (pathname) {
       const segments = pathname.split("/").filter(Boolean);
-      // segments[0] = locale, segments[1] = workspace, segments[2] = studio
-      // segments[3] = brand (if exists in nested route)
-      if (segments.length >= 4 && segments[2] === "studio") {
-        const brandSlug = segments[3];
-        setBrandState({
-          id: brandSlug,
-          slug: brandSlug,
-        });
-        return;
+      if (segments.length >= 3) {
+        const first = segments[0];
+        const firstIsLocale = (locales as readonly string[]).includes(first);
+        const studioIndex = firstIsLocale ? 2 : 1;
+        const brandIndex = studioIndex + 1;
+
+        if (segments[studioIndex] === "studio" && segments.length > brandIndex) {
+          const brandSlug = segments[brandIndex];
+          setBrandState({
+            id: brandSlug,
+            slug: brandSlug,
+          });
+          return;
+        }
       }
     }
 
@@ -76,4 +82,3 @@ export function useBrand() {
   }
   return context;
 }
-

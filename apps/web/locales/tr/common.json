@@ -21,9 +21,12 @@
   "orContinueWith": "Veya devam et",
   "signupWithGitHub": "GitHub ile kayıt ol",
   "alreadyHaveAccount": "Zaten hesabınız var mı?",
-  "dashboard": "Dashboard",
+  "dashboard": "Kontrol Paneli",
   "team": "Takım",
   "workspaceSlug": "Çalışma alanı slug",
   "sampleButton": "Örnek Buton",
-  "logOut": "Çıkış Yap"
+  "logOut": "Çıkış Yap",
+  "spaces": "Alanlar",
+  "addSpace": "Alan ekle",
+  "menu": "Menü"
 }

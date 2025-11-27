@@ -25,6 +25,8 @@
   "team": "Team",
   "workspaceSlug": "Workspace slug",
   "sampleButton": "Sample Button",
-  "logOut": "Log out"
+  "logOut": "Log out",
+  "spaces": "Spaces",
+  "addSpace": "Add space",
+  "menu": "Menu"
 }
-

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useLocale } from "next-intl";
 
 import { sidebarNavigation, type NavigationContext } from "@/features/workspace/navigation/navigation";
@@ -128,10 +129,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             {items.map((item) => (
               <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton asChild tooltip={item.label[locale as "en" | "tr"] ?? item.label.en}>
-                  <a href={item.href(navCtx)}>
+                  <Link href={item.href(navCtx)}>
                     <item.icon />
                     <span>{item.label[locale as "en" | "tr"] ?? item.label.en}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
@@ -143,10 +144,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {secondaryItems.map((item) => (
             <SidebarMenuItem key={item.id}>
               <SidebarMenuButton asChild>
-                <a href={item.href}>
+                <Link href={item.href}>
                   <item.icon />
                   <span>{item.label}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

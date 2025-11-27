@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/components/ui/use-toast";
+import { routeResolver } from "@/shared/routing/route-resolver";
 
 export default function MagicLinkVerifyPage() {
   const searchParams = useSearchParams();
@@ -43,69 +44,22 @@ export default function MagicLinkVerifyPage() {
         const result = await verifyMagicLinkToken(token);
         
         if (cancelled) return;
-        
-        const localePrefix = locale === "en" ? "" : `/${locale}`;
-        let redirectPath: string;
-
         const verifyData = result.verifyData;
         console.log("[Magic Link Verify] Result:", result);
         console.log("[Magic Link Verify] VerifyData:", verifyData);
-        
-        if (!verifyData) {
-          // Fallback to old logic if verifyData not available
-          redirectPath = result.workspaces.length > 0
-            ? `${localePrefix}/${result.workspaces[0].slug}/dashboard`
-            : `${localePrefix}/onboarding`;
-          console.log("[Magic Link Verify] No verifyData, redirecting to:", redirectPath);
-          router.replace(redirectPath);
-          setStatus("success");
-          return;
-        }
 
-        const { ownerWorkspaces, memberWorkspaces, workspace } = verifyData;
-        console.log("[Magic Link Verify] Owner workspaces:", ownerWorkspaces);
-        console.log("[Magic Link Verify] Member workspaces:", memberWorkspaces);
-
-        // Rule 1 & 2: İlk defa geldiyse veya workspace'i yoksa -> /onboarding
-        if (ownerWorkspaces.length === 0 && memberWorkspaces.length === 0) {
-          // Rule 3: Workspace'i yok ama invite edildiyse ve daha katılmadıysa -> /invites
-          // TODO: Check for pending invites (will be implemented later)
-          // For now, go to onboarding
-          redirectPath = `${localePrefix}/onboarding`;
-          console.log("[Magic Link Verify] No workspaces, redirecting to onboarding");
-        }
-        // Rule 4-7: Workspace selection logic
-        else {
-          // Combine all workspaces (owner + member), sorted by updatedAt (most recent first)
-          const allWorkspaces = [
-            ...ownerWorkspaces.map((w) => ({ ...w, isOwner: true })),
-            ...memberWorkspaces.map((w) => ({ ...w, isOwner: false })),
-          ].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-
-          if (allWorkspaces.length > 0) {
-            // Use the most recently updated workspace (Rule 4, 5, 6, 7)
-            const targetWorkspace = allWorkspaces[0];
-            redirectPath = `${localePrefix}/${targetWorkspace.slug}/dashboard`;
-            console.log("[Magic Link Verify] Redirecting to workspace:", targetWorkspace.slug);
-          } else {
-            // Fallback to onboarding
-            redirectPath = `${localePrefix}/onboarding`;
-            console.log("[Magic Link Verify] Fallback to onboarding");
-          }
-        }
+        const redirectPath = routeResolver({
+          locale,
+          hasToken: true,
+          ownerWorkspaces: verifyData?.ownerWorkspaces ?? result.workspaces,
+          memberWorkspaces: verifyData?.memberWorkspaces ?? [],
+          invites: verifyData?.invites ?? [],
+          currentPath: searchParams.toString() ? `/auth/magic-link/verify?${searchParams.toString()}` : "/auth/magic-link/verify",
+          fallbackWorkspaceSlug: verifyData?.workspace?.slug ?? result.workspaces?.[0]?.slug,
+        });
 
         console.log("[Magic Link Verify] Final redirect path:", redirectPath);
-        
-        // Use window.location for immediate redirect (more reliable than router)
-        if (redirectPath) {
-          window.location.href = redirectPath;
-          return; // Don't set status, let redirect happen
-        }
-        
-        // Fallback to router if no path
-        router.replace(redirectPath || `${localePrefix}/login`);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        setStatus("success");
+        window.location.href = redirectPath;
       } catch (error) {
         if (cancelled) return;
         
@@ -162,4 +116,3 @@ export default function MagicLinkVerifyPage() {
     </div>
   );
 }
-

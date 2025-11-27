@@ -36,6 +36,7 @@ export interface MagicLinkVerifyResult {
   ownerWorkspaces: Array<Workspace & { updatedAt: string }>;
   memberWorkspaces: Array<Workspace & { updatedAt: string }>;
   redirectTo: string | null;
+  invites?: Array<{ id: string; updatedAt?: string | null }>;
 }
 
 /**
@@ -140,6 +141,7 @@ export async function getCurrentSession(): Promise<{
   user: AuthUser;
   ownerWorkspaces: Array<Workspace & { updatedAt: string }>;
   memberWorkspaces: Array<Workspace & { updatedAt: string }>;
+  invites?: Array<{ id: string; updatedAt?: string | null }>;
 } | null> {
   try {
     const response = await httpClient.get<{
@@ -148,6 +150,7 @@ export async function getCurrentSession(): Promise<{
         user: { id: string; email: string; name?: string | null };
         ownerWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
         memberWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
+        invites?: Array<{ id: string; updatedAt?: string | null }>;
       };
     }>("/auth/me");
 
@@ -163,10 +166,10 @@ export async function getCurrentSession(): Promise<{
       },
       ownerWorkspaces: response.data.data.ownerWorkspaces,
       memberWorkspaces: response.data.data.memberWorkspaces,
+      invites: response.data.data.invites,
     };
   } catch (error) {
     console.error("Error getting current session:", error);
     return null;
   }
 }
-

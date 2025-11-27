@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { verifyMagicLink, logout as logoutApi } from "@/shared/api/auth";
+import { verifyMagicLink, logout as logoutApi, getCurrentSession } from "@/shared/api/auth";
 import { setAccessToken, clearAccessToken, getAccessToken } from "@/shared/auth/token-storage";
 import { onUnauthenticated } from "@/shared/http";
 import type { LoginResult } from "@/shared/api/auth";
@@ -48,9 +48,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check if we have a token and try to restore session
-      // For now, we'll just use the stored user
-      // TODO: Call getCurrentSession() when backend endpoint is available
-      getAccessToken();
+      const token = getAccessToken();
+      if (token) {
+        try {
+          const session = await getCurrentSession();
+          if (session) {
+            setUser(session.user);
+          }
+        } catch (error) {
+          console.error("Error restoring session:", error);
+          clearAccessToken();
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+      }
 
       setLoading(false);
     };
@@ -120,4 +130,3 @@ export function useAuth() {
   }
   return context;
 }
-

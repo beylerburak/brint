@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
 import { getCurrentSession } from "@/shared/api/auth";
+import { getAccessToken } from "@/shared/auth/token-storage";
+import { routeResolver } from "@/shared/routing/route-resolver";
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,37 +17,21 @@ export default function HomePage() {
   useEffect(() => {
     const redirect = async () => {
       const localePrefix = locale === "en" ? "" : `/${locale}`;
-
-      if (!isAuthenticated) {
-        // Not authenticated - redirect to login
-        router.replace(`${localePrefix}/login`);
-        return;
-      }
+      const hasToken = isAuthenticated || !!getAccessToken();
 
       try {
         // Get user workspaces
         const session = await getCurrentSession();
-        
-        if (session) {
-          const { ownerWorkspaces, memberWorkspaces } = session;
-          const allWorkspaces = [...ownerWorkspaces, ...memberWorkspaces].sort(
-            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-          );
-
-          if (allWorkspaces.length > 0) {
-            // User has workspaces - redirect to most recent one
-            const targetWorkspace = allWorkspaces[0];
-            router.replace(`${localePrefix}/${targetWorkspace.slug}/dashboard`);
-            return;
-          } else {
-            // No workspaces - redirect to onboarding
-            router.replace(`${localePrefix}/onboarding`);
-            return;
-          }
-        } else {
-          // Could not get session - redirect to login
-          router.replace(`${localePrefix}/login`);
-        }
+        const redirectPath = routeResolver({
+          locale,
+          hasToken,
+          ownerWorkspaces: session?.ownerWorkspaces,
+          memberWorkspaces: session?.memberWorkspaces,
+          invites: session?.invites,
+          currentPath: "/",
+          fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
+        });
+        router.replace(redirectPath);
       } catch (error) {
         console.error("Error getting session:", error);
         router.replace(`${localePrefix}/login`);
@@ -69,4 +55,3 @@ export default function HomePage() {
 
   return null;
 }
-

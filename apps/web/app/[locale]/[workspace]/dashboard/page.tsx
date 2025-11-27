@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LogoutButton } from "./logout-button";
 
 export default async function DashboardPage({
   params,
@@ -10,7 +11,8 @@ export default async function DashboardPage({
 
   return (
     <div className="p-8">
-      <div className="absolute top-8 right-8">
+      <div className="absolute top-8 right-8 flex gap-2">
+        <LogoutButton />
         <ThemeToggle />
       </div>
       <div className="flex flex-col gap-6">

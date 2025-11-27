@@ -1,0 +1,108 @@
+// Database Diagram for Brint Project
+// Generated from Prisma Schema
+
+Table users {
+  id varchar [primary key, note: 'CUID']
+  email varchar [unique, not null]
+  name varchar
+  emailVerified timestamp
+  avatarUrl varchar
+  googleId varchar [unique]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+}
+
+Table workspaces {
+  id varchar [primary key, note: 'CUID']
+  name varchar [not null]
+  slug varchar [unique, not null]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+}
+
+Table workspace_members {
+  id varchar [primary key, note: 'CUID']
+  userId varchar [not null]
+  workspaceId varchar [not null]
+  role varchar [not null, note: 'owner | admin | member']
+  createdAt timestamp [default: `now()`]
+  
+  indexes {
+    (userId, workspaceId) [unique]
+  }
+}
+
+Table roles {
+  id varchar [primary key, note: 'CUID']
+  workspaceId varchar [note: 'null = global role, value = workspace-specific']
+  key varchar [not null, note: 'e.g., workspace-owner, content-manager']
+  name varchar [not null]
+  description varchar
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+  
+  indexes {
+    (workspaceId, key) [unique]
+  }
+}
+
+Table permissions {
+  id varchar [primary key, note: 'CUID']
+  key varchar [unique, not null, note: 'e.g., workspace:settings.view']
+  description varchar
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+}
+
+Table role_permissions {
+  id varchar [primary key, note: 'CUID']
+  roleId varchar [not null]
+  permissionId varchar [not null]
+  createdAt timestamp [default: `now()`]
+  
+  indexes {
+    (roleId, permissionId) [unique]
+  }
+}
+
+Table sessions {
+  id varchar [primary key, note: 'refresh token tid']
+  userId varchar [not null]
+  expiresAt timestamp [not null]
+  userAgent varchar
+  ipAddress varchar
+  lastActiveAt timestamp [default: `now()`]
+  createdAt timestamp [default: `now()`]
+  
+  indexes {
+    (userId, expiresAt)
+  }
+}
+
+Table brands {
+  id varchar [primary key, note: 'CUID']
+  workspaceId varchar [not null]
+  name varchar [not null]
+  slug varchar [not null]
+  description varchar
+  isActive boolean [default: true]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+  
+  indexes {
+    (workspaceId, slug) [unique]
+  }
+}
+
+// Relationships
+Ref: workspace_members.userId > users.id
+Ref: workspace_members.workspaceId > workspaces.id
+
+Ref: roles.workspaceId > workspaces.id
+
+Ref: role_permissions.roleId > roles.id [delete: cascade]
+Ref: role_permissions.permissionId > permissions.id [delete: cascade]
+
+Ref: sessions.userId > users.id [delete: cascade]
+
+Ref: brands.workspaceId > workspaces.id [delete: cascade]

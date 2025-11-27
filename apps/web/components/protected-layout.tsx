@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
+import { getAccessToken } from "@/shared/auth/token-storage";
+import { getCurrentSession } from "@/shared/api/auth";
+import { routeResolver } from "@/shared/routing/route-resolver";
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -33,12 +36,38 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const isPublic = isPublicRoute || isAuthRoute;
 
   useEffect(() => {
+    const localePrefix = locale === "en" ? "" : `/${locale}`;
+    const hasToken = isAuthenticated || !!getAccessToken();
+
     // Don't redirect while loading
     if (loading) {
       return;
     }
 
     // Don't redirect if already authenticated
+    if (isAuthenticated && isPublic) {
+      // Authenticated users should not access login/signup - resolve destination
+      void (async () => {
+        try {
+          const session = await getCurrentSession();
+          const redirectPath = routeResolver({
+            locale,
+            hasToken: hasToken,
+            ownerWorkspaces: session?.ownerWorkspaces,
+            memberWorkspaces: session?.memberWorkspaces,
+            invites: session?.invites,
+            currentPath: pathname,
+            fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
+          });
+          router.replace(redirectPath);
+        } catch (error) {
+          console.error("ProtectedLayout redirect error:", error);
+          router.replace(`${localePrefix}/login`);
+        }
+      })();
+      return;
+    }
+
     if (isAuthenticated) {
       return;
     }
@@ -49,7 +78,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
     }
 
     // Redirect to login
-    const loginPath = locale === "en" ? "/login" : `/${locale}/login`;
+    const loginPath = localePrefix ? `${localePrefix}/login` : "/login";
     router.replace(loginPath);
   }, [isAuthenticated, loading, router, pathname, locale, isPublic]);
 
@@ -65,4 +94,3 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
   return <>{children}</>;
 }
-

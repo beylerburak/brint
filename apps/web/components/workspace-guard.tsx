@@ -36,20 +36,27 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
 
     // Don't redirect on public routes (login, signup, auth routes)
     const localePrefix = locale === "en" ? "" : `/${locale}`;
-    const publicRoutes = ["/login", "/signup"];
+    const publicRoutes = ["/login", "/signup", "/sign-up"];
     const isPublicRoute = publicRoutes.some((route) => {
       return pathname === `${localePrefix}${route}` || pathname.startsWith(`${localePrefix}${route}/`);
     });
     const isAuthRoute = pathname.includes("/auth/");
-    if (isPublicRoute || isAuthRoute) {
+    const isInvitesRoute = pathname.startsWith(`${localePrefix}/invites`);
+    if (isPublicRoute || isAuthRoute || isInvitesRoute) {
       return;
     }
 
     const onboardingPath = `${localePrefix}/onboarding`;
+    const isBaseLocalePath = pathname === localePrefix || pathname === `${localePrefix}/`;
     const isOnOnboarding = pathname === onboardingPath;
 
-    // If no workspace and not on onboarding → redirect to onboarding
-    if (!workspace && !isOnOnboarding) {
+    // Allow base locale path to resolve via route resolver elsewhere
+    if (isBaseLocalePath && !workspace) {
+      return;
+    }
+
+    // If no workspace and not on onboarding/invites → redirect to onboarding
+    if (!workspace && !isOnOnboarding && !isInvitesRoute) {
       router.replace(onboardingPath);
       return;
     }
@@ -69,4 +76,3 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
 
   return <>{children}</>;
 }
-

@@ -47,7 +47,17 @@ export function WorkspaceProvider({
       if (segments.length >= 2) {
         const workspaceSlug = segments[1];
         // Check if it's a valid workspace (not a reserved route like 'login', 'signup', etc.)
-        const reservedRoutes = ["login", "signup", "debug-context", "config-debug", "http-debug"];
+        const reservedRoutes = [
+          "login",
+          "signup",
+          "sign-up",
+          "debug-context",
+          "config-debug",
+          "http-debug",
+          "onboarding",
+          "invites",
+          "auth",
+        ];
         if (!reservedRoutes.includes(workspaceSlug)) {
           setWorkspaceState({
             id: workspaceSlug,
@@ -85,4 +95,3 @@ export function useWorkspace() {
   }
   return context;
 }
-

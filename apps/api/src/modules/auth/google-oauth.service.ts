@@ -10,7 +10,7 @@ export interface GoogleProfile {
   email: string;
   email_verified?: boolean;
   name?: string;
-  picture?: string;
+  phone_number?: string;
 }
 
 export interface GoogleLoginContext {
@@ -29,38 +29,55 @@ export async function loginOrRegisterWithGoogle(
   profile: GoogleProfile,
   ctx: GoogleLoginContext,
 ): Promise<GoogleLoginResult> {
-  const { email, sub, email_verified, name, picture } = profile;
+  const { email, sub, email_verified, name, phone_number } = profile;
 
-  if (!email) {
+  if (!email || !sub) {
     // defensive, ama decode aşamasında filtrelemiş olacağız
     throw new Error('GOOGLE_OAUTH_NO_EMAIL');
   }
 
-  // 1) User'ı bul
-  let user = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  // 2) Yoksa oluştur
+  // 1) User'ı bul (email öncelik, yoksa googleId)
+  let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email,
-        name: name ?? null,
-        avatarUrl: picture ?? null,
-        emailVerified: email_verified ? new Date() : null,
-        googleId: sub,
-      },
-    });
-  } else {
-    // Varsa ve googleId yoksa ekle
-    if (!user.googleId) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { googleId: sub },
+    user = await prisma.user.findUnique({ where: { googleId: sub } });
+  }
+
+  // 2) Yoksa oluştur (unique conflict ihtimalini yakala)
+  if (!user) {
+    try {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: name ?? null,
+          phone: phone_number ?? null,
+          emailVerified: email_verified ? new Date() : null,
+          googleId: sub,
+        },
       });
+    } catch (error: any) {
+      // Unique constraint ise mevcut user'ı çek ve güncelle
+      if (error?.code === 'P2002') {
+        logger.warn(
+          { email, sub, target: error?.meta?.target },
+          'Google OAuth create conflict, attempting to merge user'
+        );
+        user =
+          (await prisma.user.findUnique({ where: { email } })) ??
+          (await prisma.user.findUnique({ where: { googleId: sub } }));
+      }
+      if (!user) {
+        throw error;
+      }
+    }
+  }
+
+  // 3) Güncelleme (Google verisi baskın)
+  if (user) {
+    const updates: Record<string, any> = {};
+
+    if (!user.googleId) {
+      updates.googleId = sub;
     } else if (user.googleId !== sub) {
-      // Şüpheli durum: aynı email, farklı Google account
       logger.warn(
         {
           userId: user.id,
@@ -70,7 +87,19 @@ export async function loginOrRegisterWithGoogle(
         },
         'Google OAuth: email already linked to another googleId',
       );
-      // Şimdilik sadece log, davranışı değiştirmiyoruz
+    }
+
+    if (name) updates.name = name;
+    if (phone_number) updates.phone = phone_number;
+    if (email_verified && !user.emailVerified) {
+      updates.emailVerified = new Date();
+    }
+
+    if (Object.keys(updates).length > 0) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: updates,
+      });
     }
   }
 
@@ -101,4 +130,3 @@ export async function loginOrRegisterWithGoogle(
     refreshToken,
   };
 }
-

@@ -66,7 +66,8 @@ export const oauthConfig = {
     redirectUri: env.GOOGLE_OAUTH_REDIRECT_URI,
     authBaseUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: ['openid', 'email', 'profile'] as const,
+    // 'phone' eklenerek phone_number claim'i alınır; userinfo ile de telefon çekilir
+    scopes: ['openid', 'email', 'profile', 'phone'] as const,
   },
 } as const;
 
@@ -96,4 +97,3 @@ export const emailConfig = {
   from: env.SMTP_FROM ?? 'EPRU <no-reply@epru.app>',
   enabled: !!env.SMTP_HOST,
 } as const;
-

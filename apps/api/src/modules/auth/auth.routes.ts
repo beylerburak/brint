@@ -77,6 +77,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         properties: {
           code: { type: 'string' },
           state: { type: 'string' },
+          redirect_url: { type: 'string' },
         },
         required: ['code', 'state'],
       },
@@ -130,8 +131,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Querystring: { code?: string; state?: string } }>, reply: FastifyReply) => {
-    const { code, state } = request.query;
+  }, async (request: FastifyRequest<{ Querystring: { code?: string; state?: string; redirect_url?: string } }>, reply: FastifyReply) => {
+    const { code, state, redirect_url: redirectUrlOverride } = request.query;
 
     // 1. Validate query parameters
     if (!code || !state) {
@@ -198,7 +199,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
       const tokenData = await tokenResponse.json() as { id_token?: string; access_token?: string; refresh_token?: string };
 
-      // 4. Decode id_token
+      // 4. Decode id_token (basic profile)
       if (!tokenData.id_token) {
         return reply.status(400).send({
           success: false,
@@ -212,18 +213,57 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // Decode without verification for now (will add verification later)
       const decoded = jwt.decode(tokenData.id_token) as GoogleProfile | null;
 
-      if (!decoded || !decoded.email) {
+      // 4b. Optionally fetch userinfo (to get phone_number and freshest fields)
+      let userinfo: Partial<GoogleProfile> | null = null;
+      if (tokenData.access_token) {
+        try {
+          const userInfoResp = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+            },
+          });
+          if (userInfoResp.ok) {
+            userinfo = await userInfoResp.json() as Partial<GoogleProfile>;
+          } else {
+            const text = await userInfoResp.text();
+            logger.warn({ status: userInfoResp.status, text }, 'Google userinfo fetch failed');
+          }
+        } catch (err) {
+          logger.warn({ err }, 'Google userinfo fetch error');
+        }
+      }
+
+      const profile: GoogleProfile = {
+        sub: userinfo?.sub ?? decoded?.sub ?? '',
+        email: userinfo?.email ?? decoded?.email ?? '',
+        email_verified: userinfo?.email_verified ?? decoded?.email_verified,
+        name: userinfo?.name ?? decoded?.name,
+        phone_number: userinfo?.phone_number ?? decoded?.phone_number,
+      };
+
+      if (!profile.email || !profile.sub) {
         return reply.status(400).send({
           success: false,
           error: {
-            code: 'OAUTH_NO_EMAIL',
-            message: 'No email found in Google profile',
+            code: 'OAUTH_PROFILE_INCOMPLETE',
+            message: 'Missing required fields from Google profile (email/sub)',
           },
         });
       }
 
+      logger.info(
+        {
+          email: profile.email,
+          sub: profile.sub,
+          name: profile.name,
+          phone: profile.phone_number,
+          hasAccessToken: !!tokenData.access_token,
+        },
+        'Google OAuth profile resolved'
+      );
+
       // 5. Login or register user
-      const result = await loginOrRegisterWithGoogle(decoded, {
+      const result = await loginOrRegisterWithGoogle(profile, {
         userAgent: request.headers['user-agent'] ?? null,
         ipAddress: request.ip ?? null,
       });
@@ -234,7 +274,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         refreshToken: result.refreshToken,
       });
 
-      // 7. Return success response
+      // 7. If redirect override is provided, redirect after setting cookies
+      if (redirectUrlOverride) {
+        return reply.redirect(redirectUrlOverride);
+      }
+
+      // 8. Return success response
       return reply.status(200).send({
         success: true,
         user: {
@@ -245,10 +290,15 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         redirectTo: '/',
       });
     } catch (error) {
+      const safeError = error instanceof Error
+        ? { message: error.message, stack: error.stack }
+        : { error };
+
       logger.error(
         {
-          error,
+          error: safeError,
           code,
+          state,
         },
         'Error in Google OAuth callback'
       );
@@ -256,7 +306,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(500).send({
         success: false,
         error: {
-          code: 'INTERNAL_ERROR',
+          code: 'OAUTH_CALLBACK_ERROR',
           message: 'An unexpected error occurred during OAuth callback',
         },
       });

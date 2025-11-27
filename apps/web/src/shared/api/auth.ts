@@ -39,6 +39,11 @@ export interface MagicLinkVerifyResult {
   invites?: Array<{ id: string; updatedAt?: string | null }>;
 }
 
+export interface GoogleCallbackResult {
+  user: { id: string; email: string; name?: string | null };
+  redirectTo: string;
+}
+
 /**
  * Request a magic link email
  */
@@ -52,6 +57,43 @@ export async function requestMagicLink(email: string): Promise<MagicLinkRequestR
 
   if (!response.ok) {
     throw new Error(response.message || "Failed to request magic link");
+  }
+
+  return response.data;
+}
+
+/**
+ * Get Google OAuth redirect URL
+ */
+export async function getGoogleOAuthUrl(): Promise<string> {
+  const response = await httpClient.get<{
+    success: boolean;
+    redirectUrl: string;
+  }>("/auth/google", {
+    skipAuth: true,
+  });
+
+  if (!response.ok || !response.data.redirectUrl) {
+    throw new Error(response.message || "Failed to get Google OAuth URL");
+  }
+
+  return response.data.redirectUrl;
+}
+
+/**
+ * Complete Google OAuth flow after redirect
+ */
+export async function completeGoogleOAuth(code: string, state: string): Promise<GoogleCallbackResult> {
+  const response = await httpClient.get<{
+    success: boolean;
+    user: { id: string; email: string; name?: string | null };
+    redirectTo: string;
+  }>(`/auth/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+    skipAuth: true,
+  });
+
+  if (!response.ok || !response.data.user) {
+    throw new Error(response.message || "Failed to complete Google login");
   }
 
   return response.data;

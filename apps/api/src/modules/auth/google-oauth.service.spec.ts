@@ -19,6 +19,7 @@ async function main() {
     email_verified: true,
     name: 'Google Test User',
     picture: 'https://example.com/avatar.png',
+    phone_number: '+1-555-0001',
   };
 
   const ctx = {
@@ -49,12 +50,12 @@ async function main() {
     throw new Error(`Test 1 failed: User name mismatch. Expected 'Google Test User', got ${user.name}`);
   }
 
-  if (user.avatarUrl !== 'https://example.com/avatar.png') {
-    throw new Error(`Test 1 failed: User avatarUrl mismatch. Expected 'https://example.com/avatar.png', got ${user.avatarUrl}`);
-  }
-
   if (!user.emailVerified) {
     throw new Error('Test 1 failed: User emailVerified should be set');
+  }
+
+  if (user.phone !== '+1-555-0001') {
+    throw new Error(`Test 1 failed: User phone mismatch. Expected '+1-555-0001', got ${user.phone}`);
   }
 
   // Verify session was created
@@ -119,7 +120,7 @@ async function main() {
     email,
     email_verified: true,
     name: 'Google Test User Updated',
-    picture: 'https://example.com/avatar2.png',
+    phone_number: '+1-555-0002',
   };
 
   const result2 = await loginOrRegisterWithGoogle(profile2, ctx);
@@ -142,6 +143,14 @@ async function main() {
   if (user.googleId && user.googleId !== user2.googleId) {
     // This is expected behavior - if googleId was already set, it doesn't change
     console.log('  Note: googleId was already set, so it was not updated (expected behavior)');
+  }
+
+  if (user2.name !== 'Google Test User Updated') {
+    throw new Error(`Test 2 failed: User name should update from Google. Got ${user2.name}`);
+  }
+
+  if (user2.phone !== '+1-555-0002') {
+    throw new Error(`Test 2 failed: User phone should update from Google. Got ${user2.phone}`);
   }
 
   // Verify new session was created
@@ -188,4 +197,3 @@ main().catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);
 });
-

@@ -25,51 +25,14 @@ export function WorkspaceProvider({
   params: { workspace?: string; locale: string };
   children: React.ReactNode;
 }) {
-  const [workspace, setWorkspaceState] = useState<Workspace | null>(null);
   const pathname = usePathname();
+  const [workspace, setWorkspaceState] = useState<Workspace | null>(
+    () => deriveWorkspace(params.workspace, pathname)
+  );
 
   // Initialize from route params or pathname
   useEffect(() => {
-    // First try to use params.workspace if provided
-    if (params.workspace) {
-      setWorkspaceState({
-        id: params.workspace,
-        slug: params.workspace,
-      });
-      return;
-    }
-
-    // Otherwise, extract from pathname
-    // Pathname format: /[locale]/[workspace]/... or /[locale]/...
-    if (pathname) {
-      const segments = pathname.split("/").filter(Boolean);
-      // segments[0] = locale, segments[1] = workspace (if exists)
-      if (segments.length >= 2) {
-        const workspaceSlug = segments[1];
-        // Check if it's a valid workspace (not a reserved route like 'login', 'signup', etc.)
-        const reservedRoutes = [
-          "login",
-          "signup",
-          "sign-up",
-          "debug-context",
-          "config-debug",
-          "http-debug",
-          "onboarding",
-          "invites",
-          "auth",
-        ];
-        if (!reservedRoutes.includes(workspaceSlug)) {
-          setWorkspaceState({
-            id: workspaceSlug,
-            slug: workspaceSlug,
-          });
-          return;
-        }
-      }
-    }
-
-    // No workspace found
-    setWorkspaceState(null);
+    setWorkspaceState(deriveWorkspace(params.workspace, pathname));
   }, [params.workspace, pathname]);
 
   const setWorkspace = (ws: Workspace | null) => {
@@ -86,6 +49,35 @@ export function WorkspaceProvider({
       {children}
     </WorkspaceContext.Provider>
   );
+}
+
+function deriveWorkspace(paramSlug?: string, pathname?: string | null): Workspace | null {
+  if (paramSlug) {
+    return { id: paramSlug, slug: paramSlug };
+  }
+
+  if (!pathname) return null;
+
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length >= 2) {
+    const workspaceSlug = segments[1];
+    const reservedRoutes = [
+      "login",
+      "signup",
+      "sign-up",
+      "debug-context",
+      "config-debug",
+      "http-debug",
+      "onboarding",
+      "invites",
+      "auth",
+    ];
+    if (!reservedRoutes.includes(workspaceSlug)) {
+      return { id: workspaceSlug, slug: workspaceSlug };
+    }
+  }
+
+  return null;
 }
 
 export function useWorkspace() {

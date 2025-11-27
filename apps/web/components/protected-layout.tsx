@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { getAccessToken } from "@/shared/auth/token-storage";
 import { getCurrentSession } from "@/shared/api/auth";
 import { routeResolver } from "@/shared/routing/route-resolver";
+import { useRef } from "react";
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -23,9 +24,10 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
+  const hasRedirectedFromPublic = useRef(false);
 
   // Check if current route is public
-  const publicRoutes = ["/login", "/signup"];
+  const publicRoutes = ["/login", "/signup", "/sign-up"];
   const isPublicRoute = publicRoutes.some((route) => {
     const localePrefix = locale === "en" ? "" : `/${locale}`;
     return pathname === `${localePrefix}${route}` || pathname.startsWith(`${localePrefix}${route}/`);
@@ -34,6 +36,13 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   // Also allow auth routes (magic link verify, etc.)
   const isAuthRoute = pathname.includes("/auth/");
   const isPublic = isPublicRoute || isAuthRoute;
+
+  // Reset public redirect guard when leaving public routes
+  useEffect(() => {
+    if (!isPublic) {
+      hasRedirectedFromPublic.current = false;
+    }
+  }, [isPublic]);
 
   useEffect(() => {
     const localePrefix = locale === "en" ? "" : `/${locale}`;
@@ -46,6 +55,12 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
     // Don't redirect if already authenticated
     if (isAuthenticated && isPublic) {
+      // Prevent repeated redirects on the same public path
+      if (hasRedirectedFromPublic.current) {
+        return;
+      }
+      hasRedirectedFromPublic.current = true;
+
       // Authenticated users should not access login/signup - resolve destination
       void (async () => {
         try {
@@ -59,7 +74,9 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
             currentPath: pathname,
             fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
           });
-          router.replace(redirectPath);
+          if (redirectPath !== pathname) {
+            router.replace(redirectPath);
+          }
         } catch (error) {
           console.error("ProtectedLayout redirect error:", error);
           router.replace(`${localePrefix}/login`);

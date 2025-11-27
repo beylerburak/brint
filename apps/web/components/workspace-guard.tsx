@@ -55,8 +55,15 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
       return;
     }
 
-    // If no workspace and not on onboarding/invites → redirect to onboarding
-    if (!workspace && !isOnOnboarding && !isInvitesRoute) {
+    const segments = pathname.split("/").filter(Boolean);
+    const candidateWorkspace = segments.length >= 2 ? segments[1] : null;
+    const reservedCandidates = ["login", "signup", "sign-up", "onboarding", "invites", "auth"];
+
+    // If no workspace and not on onboarding/invites, but also no valid workspace in URL → redirect to onboarding
+    const hasValidWorkspaceInUrl =
+      candidateWorkspace !== null && !reservedCandidates.includes(candidateWorkspace);
+
+    if (!workspace && !isOnOnboarding && !isInvitesRoute && !hasValidWorkspaceInUrl) {
       router.replace(onboardingPath);
       return;
     }

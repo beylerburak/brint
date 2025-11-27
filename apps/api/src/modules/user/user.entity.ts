@@ -9,6 +9,14 @@ export type UserProps = {
   id: string;
   email: string;
   name?: string | null;
+  username?: string | null;
+  firstOnboardedAt?: Date | null;
+  completedOnboarding?: boolean;
+  lastLoginAt?: Date | null;
+  locale?: string;
+  timezone?: string;
+  phone?: string | null;
+  status?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -17,6 +25,14 @@ export class UserEntity {
   public readonly id: string;
   public readonly email: string;
   public readonly name: string | null;
+  public readonly username: string | null;
+  public readonly firstOnboardedAt: Date | null;
+  public readonly completedOnboarding: boolean;
+  public readonly lastLoginAt: Date | null;
+  public readonly locale: string | undefined;
+  public readonly timezone: string | undefined;
+  public readonly phone: string | null;
+  public readonly status: string | undefined;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -24,6 +40,14 @@ export class UserEntity {
     this.id = props.id;
     this.email = props.email;
     this.name = props.name ?? null;
+    this.username = props.username ?? null;
+    this.firstOnboardedAt = props.firstOnboardedAt ?? null;
+    this.completedOnboarding = props.completedOnboarding ?? false;
+    this.lastLoginAt = props.lastLoginAt ?? null;
+    this.locale = props.locale;
+    this.timezone = props.timezone;
+    this.phone = props.phone ?? null;
+    this.status = props.status;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -49,6 +73,14 @@ export class UserEntity {
     id: string;
     email: string;
     name: string | null;
+    username: string | null;
+    firstOnboardedAt: Date | null;
+    completedOnboarding: boolean;
+    lastLoginAt: Date | null;
+    locale: string;
+    timezone: string;
+    phone: string | null;
+    status: string;
     createdAt: Date;
     updatedAt: Date;
   }): UserEntity {
@@ -56,6 +88,14 @@ export class UserEntity {
       id: prismaUser.id,
       email: prismaUser.email,
       name: prismaUser.name,
+      username: prismaUser.username,
+      firstOnboardedAt: prismaUser.firstOnboardedAt,
+      completedOnboarding: prismaUser.completedOnboarding,
+      lastLoginAt: prismaUser.lastLoginAt,
+      locale: prismaUser.locale,
+      timezone: prismaUser.timezone,
+      phone: prismaUser.phone,
+      status: prismaUser.status,
       createdAt: prismaUser.createdAt,
       updatedAt: prismaUser.updatedAt,
     });
@@ -69,9 +109,16 @@ export class UserEntity {
       id: this.id,
       email: this.email,
       name: this.name,
+      username: this.username,
+      firstOnboardedAt: this.firstOnboardedAt,
+      completedOnboarding: this.completedOnboarding,
+      lastLoginAt: this.lastLoginAt,
+      locale: this.locale,
+      timezone: this.timezone,
+      phone: this.phone,
+      status: this.status,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
   }
 }
-

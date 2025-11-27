@@ -104,9 +104,6 @@ export const magicLinkService = {
       throw new MagicLinkError('Magic link invalid or expired');
     }
 
-    // Delete immediately (one-time use)
-    await redis.del(redisKey);
-
     const { email } = payload;
 
     // Find or create user
@@ -141,12 +138,12 @@ export const magicLinkService = {
       b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
     );
 
-    // Separate owner and member workspaces
+    // Separate owner and member workspaces (enum-aware)
     const ownerWorkspaces = allMemberships
-      .filter((m) => m.role === 'owner')
+      .filter((m) => m.role === 'OWNER')
       .map((m) => m.workspace);
     const memberWorkspaces = allMemberships
-      .filter((m) => m.role !== 'owner')
+      .filter((m) => m.role !== 'OWNER')
       .map((m) => m.workspace);
 
     // For backward compatibility, keep the first workspace (most recently updated)
@@ -187,6 +184,9 @@ export const magicLinkService = {
       'Magic link consumed successfully'
     );
 
+    // Delete token after successful processing (one-time use)
+    await redis.del(redisKey);
+
     return {
       user,
       workspace, // Can be null for new users - kept for backward compatibility
@@ -198,4 +198,3 @@ export const magicLinkService = {
     };
   },
 };
-

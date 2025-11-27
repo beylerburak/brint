@@ -9,6 +9,10 @@ import { registerHealthRoutes } from '../../modules/health/health.routes.js';
 import { registerDebugRoutes } from '../../modules/debug/debug.routes.js';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerStudioRoutes } from '../../modules/studio/studio.routes.js';
+import { registerUserRoutes } from '../../modules/user/user.routes.js';
+import { workspaceInviteRoutes } from '../../modules/workspace/workspace-invite.routes.js';
+import { registerSubscriptionRoutes } from '../../modules/workspace/subscription.routes.js';
+import { registerWorkspaceMemberRoutes } from '../../modules/workspace/workspace-member.routes.js';
 import { appConfig } from '../../config/index.js';
 
 /**
@@ -72,7 +76,10 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerDebugRoutes(app);
   await registerAuthRoutes(app);
   await app.register(registerStudioRoutes, { prefix: '/studio' });
+  await registerUserRoutes(app);
+  await registerSubscriptionRoutes(app);
+  await registerWorkspaceMemberRoutes(app);
+  await workspaceInviteRoutes(app);
 
   return app;
 }
-

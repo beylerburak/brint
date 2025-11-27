@@ -740,7 +740,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
       // Separate owner and member workspaces
       const ownerWorkspaces = allMemberships
-        .filter((m) => m.role === 'owner')
+        .filter((m) => m.role === 'OWNER')
         .map((m) => ({
           id: m.workspace.id,
           slug: m.workspace.slug,
@@ -749,7 +749,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         }));
 
       const memberWorkspaces = allMemberships
-        .filter((m) => m.role !== 'owner')
+        .filter((m) => m.role !== 'OWNER')
         .map((m) => ({
           id: m.workspace.id,
           slug: m.workspace.slug,
@@ -980,4 +980,3 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 }
-

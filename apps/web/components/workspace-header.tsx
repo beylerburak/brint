@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LogoutButton } from "@/components/logout-button";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 function getPageTitle(pathname: string, workspace: string): string {
   // Extract locale from pathname (first segment)
@@ -47,8 +47,8 @@ export function WorkspaceHeader({ workspace }: WorkspaceHeaderProps) {
         <h1 className="text-base text-foreground font-medium">{pageTitle}</h1>
       </div>
       <div className="ml-auto flex items-center gap-2 px-4">
+        <LanguageSwitcher />
         <ThemeToggle />
-        <LogoutButton />
       </div>
     </header>
   );

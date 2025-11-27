@@ -17,6 +17,15 @@ export default fp(async function swaggerPlugin(app: FastifyInstance) {
           description: 'Local dev',
         },
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+          },
+        },
+      },
     },
   });
 
@@ -30,4 +39,3 @@ export default fp(async function swaggerPlugin(app: FastifyInstance) {
     transformStaticCSP: (header) => header,
   });
 });
-

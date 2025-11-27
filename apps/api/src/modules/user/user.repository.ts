@@ -51,12 +51,14 @@ export class UserRepository {
   async createUser(data: {
     email: string;
     name?: string | null;
+    username?: string | null;
   }): Promise<UserEntity> {
     try {
       const user = await prisma.user.create({
         data: {
           email: data.email,
           name: data.name ?? null,
+          username: data.username ?? null,
         },
       });
 
@@ -71,8 +73,32 @@ export class UserRepository {
       throw error;
     }
   }
+
+  async updateUser(id: string, data: {
+    name?: string | null;
+    username?: string | null;
+    locale?: string;
+    timezone?: string;
+    phone?: string | null;
+    completedOnboarding?: boolean;
+    firstOnboardedAt?: Date | null;
+  }): Promise<UserEntity | null> {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        name: data.name ?? undefined,
+        username: data.username ?? undefined,
+        locale: data.locale ?? undefined,
+        timezone: data.timezone ?? undefined,
+        phone: data.phone ?? undefined,
+        completedOnboarding: data.completedOnboarding ?? undefined,
+        firstOnboardedAt: data.firstOnboardedAt ?? undefined,
+      },
+    });
+
+    return UserEntity.fromPrisma(user);
+  }
 }
 
 // Export singleton instance
 export const userRepository = new UserRepository();
-

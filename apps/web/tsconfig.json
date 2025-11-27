@@ -20,11 +20,15 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@/app-config/*": ["./src/app-config/*"],
-      "@/shared/*": ["./src/shared/*"],
+      "@/app/*": ["./app/*"],
+      "@/components/*": ["./components/*"],
+      "@/features/*": ["./features/*"],
+      "@/locales/*": ["./locales/*"],
+      "@/shared/*": ["./shared/*"],
+      "@/app-config/*": ["./features/workspace/navigation/*"],
       "@/contexts/*": ["./src/contexts/*"],
-      "@/permissions": ["./src/permissions/index"],
-      "@/permissions/*": ["./src/permissions/*"]
+      "@/permissions": ["./features/permissions/index"],
+      "@/permissions/*": ["./features/permissions/*"]
     }
   },
   "include": [

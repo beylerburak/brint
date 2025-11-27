@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
-import { useWorkspace } from "@/contexts/workspace-context";
+import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { Button } from "@/components/ui/button";
 
 export default function DebugContextPage() {

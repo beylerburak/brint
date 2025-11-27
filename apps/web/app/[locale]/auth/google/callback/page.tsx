@@ -7,7 +7,7 @@ import { useLocale } from "next-intl";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { appConfig } from "@/shared/config/app";
-import { refreshToken, getCurrentSession } from "@/shared/api/auth";
+import { refreshToken, getCurrentSession } from "@/features/auth/api/auth-api";
 import { setAccessToken } from "@/shared/auth/token-storage";
 import { routeResolver } from "@/shared/routing/route-resolver";
 

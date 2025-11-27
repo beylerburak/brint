@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { useLocale } from "next-intl";
 
-import { sidebarNavigation, type NavigationContext } from "@/app-config/navigation";
-import { useWorkspace } from "@/contexts/workspace-context";
-import { useBrand } from "@/contexts/brand-context";
+import { sidebarNavigation, type NavigationContext } from "@/features/workspace/navigation/navigation";
+import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useBrand } from "@/features/brand/context/brand-context";
 import { usePermissions } from "@/permissions";
 import { useAuth } from "@/contexts/auth-context";
 

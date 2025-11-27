@@ -1,0 +1,86 @@
+"use client";
+
+import React, { createContext, useContext, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { locales } from "@/shared/i18n/locales";
+
+export type Brand = {
+  id: string;
+  slug: string;
+  name?: string;
+};
+
+interface BrandContextValue {
+  brand: Brand | null;
+  setBrand: (b: Brand | null) => void;
+}
+
+const BrandContext = createContext<BrandContextValue | undefined>(undefined);
+
+export function BrandProvider({
+  params,
+  children,
+}: {
+  params: { brand?: string; workspace: string; locale: string };
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const derivedBrand = useMemo(() => {
+    // First try to use params.brand if provided (from nested routes)
+    if (params.brand) {
+      return {
+        id: params.brand,
+        slug: params.brand,
+      };
+    }
+
+    // Otherwise, extract from pathname
+    // Pathname format: /[locale]/[workspace]/studio/[brand]/... or /[workspace]/studio/...
+    if (pathname) {
+      const segments = pathname.split("/").filter(Boolean);
+      if (segments.length >= 3) {
+        const first = segments[0];
+        const firstIsLocale = (locales as readonly string[]).includes(first);
+        const studioIndex = firstIsLocale ? 2 : 1;
+        const brandIndex = studioIndex + 1;
+
+        if (segments[studioIndex] === "studio" && segments.length > brandIndex) {
+          const brandSlug = segments[brandIndex];
+          return {
+            id: brandSlug,
+            slug: brandSlug,
+          };
+        }
+      }
+    }
+
+    // No brand found
+    return null;
+  }, [params.brand, pathname]);
+  const [brandOverride, setBrandOverride] = useState<Brand | null>(null);
+
+  const brand = brandOverride ?? derivedBrand;
+
+  const setBrand = (b: Brand | null) => {
+    setBrandOverride(b);
+  };
+
+  const value: BrandContextValue = {
+    brand,
+    setBrand,
+  };
+
+  return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
+}
+
+export function useBrand() {
+  const context = useContext(BrandContext);
+  if (context === undefined) {
+    console.warn("useBrand called outside BrandProvider - returning null brand");
+    return {
+      brand: null,
+      setBrand: () => {},
+    } satisfies BrandContextValue;
+  }
+  return context;
+}

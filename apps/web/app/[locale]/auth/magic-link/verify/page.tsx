@@ -13,7 +13,10 @@ export default function MagicLinkVerifyPage() {
   const locale = useLocale();
   const { verifyMagicLinkToken } = useAuth();
   const { toast } = useToast();
-  const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
+  const token = searchParams.get("token");
+  const [status, setStatus] = useState<"verifying" | "success" | "error">(
+    () => (token ? "verifying" : "error")
+  );
   const hasVerified = useRef(false);
 
   useEffect(() => {
@@ -22,8 +25,6 @@ export default function MagicLinkVerifyPage() {
       return;
     }
 
-    const token = searchParams.get("token");
-
     if (!token) {
       toast({
         title: "Invalid link",
@@ -31,8 +32,10 @@ export default function MagicLinkVerifyPage() {
         variant: "destructive",
       });
       hasVerified.current = true;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      setStatus("error");
+      const localePrefix = locale === "en" ? "" : `/${locale}`;
+      setTimeout(() => {
+        router.replace(`${localePrefix}/login`);
+      }, 1000);
       return;
     }
 
@@ -68,7 +71,6 @@ export default function MagicLinkVerifyPage() {
           description: error instanceof Error ? error.message : "Failed to verify magic link",
           variant: "destructive",
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         setStatus("error");
         // Redirect to login after a delay
         const localePrefix = locale === "en" ? "" : `/${locale}`;
@@ -85,7 +87,7 @@ export default function MagicLinkVerifyPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, verifyMagicLinkToken, router, locale, toast]);
+  }, [token, searchParams, verifyMagicLinkToken, router, locale, toast]);
 
   if (status === "verifying") {
     return (

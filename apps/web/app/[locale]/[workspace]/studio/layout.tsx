@@ -1,4 +1,4 @@
-import { BrandProvider } from "@/contexts/brand-context";
+import { BrandProvider } from "@/features/brand/context/brand-context";
 
 export default async function StudioLayout({
   children,
@@ -15,4 +15,3 @@ export default async function StudioLayout({
     </BrandProvider>
   );
 }
-

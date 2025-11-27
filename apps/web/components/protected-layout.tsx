@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
 import { getAccessToken } from "@/shared/auth/token-storage";
-import { getCurrentSession } from "@/shared/api/auth";
+import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { routeResolver } from "@/shared/routing/route-resolver";
 import { useRef } from "react";
 

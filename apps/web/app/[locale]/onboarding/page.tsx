@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
-import { getCurrentSession } from "@/shared/api/auth";
+import { getCurrentSession } from "@/features/auth/api/auth-api";
 
 export default function OnboardingPage() {
   const router = useRouter();

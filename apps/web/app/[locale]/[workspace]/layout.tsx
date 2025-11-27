@@ -1,7 +1,7 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { WorkspaceHeader } from "@/components/workspace-header";
-import { BrandProvider } from "@/contexts/brand-context";
+import { AppSidebar } from "@/features/workspace/components/sidebar/app-sidebar";
+import { WorkspaceHeader } from "@/features/workspace/components/workspace-header";
+import { BrandProvider } from "@/features/brand/context/brand-context";
 
 export default async function WorkspaceLayout({
   children,

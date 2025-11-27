@@ -25,7 +25,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { CropIcon, RotateCcwIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 import "react-image-crop/dist/ReactCrop.css";
 

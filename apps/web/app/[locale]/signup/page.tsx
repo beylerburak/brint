@@ -1,8 +1,9 @@
 "use client";
 
 import { GalleryVerticalEnd } from "lucide-react";
-import { SignupForm } from "@/components/signup-form";
+import { SignupForm } from "@/features/auth/components/signup-form";
 import { ThemeToggle } from "@/components/theme-toggle";
+import Image from "next/image";
 
 export default function SignupPage() {
   return (
@@ -26,13 +27,15 @@ export default function SignupPage() {
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
-        <img
+        <Image
           src="/placeholder-image.svg"
-          alt="Image"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          alt="Signup illustration"
+          fill
+          priority
+          sizes="50vw"
+          className="object-cover dark:brightness-[0.2] dark:grayscale"
         />
       </div>
     </div>
   );
 }
-

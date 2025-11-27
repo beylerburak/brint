@@ -244,7 +244,7 @@ app.get('/protected', {
 
 ### Frontend useHasPermission + PermissionGate
 
-**Location**: `apps/web/src/permissions/`
+**Location**: `apps/web/features/permissions/`
 
 **Hooks**:
 ```typescript
@@ -499,13 +499,13 @@ if (!isAuthenticated) {
 
 **Frontend HTTP Client**:
 ```typescript
-import { useWorkspace } from "@/contexts/workspace-context";
+import { useWorkspace } from "@/features/workspace/context/workspace-context";
 
 const { workspace } = useWorkspace();
 
 await httpClient.get("/studio/brands", {
   headers: {
-    "Authorization": `Bearer ${accessToken}`,
+    Authorization: `Bearer ${accessToken}`,
     "X-Workspace-Id": workspace?.id,
   },
 });
@@ -602,4 +602,4 @@ await httpClient.get("/studio/brands", {
 - **WorkspaceId**: Frontend sends header → Backend attaches to auth context
 - **Permissions**: Future sync via API (TS-40+)
 
-All authentication, authorization, and i18n code must follow these patterns. When in doubt, refer to existing implementations in `apps/api/src/core/auth/` and `apps/web/src/permissions/`.
+All authentication, authorization, and i18n code must follow these patterns. When in doubt, refer to existing implementations in `apps/api/src/core/auth/` and `apps/web/features/permissions/`.

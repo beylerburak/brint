@@ -2,10 +2,15 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { verifyMagicLink, logout as logoutApi, getCurrentSession } from "@/shared/api/auth";
+import {
+  verifyMagicLink,
+  logout as logoutApi,
+  getCurrentSession,
+  type MagicLinkVerifyResult,
+} from "@/features/auth/api/auth-api";
 import { setAccessToken, clearAccessToken, getAccessToken } from "@/shared/auth/token-storage";
 import { onUnauthenticated } from "@/shared/http";
-import type { LoginResult } from "@/shared/api/auth";
+import type { LoginResult } from "@/features/auth/api/auth-api";
 
 export type AuthUser = {
   id: string;
@@ -41,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsedUser = JSON.parse(stored) as AuthUser;
           setUser(parsedUser);
-        } catch (error) {
+        } catch {
           // Invalid stored data, clear it
           localStorage.removeItem(AUTH_STORAGE_KEY);
         }
@@ -91,7 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(result);
   };
 
-  const verifyMagicLinkToken = async (token: string): Promise<LoginResult & { verifyData?: any }> => {
+  const verifyMagicLinkToken = async (
+    token: string
+  ): Promise<LoginResult & { verifyData?: MagicLinkVerifyResult }> => {
     const result = await verifyMagicLink(token);
     await login(result);
     return result;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
-import { useWorkspace } from "@/contexts/workspace-context";
-import { useBrand } from "@/contexts/brand-context";
+import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useBrand } from "@/features/brand/context/brand-context";
 
 export default function DebugBrandPage() {
   const { user, isAuthenticated } = useAuth();
@@ -80,4 +80,3 @@ export default function DebugBrandPage() {
     </div>
   );
 }
-

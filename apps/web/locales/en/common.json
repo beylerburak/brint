@@ -28,5 +28,8 @@
   "logOut": "Log out",
   "spaces": "Spaces",
   "addSpace": "Add space",
-  "menu": "Menu"
+  "menu": "Menu",
+  "preferences": "Preferences",
+  "support": "Support",
+  "toggleSidebar": "Toggle sidebar"
 }

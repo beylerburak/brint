@@ -25,6 +25,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { useTranslations } from "next-intl";
+import { Settings, LifeBuoy } from "lucide-react";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const locale = useLocale();
@@ -92,6 +93,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   const items = sidebarNavigation.filter((item) => item.show(navCtx));
+  const secondaryItems = [
+    {
+      id: "preferences",
+      label: t("preferences"),
+      icon: Settings,
+      href: "#",
+    },
+    {
+      id: "support",
+      label: t("support"),
+      icon: LifeBuoy,
+      href: "#",
+    },
+  ];
 
   const teams = workspace
     ? [
@@ -126,6 +141,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          {secondaryItems.map((item) => (
+            <SidebarMenuItem key={item.id}>
+              <SidebarMenuButton asChild>
+                <a href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
         <NavUser />
       </SidebarFooter>
       <SidebarRail />

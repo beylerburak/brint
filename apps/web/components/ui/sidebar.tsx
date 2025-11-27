@@ -24,13 +24,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Kbd } from "@/components/ui/kbd"
+import { useTranslations } from "next-intl"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_SHORTCUT = {
+  key: ".",
+  meta: true,
+  ctrl: true, // allow ctrl+.
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -96,10 +102,11 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      const matchesKey = event.key === SIDEBAR_SHORTCUT.key
+      const matchesMeta = SIDEBAR_SHORTCUT.meta ? event.metaKey : true
+      const matchesCtrl = SIDEBAR_SHORTCUT.ctrl ? event.ctrlKey : true
+
+      if (matchesKey && (matchesMeta || matchesCtrl)) {
         event.preventDefault()
         toggleSidebar()
       }
@@ -259,23 +266,36 @@ function SidebarTrigger({
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar()
+  const t = useTranslations("common")
+  const shortcutLabel = "⌘ ."
+  const shortcutLabelText = t("toggleSidebar")
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          data-sidebar="trigger"
+          data-slot="sidebar-trigger"
+          variant="ghost"
+          size="icon"
+          className={cn("size-7", className)}
+          onClick={(event) => {
+            onClick?.(event)
+            toggleSidebar()
+          }}
+          {...props}
+        >
+          <PanelLeftIcon />
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start">
+        <div className="flex items-center gap-2">
+          <span>{shortcutLabelText}</span>
+          <Kbd>{shortcutLabel}</Kbd>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -724,4 +744,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-

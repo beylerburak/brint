@@ -28,5 +28,8 @@
   "logOut": "Çıkış Yap",
   "spaces": "Alanlar",
   "addSpace": "Alan ekle",
-  "menu": "Menü"
+  "menu": "Menü",
+  "preferences": "Tercihler",
+  "support": "Destek",
+  "toggleSidebar": "Sidebar'ı değiştir"
 }

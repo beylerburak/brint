@@ -1,8 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { locales } from "@/shared/i18n/locales";
+import { setWorkspaceIdGetter } from "@/shared/http/workspace-header";
+import { getCurrentSession } from "@/features/auth/api/auth-api";
 
 export type Workspace = {
   id: string;
@@ -13,6 +15,8 @@ export type Workspace = {
 interface WorkspaceContextValue {
   workspace: Workspace | null;
   setWorkspace: (ws: Workspace | null) => void;
+  workspaceReady: boolean;
+  isOwner: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(
@@ -34,13 +38,92 @@ export function WorkspaceProvider({
   const [workspaceOverride, setWorkspaceOverride] = useState<Workspace | null>(
     null
   );
+  const [resolvedWorkspace, setResolvedWorkspace] = useState<Workspace | null>(
+    derivedWorkspace
+  );
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
-  const workspace = workspaceOverride ?? derivedWorkspace;
+  const workspace = resolvedWorkspace;
   const setWorkspace = (ws: Workspace | null) => setWorkspaceOverride(ws);
+
+  // Set workspace ID getter for HTTP client
+  useEffect(() => {
+    if (!workspaceReady || !workspace?.id) {
+      setWorkspaceIdGetter(() => null);
+      return;
+    }
+
+    setWorkspaceIdGetter(() => workspace.id ?? null);
+    return () => {
+      setWorkspaceIdGetter(() => null);
+    };
+  }, [workspace?.id, workspaceReady]);
+
+  // Resolve workspace ID + name from session when slug changes
+  useEffect(() => {
+    let cancelled = false;
+    const baseWorkspace = workspaceOverride ?? derivedWorkspace;
+
+    // Reset workspaceReady and clear workspace ID getter when workspace changes
+    setWorkspaceReady(false);
+    setWorkspaceIdGetter(() => null);
+    setIsOwner(false);
+
+    if (!baseWorkspace) {
+      setResolvedWorkspace(null);
+      setWorkspaceReady(true);
+      return;
+    }
+
+    const hydrate = async () => {
+      try {
+        const session = await getCurrentSession();
+        const allWorkspaces = [
+          ...(session?.ownerWorkspaces ?? []),
+          ...(session?.memberWorkspaces ?? []),
+        ];
+        const match = allWorkspaces.find((ws) => ws.slug === baseWorkspace.slug);
+        
+        // Check if user is owner of this workspace
+        const isOwnerWorkspace = session?.ownerWorkspaces?.some(
+          (ws) => ws.slug === baseWorkspace.slug
+        ) ?? false;
+
+        if (!cancelled) {
+          if (match) {
+            setResolvedWorkspace({
+              id: match.id,
+              slug: match.slug,
+              name: match.name,
+            });
+          } else {
+            setResolvedWorkspace(baseWorkspace);
+          }
+          setIsOwner(isOwnerWorkspace);
+          setWorkspaceReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedWorkspace(baseWorkspace);
+          setIsOwner(false);
+          setWorkspaceReady(true);
+        }
+      }
+    };
+
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [derivedWorkspace?.slug, workspaceOverride?.slug, workspaceOverride?.id]);
 
   const value: WorkspaceContextValue = {
     workspace,
     setWorkspace,
+    workspaceReady,
+    isOwner,
   };
 
   return (

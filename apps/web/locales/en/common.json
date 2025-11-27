@@ -31,5 +31,36 @@
   "menu": "Menu",
   "preferences": "Preferences",
   "support": "Support",
-  "toggleSidebar": "Toggle sidebar"
+  "toggleSidebar": "Toggle sidebar",
+  "workspaceDashboard": "Workspace Dashboard",
+  "backToWorkspace": "Back to workspace",
+  "settings": {
+    "title": "Settings",
+    "group": {
+      "account": "Account",
+      "workspace": "Workspace",
+      "brand": "Brand"
+    },
+    "account": {
+      "userProfile": "User Profile",
+      "preferences": "Preferences",
+      "notifications": "Notifications",
+      "connections": "Connections"
+    },
+    "workspace": {
+      "general": "General",
+      "people": "People",
+      "identity": "Identity",
+      "subscription": "Subscription",
+      "integrations": "Integrations",
+      "supportTickets": "Support Tickets"
+    },
+    "brand": {
+      "brandProfile": "Brand Profile",
+      "socialAccounts": "Social Accounts",
+      "publishingRules": "Publishing Rules",
+      "automationReporting": "Automation & Reporting",
+      "integrations": "Integrations"
+    }
+  }
 }

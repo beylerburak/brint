@@ -11,6 +11,8 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { magicLinkService } from './magic-link.service.js';
 import { sendMagicLinkEmail } from '../../core/email/email.service.js';
+import { permissionService } from '../../core/auth/permission.service.js';
+import { BadRequestError, UnauthorizedError } from '../../lib/http-errors.js';
 
 /**
  * Registers authentication routes
@@ -673,6 +675,88 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         message: 'If an account exists for this email, a magic link has been sent.',
       });
     }
+  });
+
+  // GET /auth/permissions - Permission snapshot for current workspace
+  app.get('/auth/permissions', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Get effective permissions for current workspace',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            data: {
+              type: 'object',
+              properties: {
+                workspaceId: { type: 'string' },
+                permissions: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+              required: ['workspaceId', 'permissions'],
+            },
+          },
+          required: ['success', 'data'],
+        },
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { userId, workspaceId } = request.auth ?? {};
+
+    if (!userId) {
+      throw new UnauthorizedError('AUTH_REQUIRED');
+    }
+
+    if (!workspaceId) {
+      throw new BadRequestError('WORKSPACE_ID_REQUIRED', 'X-Workspace-Id header is required');
+    }
+
+    const { permissions } =
+      await permissionService.getEffectivePermissionsForUserWorkspace({
+        userId,
+        workspaceId,
+      });
+
+    return reply.send({
+      success: true,
+      data: {
+        workspaceId,
+        permissions,
+      },
+    });
   });
 
   // GET /auth/me - Get current user and workspace information

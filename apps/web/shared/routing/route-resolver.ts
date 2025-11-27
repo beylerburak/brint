@@ -58,6 +58,10 @@ export function routeResolver(input: RouteResolverInput): string {
 
   // Workspaces exist -> pick most recently updated (owner/member agnostic)
   const workspaceSlug = selectWorkspace(allWorkspaces, fallbackWorkspaceSlug);
+  if (!workspaceSlug) {
+    return `${localePrefix}/onboarding`;
+  }
+
   return `${localePrefix}/${workspaceSlug}/dashboard`;
 }
 
@@ -89,6 +93,6 @@ export function resolveWorkspacePath(locale: string, newWorkspace: string, pathn
   if (last === "settings") return `/${locale}/${newWorkspace}/settings`;
   if (last === "studio") return `/${locale}/${newWorkspace}/studio`;
 
-  // default → dashboard
-  return `/${locale}/${newWorkspace}/dashboard`;
+  // default → workspace homepage (dashboard)
+  return `/${locale}/${newWorkspace}`;
 }

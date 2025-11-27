@@ -1,5 +1,6 @@
 import { httpClient } from "@/shared/http";
-import type { AuthUser } from "@/contexts/auth-context";
+import { apiCache } from "@/shared/api/cache";
+import type { AuthUser } from "@/features/auth/context/auth-context";
 
 export interface LoginPayload {
   email: string;
@@ -178,6 +179,7 @@ export async function logout(): Promise<void> {
 
 /**
  * Get current user session and workspaces
+ * Uses global cache to prevent duplicate requests
  */
 export async function getCurrentSession(): Promise<{
   user: AuthUser;
@@ -185,33 +187,39 @@ export async function getCurrentSession(): Promise<{
   memberWorkspaces: Array<Workspace & { updatedAt: string }>;
   invites?: Array<{ id: string; updatedAt?: string | null }>;
 } | null> {
-  try {
-    const response = await httpClient.get<{
-      success: boolean;
-      data: {
-        user: { id: string; email: string; name?: string | null };
-        ownerWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
-        memberWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
-        invites?: Array<{ id: string; updatedAt?: string | null }>;
-      };
-    }>("/auth/me");
+  return apiCache.getOrFetch(
+    "session:current",
+    async () => {
+      try {
+        const response = await httpClient.get<{
+          success: boolean;
+          data: {
+            user: { id: string; email: string; name?: string | null };
+            ownerWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
+            memberWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
+            invites?: Array<{ id: string; updatedAt?: string | null }>;
+          };
+        }>("/auth/me");
 
-    if (!response.ok) {
-      return null;
-    }
+        if (!response.ok) {
+          return null;
+        }
 
-    return {
-      user: {
-        id: response.data.data.user.id,
-        email: response.data.data.user.email,
-        name: response.data.data.user.name ?? undefined,
-      },
-      ownerWorkspaces: response.data.data.ownerWorkspaces,
-      memberWorkspaces: response.data.data.memberWorkspaces,
-      invites: response.data.data.invites,
-    };
-  } catch (error) {
-    console.error("Error getting current session:", error);
-    return null;
-  }
+        return {
+          user: {
+            id: response.data.data.user.id,
+            email: response.data.data.user.email,
+            name: response.data.data.user.name ?? undefined,
+          },
+          ownerWorkspaces: response.data.data.ownerWorkspaces,
+          memberWorkspaces: response.data.data.memberWorkspaces,
+          invites: response.data.data.invites,
+        };
+      } catch (error) {
+        console.error("Error getting current session:", error);
+        return null;
+      }
+    },
+    30000 // 30 seconds cache
+  );
 }

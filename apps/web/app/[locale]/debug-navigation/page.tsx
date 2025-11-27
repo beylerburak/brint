@@ -7,7 +7,7 @@ import { sidebarNavigation, type NavigationContext } from "@/features/workspace/
 import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { useBrand } from "@/features/brand/context/brand-context";
 import { usePermissions } from "@/permissions";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 
 export default function DebugNavigationPage() {
   const locale = useLocale();

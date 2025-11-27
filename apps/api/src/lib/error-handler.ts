@@ -1,5 +1,6 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { logger } from './logger.js';
+import { HttpError } from './http-errors.js';
 
 /**
  * Standard error response format for all API errors
@@ -19,6 +20,10 @@ export type ErrorResponse = {
 function mapErrorCode(error: FastifyError): string {
   if (error.code === 'FST_ERR_NOT_FOUND') {
     return 'NOT_FOUND';
+  }
+
+  if (typeof error.code === 'string') {
+    return error.code;
   }
   return 'INTERNAL_SERVER_ERROR';
 }
@@ -44,10 +49,13 @@ export function globalErrorHandler(
   );
 
   // Determine status code
-  const statusCode = error.statusCode || 500;
+  const statusCode = (error as HttpError).statusCode ?? error.statusCode ?? 500;
 
   // Map error code
-  const errorCode = mapErrorCode(error);
+  const errorCode =
+    (error as HttpError).code ??
+    (typeof error.code === 'string' ? error.code : undefined) ??
+    mapErrorCode(error);
 
   // Build error response
   const errorResponse: ErrorResponse = {
@@ -55,7 +63,9 @@ export function globalErrorHandler(
     error: {
       code: errorCode,
       message: error.message || 'An unexpected error occurred',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      details:
+        (error as HttpError).details ??
+        (process.env.NODE_ENV === 'development' ? error.stack : undefined),
     },
   };
 
@@ -81,4 +91,3 @@ export function notFoundHandler(
 
   reply.status(404).send(errorResponse);
 }
-

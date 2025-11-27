@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { AvatarUploadDemo } from "@/app/[locale]/[workspace]/dashboard/avatar-upload-demo";
+import { DataTable } from "@/components/ui/data-table";
+import { PermissionGate, PERMISSIONS } from "@/permissions";
+import { AvatarUploadDemo } from "@/app/[locale]/[workspace]/dashboard/avatar-upload-demo"; // TODO: Move to features/workspace/components when refactoring
 
 interface DashboardPageProps {
   workspace: string;
@@ -31,7 +33,10 @@ export function WorkspaceDashboardPage({ workspace }: DashboardPageProps) {
               </p>
             </div>
             <Button>Sample Button</Button>
-            <AvatarUploadDemo workspaceSlug={workspace} />
+            <PermissionGate permission={PERMISSIONS.WORKSPACE_MEMBERS_MANAGE}>
+              <AvatarUploadDemo workspaceSlug={workspace} />
+            </PermissionGate>
+            <DataTable data={[]} />
           </div>
         </div>
       </div>

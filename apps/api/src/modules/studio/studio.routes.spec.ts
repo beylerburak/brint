@@ -197,15 +197,15 @@ async function main() {
       );
     }
 
-    if (unauthorizedBody.error?.code !== 'UNAUTHORIZED') {
+    if (unauthorizedBody.error?.code !== 'AUTH_REQUIRED') {
       throw new Error(
-        `Expected error.code: "UNAUTHORIZED", got "${unauthorizedBody.error?.code}"`
+        `Expected error.code: "AUTH_REQUIRED", got "${unauthorizedBody.error?.code}"`
       );
     }
 
     console.log('   ✅ Status: 401');
     console.log('   ✅ Body: success: false');
-    console.log('   ✅ Error code: UNAUTHORIZED\n');
+    console.log('   ✅ Error code: AUTH_REQUIRED\n');
 
     // ==========================================
     // Test 3: Unauthorized (no workspace header)
@@ -232,15 +232,15 @@ async function main() {
       );
     }
 
-    if (noWorkspaceBody.error?.code !== 'UNAUTHORIZED') {
+    if (noWorkspaceBody.error?.code !== 'AUTH_REQUIRED') {
       throw new Error(
-        `Expected error.code: "UNAUTHORIZED", got "${noWorkspaceBody.error?.code}"`
+        `Expected error.code: "AUTH_REQUIRED", got "${noWorkspaceBody.error?.code}"`
       );
     }
 
     console.log('   ✅ Status: 401');
     console.log('   ✅ Body: success: false');
-    console.log('   ✅ Error code: UNAUTHORIZED\n');
+    console.log('   ✅ Error code: AUTH_REQUIRED\n');
 
     console.log('🎉 TS-23 Studio routes tests: OK');
   } catch (error) {
@@ -277,4 +277,3 @@ main().catch((error) => {
   console.error('❌ Test script failed:', error);
   process.exit(1);
 });
-

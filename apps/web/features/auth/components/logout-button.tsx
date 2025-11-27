@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { Button } from "@/components/ui/button";
 
 export function LogoutButton() {

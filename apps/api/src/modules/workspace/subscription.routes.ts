@@ -3,8 +3,61 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
+import { BadRequestError, ForbiddenError, HttpError } from "../../lib/http-errors.js";
 
 export async function registerSubscriptionRoutes(app: FastifyInstance) {
+  // Workspace-scoped subscription (uses X-Workspace-Id)
+  app.get("/workspace/subscription", {
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
+    schema: {
+      tags: ["Workspaces"],
+      summary: "Get current workspace subscription (header-based)",
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                workspaceId: { type: "string" },
+                plan: { type: "string" },
+                status: { type: "string" },
+                renewsAt: { type: ["string", "null"], format: "date-time" },
+              },
+              required: ["workspaceId", "plan", "status", "renewsAt"],
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const workspaceId = request.auth?.workspaceId;
+
+    if (!workspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { workspaceId },
+    });
+
+    if (!subscription) {
+      throw new HttpError(404, "SUBSCRIPTION_NOT_FOUND", "Subscription not found");
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        workspaceId,
+        plan: subscription.plan,
+        status: subscription.status,
+        renewsAt: subscription.periodEnd ? subscription.periodEnd.toISOString() : null,
+      },
+    });
+  });
+
   app.get("/workspaces/:workspaceId/subscription", {
     preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
     schema: {
@@ -48,7 +101,17 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { workspaceId } = request.params as { workspaceId: string };
+    const { workspaceId: paramWorkspaceId } = request.params as { workspaceId: string };
+    const workspaceId = request.auth?.workspaceId;
+
+    if (!workspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (workspaceId !== paramWorkspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId: workspaceId, paramWorkspaceId });
+    }
+
     const subscription = await prisma.subscription.findUnique({
       where: { workspaceId },
     });
@@ -104,7 +167,17 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { workspaceId } = request.params as { workspaceId: string };
+    const { workspaceId: paramWorkspaceId } = request.params as { workspaceId: string };
+    const workspaceId = request.auth?.workspaceId;
+
+    if (!workspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (workspaceId !== paramWorkspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId: workspaceId, paramWorkspaceId });
+    }
+
     const body = request.body as any;
     try {
       const subscription = await prisma.subscription.upsert({

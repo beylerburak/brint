@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
           if (allWorkspaces.length > 0) {
             const localePrefix = locale === "en" ? "" : `/${locale}`;
             const targetWorkspace = allWorkspaces[0];
-            router.replace(`${localePrefix}/${targetWorkspace.slug}/dashboard`);
+            router.replace(`${localePrefix}/${targetWorkspace.slug}`);
             return;
           }
         }

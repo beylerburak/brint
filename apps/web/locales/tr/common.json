@@ -31,5 +31,36 @@
   "menu": "Menü",
   "preferences": "Tercihler",
   "support": "Destek",
-  "toggleSidebar": "Sidebar'ı değiştir"
+  "toggleSidebar": "Sidebar'ı değiştir",
+  "workspaceDashboard": "Workspace Kontrol Paneli",
+  "backToWorkspace": "Workspace'e dön",
+  "settings": {
+    "title": "Ayarlar",
+    "group": {
+      "account": "Hesap",
+      "workspace": "Workspace",
+      "brand": "Marka"
+    },
+    "account": {
+      "userProfile": "Kullanıcı Profili",
+      "preferences": "Tercihler",
+      "notifications": "Bildirimler",
+      "connections": "Bağlantılar"
+    },
+    "workspace": {
+      "general": "Genel",
+      "people": "Kişiler",
+      "identity": "Kimlik",
+      "subscription": "Abonelik",
+      "integrations": "Entegrasyonlar",
+      "supportTickets": "Destek Talepleri"
+    },
+    "brand": {
+      "brandProfile": "Marka Profili",
+      "socialAccounts": "Social Accounts",
+      "publishingRules": "Yayınlama Kuralları",
+      "automationReporting": "Otomasyon & Raporlama",
+      "integrations": "Entegrasyonlar"
+    }
+  }
 }

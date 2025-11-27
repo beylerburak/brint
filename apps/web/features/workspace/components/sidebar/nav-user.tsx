@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import {
   BadgeCheck,
   Bell,
@@ -32,8 +32,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useAuth } from "@/contexts/auth-context"
-import { getUserProfile } from "@/shared/api/user"
+import { useAuth } from "@/features/auth/context/auth-context"
+import { getUserProfile } from "@/features/workspace/api/user-api"
 
 function getInitials(name: string | null | undefined, email: string): string {
   if (name) {
@@ -62,35 +62,45 @@ export function NavUser() {
   // Use auth context user as primary source, try to enhance with profile data
   useEffect(() => {
     if (!authUser) {
-      return
+      setProfileUser(null);
+      return;
     }
 
-    // Try to fetch full profile from backend to get updated name/avatar
+    let cancelled = false;
+
+    // getUserProfile now uses global cache, so no need for local cache
     const loadProfile = async () => {
-      const currentUserId = authUser.id
+      const currentUserId = authUser.id;
       try {
-        const profile = await getUserProfile()
-        if (!active || authUser.id !== currentUserId) {
-          return
+        const profile = await getUserProfile();
+        if (cancelled || authUser.id !== currentUserId) {
+          return;
         }
-        setProfileUser({
+
+        const profileData = {
           userId: currentUserId,
           name: profile.name,
           email: profile.email,
           avatarUrl: profile.avatarUrl,
-        })
+        };
+
+        if (!cancelled) {
+          setProfileUser(profileData);
+        }
       } catch (error) {
         // Silently fail - we'll use auth context user instead
-        console.warn("Failed to load user profile, using auth context user:", error)
+        console.warn("Failed to load user profile, using auth context user:", error);
+        if (!cancelled) {
+          setProfileUser(null);
+        }
       }
-    }
+    };
 
-    let active = true
-    loadProfile()
+    loadProfile();
 
     return () => {
-      active = false
-    }
+      cancelled = true;
+    };
   }, [authUser])
 
   // Determine which user data to use

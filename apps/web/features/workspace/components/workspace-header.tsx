@@ -5,6 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/features/auth/components/language-switcher";
+import { useSubscription } from "@/features/subscription";
+import { AlertTriangle } from "lucide-react";
 
 function getPageTitle(pathname: string, workspace: string): string {
   // Extract locale from pathname (first segment)
@@ -35,6 +37,14 @@ interface WorkspaceHeaderProps {
 export function WorkspaceHeader({ workspace }: WorkspaceHeaderProps) {
   const pathname = usePathname();
   const pageTitle = getPageTitle(pathname, workspace);
+  const { subscription, plan } = useSubscription();
+  const isActive = subscription?.status === "ACTIVE" || !subscription;
+  const renewsLabel = subscription?.renewsAt
+    ? new Date(subscription.renewsAt).toLocaleDateString()
+    : null;
+  const statusLabel = isActive
+    ? plan
+    : `${plan} (${subscription?.status ?? "Unknown"})`;
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
@@ -47,6 +57,19 @@ export function WorkspaceHeader({ workspace }: WorkspaceHeaderProps) {
         <h1 className="text-base text-foreground font-medium">{pageTitle}</h1>
       </div>
       <div className="ml-auto flex items-center gap-2 px-4">
+        <div
+          className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${
+            isActive ? "bg-muted/50 text-foreground" : "border-amber-300 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {!isActive && <AlertTriangle className="h-4 w-4" />}
+          <span className="font-medium uppercase">{statusLabel}</span>
+          {renewsLabel && (
+            <span className="text-[11px] text-muted-foreground">
+              {renewsLabel}
+            </span>
+          )}
+        </div>
         <LanguageSwitcher />
         <ThemeToggle />
       </div>

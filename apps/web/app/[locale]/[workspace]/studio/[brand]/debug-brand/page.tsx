@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { useBrand } from "@/features/brand/context/brand-context";
 

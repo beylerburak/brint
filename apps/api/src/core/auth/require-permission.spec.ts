@@ -172,9 +172,9 @@ async function main() {
       );
     }
 
-    if (forbiddenBody.error?.code !== 'FORBIDDEN') {
+    if (forbiddenBody.error?.code !== 'PERMISSION_DENIED') {
       throw new Error(
-        `Expected error.code: "FORBIDDEN", got "${forbiddenBody.error?.code}"`
+        `Expected error.code: "PERMISSION_DENIED", got "${forbiddenBody.error?.code}"`
       );
     }
 
@@ -215,15 +215,15 @@ async function main() {
       );
     }
 
-    if (unauthorizedBody.error?.code !== 'UNAUTHORIZED') {
+    if (unauthorizedBody.error?.code !== 'AUTH_REQUIRED') {
       throw new Error(
-        `Expected error.code: "UNAUTHORIZED", got "${unauthorizedBody.error?.code}"`
+        `Expected error.code: "AUTH_REQUIRED", got "${unauthorizedBody.error?.code}"`
       );
     }
 
     console.log('   ✅ Status: 401');
     console.log('   ✅ Body: success: false');
-    console.log('   ✅ Error code: UNAUTHORIZED\n');
+    console.log('   ✅ Error code: AUTH_REQUIRED\n');
 
     // 10. Test unauthorized case: No workspace header
     console.log('📋 Test 4: Unauthorized case - No workspace header');
@@ -248,15 +248,15 @@ async function main() {
       );
     }
 
-    if (noWorkspaceBody.error?.code !== 'UNAUTHORIZED') {
+    if (noWorkspaceBody.error?.code !== 'AUTH_REQUIRED') {
       throw new Error(
-        `Expected error.code: "UNAUTHORIZED", got "${noWorkspaceBody.error?.code}"`
+        `Expected error.code: "AUTH_REQUIRED", got "${noWorkspaceBody.error?.code}"`
       );
     }
 
     console.log('   ✅ Status: 401');
     console.log('   ✅ Body: success: false');
-    console.log('   ✅ Error code: UNAUTHORIZED\n');
+    console.log('   ✅ Error code: AUTH_REQUIRED\n');
 
     console.log('🎉 TS-21 requirePermission tests: OK');
   } catch (error) {

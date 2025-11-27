@@ -10,6 +10,7 @@ import {
 } from "@/features/auth/api/auth-api";
 import { setAccessToken, clearAccessToken, getAccessToken } from "@/shared/auth/token-storage";
 import { onUnauthenticated } from "@/shared/http";
+import { apiCache } from "@/shared/api/cache";
 import type { LoginResult } from "@/features/auth/api/auth-api";
 
 export type AuthUser = {
@@ -22,6 +23,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
+  accessToken: string | null;
+  tokenReady: boolean;
   login: (result: LoginResult) => Promise<void>;
   loginWithSession: (result: LoginResult) => Promise<void>;
   logout: () => Promise<void>;
@@ -35,6 +38,7 @@ const AUTH_STORAGE_KEY = "auth_user";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tokenReady, setTokenReady] = useState(false);
   const router = useRouter();
 
   // Initialize from localStorage and check session on mount
@@ -59,12 +63,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const session = await getCurrentSession();
           if (session) {
             setUser(session.user);
+            setTokenReady(true);
+          } else {
+            setTokenReady(false);
           }
         } catch (error) {
           console.error("Error restoring session:", error);
           clearAccessToken();
           localStorage.removeItem(AUTH_STORAGE_KEY);
+          setTokenReady(false);
         }
+      } else {
+        setTokenReady(false);
       }
 
       setLoading(false);
@@ -77,7 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear auth state and redirect to login
       setUser(null);
       clearAccessToken();
+      setTokenReady(false);
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      // Clear API cache on unauthenticated
+      apiCache.invalidate("session:current");
+      apiCache.invalidate("user:profile");
       const locale = window.location.pathname.split("/")[1] || "en";
       router.push(locale === "en" ? "/login" : `/${locale}/login`);
     });
@@ -88,7 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (result: LoginResult) => {
     setUser(result.user);
     setAccessToken(result.accessToken);
+    setTokenReady(true);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user));
+    // Clear cache on login to force fresh data fetch
+    apiCache.invalidate("session:current");
+    apiCache.invalidate("user:profile");
   };
 
   const loginWithSession = async (result: LoginResult) => {
@@ -113,7 +131,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       clearAccessToken();
+      setTokenReady(false);
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      // Clear API cache on logout
+      apiCache.invalidate("session:current");
+      apiCache.invalidate("user:profile");
     }
   };
 
@@ -121,6 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     isAuthenticated: user !== null,
     loading,
+    accessToken: getAccessToken(),
+    tokenReady,
     login,
     loginWithSession,
     logout,
@@ -137,3 +161,4 @@ export function useAuth() {
   }
   return context;
 }
+

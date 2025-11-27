@@ -11,6 +11,7 @@ import {
   PERMISSIONS,
   getAllPermissionKeys,
 } from './permissions.registry.js';
+import { redis } from '../../lib/redis.js';
 
 async function main() {
   console.log('🧪 Starting TS-20 permission service tests...\n');
@@ -214,6 +215,34 @@ async function main() {
     }
 
     console.log('   ✅ Content manager does NOT have workspace:settings.view\n');
+
+    // Test 5: Cache + invalidate
+    console.log('📋 Test 5: Permission cache + invalidate');
+    const cacheKey = `permissions:${ownerUser.id}:${demoWorkspace.id}`;
+    await redis.del(cacheKey);
+
+    await permissionService.getEffectivePermissionsForUserWorkspace({
+      userId: ownerUser.id,
+      workspaceId: demoWorkspace.id,
+    });
+
+    const cached = await redis.get(cacheKey);
+    if (!cached) {
+      throw new Error('Permission cache should be populated after first call');
+    }
+
+    const ttl = await redis.ttl(cacheKey);
+    if (ttl < 0) {
+      throw new Error('Permission cache should have a TTL');
+    }
+
+    await permissionService.invalidateUserWorkspace(ownerUser.id, demoWorkspace.id);
+    const afterInvalidate = await redis.get(cacheKey);
+    if (afterInvalidate) {
+      throw new Error('Permission cache should be cleared after invalidation');
+    }
+
+    console.log('   ✅ Cache set with TTL and cleared after invalidate\n');
 
     console.log('🎉 TS-20 permission service tests: OK');
   } catch (error) {

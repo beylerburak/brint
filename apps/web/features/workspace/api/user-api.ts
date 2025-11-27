@@ -1,4 +1,5 @@
 import { httpClient } from "@/shared/http";
+import { apiCache } from "@/shared/api/cache";
 
 export interface UserProfile {
   id: string;
@@ -25,15 +26,22 @@ export interface GetUserProfileResponse {
 
 /**
  * Get current user profile
+ * Uses global cache to prevent duplicate requests
  */
 export async function getUserProfile(): Promise<UserProfile> {
-  const response = await httpClient.get<GetUserProfileResponse>("/users/me");
+  return apiCache.getOrFetch(
+    "user:profile",
+    async () => {
+      const response = await httpClient.get<GetUserProfileResponse>("/users/me");
 
-  if (!response.ok) {
-    throw new Error(response.message || "Failed to get user profile");
-  }
+      if (!response.ok) {
+        throw new Error(response.message || "Failed to get user profile");
+      }
 
-  return response.data.data;
+      return response.data.data;
+    },
+    60000 // 60 seconds cache
+  );
 }
 
 export interface UpdateUserProfileRequest {
@@ -60,3 +68,4 @@ export async function updateUserProfile(
 
   return response.data.data;
 }
+

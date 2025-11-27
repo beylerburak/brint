@@ -9,10 +9,10 @@ import { sidebarNavigation, type NavigationContext } from "@/features/workspace/
 import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { useBrand } from "@/features/brand/context/brand-context";
 import { usePermissions } from "@/permissions";
+import { useSubscription } from "@/features/subscription";
 import { NavUser } from "@/features/workspace/components/sidebar/nav-user";
 import { SpaceSwitcher } from "@/features/workspace/components/sidebar/space-switcher";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
-import { getWorkspaceSubscription } from "@/shared/api/subscription";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,7 @@ import {
 import { useTranslations } from "next-intl";
 import { Settings, LifeBuoy } from "lucide-react";
 import { cn } from "@/shared/utils";
+import { SettingsDialog } from "@/features/settings";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const locale = useLocale();
@@ -37,25 +38,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { permissions } = usePermissions();
   const t = useTranslations("common");
 
+  const { plan: subscriptionPlan } = useSubscription();
   const [role, setRole] = React.useState<NavigationContext["role"]>(null);
-  const [subscriptionPlan, setSubscriptionPlan] =
-    React.useState<NavigationContext["subscriptionPlan"]>(null);
   const [availableWorkspaces, setAvailableWorkspaces] = React.useState<
     Array<{ id: string; slug: string; name?: string | null }>
   >([]);
 
-  // Derive role and subscription from backend session + subscription endpoint
+  // Derive role from backend session
   React.useEffect(() => {
     if (!workspace?.slug) {
       setRole(null);
-      setSubscriptionPlan(null);
       setAvailableWorkspaces([]);
       return;
     }
 
+    let cancelled = false;
+
     const load = async () => {
       try {
+        // getCurrentSession now uses global cache, so no need for local cache
         const session = await getCurrentSession();
+
+        if (cancelled) return;
+
         if (session) {
           const all = [
             ...(session.ownerWorkspaces ?? []),
@@ -67,38 +72,39 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         } else {
           setAvailableWorkspaces([]);
         }
+
+        if (cancelled) return;
+
         const ownerWs = session?.ownerWorkspaces?.find((w) => w.slug === workspace.slug);
         const memberWs = session?.memberWorkspaces?.find((w) => w.slug === workspace.slug);
 
         if (ownerWs) {
           setRole("OWNER");
-          const sub = await getWorkspaceSubscription(ownerWs.id);
-          if (sub?.plan) {
-            setSubscriptionPlan(sub.plan);
-          }
           return;
         }
 
         if (memberWs) {
           setRole("MEMBER");
-          const sub = await getWorkspaceSubscription(memberWs.id);
-          if (sub?.plan) {
-            setSubscriptionPlan(sub.plan);
-          }
           return;
         }
 
-        setRole(null);
-        setSubscriptionPlan(null);
+        if (!cancelled) {
+          setRole(null);
+        }
       } catch (error) {
-        console.warn("Failed to load navigation role/subscription", error);
-        setRole(null);
-        setSubscriptionPlan(null);
-        setAvailableWorkspaces([]);
+        if (!cancelled) {
+          console.warn("Failed to load navigation role", error);
+          setRole(null);
+          setAvailableWorkspaces([]);
+        }
       }
     };
 
     load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [workspace?.slug]);
 
   const navCtx: NavigationContext = {
@@ -181,7 +187,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          {secondaryItems.map((item) => (
+          {secondaryItems.map((item) => {
+            if (item.id === "preferences") {
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SettingsDialog>
+                    <SidebarMenuButton asChild>
+                      <button type="button" className="w-full">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SettingsDialog>
+                </SidebarMenuItem>
+              );
+            }
+            return (
             <SidebarMenuItem key={item.id}>
               <SidebarMenuButton asChild>
                 <Link href={item.href}>
@@ -190,7 +211,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-          ))}
+            );
+          })}
         </SidebarMenu>
         <NavUser />
       </SidebarFooter>

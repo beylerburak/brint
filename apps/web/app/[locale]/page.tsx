@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { getAccessToken } from "@/shared/auth/token-storage";
 import { routeResolver } from "@/shared/routing/route-resolver";

@@ -2,7 +2,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { locales, type Locale } from "@/shared/i18n/locales";
-import { AuthProvider } from "@/contexts/auth-context";
+import { AuthProvider } from "@/features/auth/context/auth-context";
 import { WorkspaceProvider } from "@/features/workspace/context/workspace-context";
 import { PermissionProvider } from "@/permissions";
 import { ProtectedLayout } from "@/components/protected-layout";

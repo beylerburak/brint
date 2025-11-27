@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { appConfig } from "@/shared/config/app";
 import { refreshToken, getCurrentSession } from "@/features/auth/api/auth-api";
 import { setAccessToken } from "@/shared/auth/token-storage";

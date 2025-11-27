@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { presignUpload, finalizeUpload } from "@/shared/api/media";
-import { updateUserProfile } from "@/shared/api/user";
+import { updateUserProfile } from "@/features/workspace/api/user-api";
 import {
   ImageCrop,
   ImageCropApply,

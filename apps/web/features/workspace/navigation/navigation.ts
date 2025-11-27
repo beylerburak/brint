@@ -1,4 +1,4 @@
-import { Home, Settings, Wand2, type LucideIcon } from "lucide-react";
+import { Home, Settings, Wand2, Building2, Users, Share2, FileText, type LucideIcon } from "lucide-react";
 
 export type NavigationContext = {
   locale: string;
@@ -31,6 +31,20 @@ export const sidebarNavigation: NavigationItem[] = [
     icon: Wand2,
     href: (ctx) => `/${ctx.locale}/${ctx.workspace}/studio`,
     show: (ctx) => ctx.permissions.includes("studio:brand.view"),
+  },
+  {
+    id: "brands",
+    label: { en: "Brands", tr: "Markalar" },
+    icon: Building2,
+    href: (ctx) => `/${ctx.locale}/${ctx.workspace}/brands`,
+    show: () => true,
+  },
+  {
+    id: "members",
+    label: { en: "Members", tr: "Üyeler" },
+    icon: Users,
+    href: (ctx) => `/${ctx.locale}/${ctx.workspace}/members`,
+    show: (ctx) => ctx.role === "OWNER" || ctx.role === "ADMIN",
   },
   {
     id: "workspaceSettings",

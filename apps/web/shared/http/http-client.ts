@@ -2,6 +2,7 @@ import { appConfig } from "../config";
 import type { HttpMethod, HttpResponse } from "./types";
 import { getAccessToken, setAccessToken, clearAccessToken } from "../auth/token-storage";
 import { refreshToken } from "@/features/auth/api/auth-api";
+import { getWorkspaceId } from "./workspace-header";
 
 interface RequestOptions extends RequestInit {
   method?: HttpMethod;
@@ -108,6 +109,13 @@ class HttpClient {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
 
+    // Get workspace ID - set header if we have a resolved workspace ID
+    // No heuristics - use the resolved workspace.id from context
+    const workspaceId = getWorkspaceId();
+    if (workspaceId && !headers["X-Workspace-Id"]) {
+      headers["X-Workspace-Id"] = workspaceId;
+    }
+
     // Log request
     console.log(`[HTTP] ${method} ${fullUrl}`);
 
@@ -134,8 +142,14 @@ class HttpClient {
         data = text as unknown as T;
       }
 
-      // Handle 401 Unauthorized - attempt refresh
-      if (response.status === 401 && !skipRefresh && retryCount < maxRetries) {
+      // Handle only recoverable errors: AUTH_REQUIRED, WORKSPACE_ID_REQUIRED
+      // Other 400/403 errors are not retried (they are permanent validation/permission errors)
+      const errorCode = (data as any)?.error?.code;
+      const isRecoverableError = 
+        (response.status === 401 && errorCode === "AUTH_REQUIRED") ||
+        (response.status === 400 && errorCode === "WORKSPACE_ID_REQUIRED");
+      
+      if (isRecoverableError && !skipRefresh && retryCount < maxRetries) {
         // Don't retry refresh endpoint itself
         if (url.includes("/auth/refresh")) {
           clearAccessToken();
@@ -148,20 +162,53 @@ class HttpClient {
           };
         }
 
-        // Attempt to refresh token
-        const newToken = await this.attemptRefresh();
+        // For 400 WORKSPACE_ID_REQUIRED, wait a bit for workspace to hydrate
+        if (response.status === 400 && errorCode === "WORKSPACE_ID_REQUIRED") {
+          // Wait with exponential backoff before retry
+          const delay = 200 * Math.pow(2, retryCount);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          
+          // Check if workspace ID is now available (no heuristic, just check if it exists)
+          const workspaceId = getWorkspaceId();
+          if (workspaceId) {
+            // Retry with workspace ID
+            return this.request<T>(method, url, body, options, retryCount + 1);
+          }
+        }
 
-        if (newToken) {
-          // Retry the original request with new token
-          return this.request<T>(method, url, body, options, retryCount + 1);
-        } else {
-          // Refresh failed
-          return {
-            ok: false,
-            status: 401,
-            message: "Authentication failed - please login again",
-            details: data,
-          };
+        // Attempt to refresh token for 401 errors
+        if (response.status === 401) {
+          const newToken = await this.attemptRefresh();
+
+          if (newToken) {
+            // Wait a bit to ensure token is set in storage
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            
+            // Retry the original request with new token
+            // Force get fresh token from storage
+            const freshToken = getAccessToken();
+            if (freshToken) {
+              return this.request<T>(method, url, body, options, retryCount + 1);
+            } else {
+              // Token not found after refresh - something went wrong
+              clearAccessToken();
+              emitUnauthenticated();
+              return {
+                ok: false,
+                status: 401,
+                message: "Authentication failed - token not found after refresh",
+                details: data,
+              };
+            }
+          } else {
+            // Refresh failed
+            return {
+              ok: false,
+              status: 401,
+              message: "Authentication failed - please login again",
+              details: data,
+            };
+          }
         }
       }
 

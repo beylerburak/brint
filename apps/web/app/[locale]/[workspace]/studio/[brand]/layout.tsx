@@ -1,4 +1,6 @@
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { BrandProvider } from "@/features/brand/context/brand-context";
+import { StudioSidebar, StudioHeader } from "@/features/studio";
 
 export default async function BrandLayout({
   children,
@@ -11,7 +13,15 @@ export default async function BrandLayout({
 
   return (
     <BrandProvider params={{ brand, workspace, locale }}>
-      {children}
+      <SidebarProvider>
+        <StudioSidebar />
+        <SidebarInset>
+          <StudioHeader />
+          <div className="flex flex-1 flex-col">
+            {children}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     </BrandProvider>
   );
 }

@@ -47,6 +47,8 @@ model Workspace {
   subscription Subscription? @relation("WorkspaceSubscription")
   invites   WorkspaceInvite[]
   media     Media[]
+  socialAccounts SocialAccount[]
+  brandContents  BrandContent[]
 
   @@map("workspaces")
 }
@@ -137,6 +139,8 @@ model Brand {
   updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   media       Media[]
+  socialAccounts SocialAccount[]
+  contents    BrandContent[]
 
   @@map("brands")
   @@unique([workspaceId, slug])
@@ -215,4 +219,42 @@ model Media {
   userAvatar User?
 
   @@map("media")
+}
+
+model SocialAccount {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  brandId      String
+  provider     String
+  externalId   String
+  handle       String
+  displayName  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("social_accounts")
+  @@unique([brandId, provider, externalId])
+  @@index([workspaceId, brandId])
+}
+
+model BrandContent {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  brandId      String
+  title        String
+  body         String?
+  status       String   @default("draft")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  publishedAt  DateTime?
+  scheduledAt  DateTime?
+
+  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("brand_contents")
+  @@index([workspaceId, brandId, createdAt])
 }

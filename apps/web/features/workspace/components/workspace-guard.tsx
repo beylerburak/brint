@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { useWorkspace } from "@/features/workspace/context/workspace-context";
 
 interface WorkspaceGuardProps {
@@ -70,7 +70,7 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
 
     // If workspace exists and on onboarding → redirect to workspace dashboard
     if (workspace && isOnOnboarding) {
-      const dashboardPath = `${localePrefix}/${workspace.slug}/dashboard`;
+      const dashboardPath = `${localePrefix}/${workspace.slug}`;
       router.replace(dashboardPath);
       return;
     }

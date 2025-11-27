@@ -30,7 +30,7 @@ export const sidebarNavigation: NavigationItem[] = [
     label: { en: "Brand Studio", tr: "Marka Stüdyo" },
     icon: Wand2,
     href: (ctx) => `/${ctx.locale}/${ctx.workspace}/studio`,
-    show: (ctx) => ctx.permissions.includes("studio:brand.view") && ctx.brand !== null,
+    show: (ctx) => ctx.permissions.includes("studio:brand.view"),
   },
   {
     id: "workspaceSettings",

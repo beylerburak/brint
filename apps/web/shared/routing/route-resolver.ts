@@ -76,3 +76,19 @@ function selectWorkspace(workspaces: WorkspaceLike[], fallbackSlug?: string | nu
   }
   return fallbackSlug ?? "";
 }
+
+/**
+ * Resolves the workspace-aware path when switching workspaces.
+ * Preserves the current route template (settings, studio, dashboard) in the new workspace.
+ */
+export function resolveWorkspacePath(locale: string, newWorkspace: string, pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+
+  const last = segments[segments.length - 1];
+
+  if (last === "settings") return `/${locale}/${newWorkspace}/settings`;
+  if (last === "studio") return `/${locale}/${newWorkspace}/studio`;
+
+  // default → dashboard
+  return `/${locale}/${newWorkspace}/dashboard`;
+}

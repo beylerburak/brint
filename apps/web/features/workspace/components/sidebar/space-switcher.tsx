@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { ChevronsUpDown, Plus } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { resolveWorkspacePath } from "@/shared/routing/route-resolver";
 
 import {
   DropdownMenu,
@@ -25,13 +27,26 @@ export function SpaceSwitcher({
 }: {
   teams: {
     name: string;
+    slug: string;
     logo: React.ElementType;
     plan: string;
   }[];
 }) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
   const [activeTeam, setActiveTeam] = React.useState(teams[0]);
   const t = useTranslations("common");
+
+  React.useEffect(() => {
+    if (!teams || teams.length === 0) return;
+    const segments = pathname.split("/").filter(Boolean);
+    const hasLocalePrefix = segments[0] === locale;
+    const currentWorkspaceSlug = hasLocalePrefix ? segments[1] : segments[0];
+    const matching = teams.find((team) => team.slug === currentWorkspaceSlug);
+    setActiveTeam(matching ?? teams[0]);
+  }, [teams, pathname, locale]);
 
   if (!activeTeam) {
     return null;
@@ -68,7 +83,11 @@ export function SpaceSwitcher({
             {teams.map((team, index) => (
               <DropdownMenuItem
                 key={team.name}
-                onClick={() => setActiveTeam(team)}
+                onClick={() => {
+                  setActiveTeam(team);
+                  const newPath = resolveWorkspacePath(locale, team.slug, pathname);
+                  router.push(newPath);
+                }}
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-md border">

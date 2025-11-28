@@ -1,37 +1,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
-import { BadRequestError, UnauthorizedError } from "../../lib/http-errors.js";
+import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
 import { permissionService } from "../../core/auth/permission.service.js";
 import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
 import { storageConfig } from "../../config/index.js";
-import { requireWorkspaceMatch } from "../../core/auth/require-workspace.js";
 
 const storage = new S3StorageService();
 
-type WorkspaceParams = {
-  workspaceId: string;
-};
-
-type WorkspaceMemberParams = WorkspaceParams & {
-  userId: string;
-};
-
-type UpdateWorkspaceMemberBody = {
-  role?: "OWNER" | "ADMIN" | "MEMBER";
-  status?: string;
-};
-
-const UpdateWorkspaceMemberSchema = z.object({
-  role: z.enum(["OWNER", "ADMIN", "MEMBER"]).optional(),
-  status: z.string().trim().min(1).max(50).optional(),
-});
-
 export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
   app.get("/workspaces/:workspaceId/members", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Get workspace members list",
@@ -76,10 +56,21 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Params: WorkspaceParams }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
+    }
+
     const members = await prisma.workspaceMember.findMany({
       where: {
-        workspaceId: request.params.workspaceId,
+        workspaceId,
       },
       include: {
         user: {
@@ -159,7 +150,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
   });
 
   app.patch("/workspaces/:workspaceId/members/:userId", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Update workspace member role/status",
@@ -189,8 +180,8 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Params: WorkspaceMemberParams; Body: UpdateWorkspaceMemberBody }>, reply: FastifyReply) => {
-    const { workspaceId, userId } = request.params;
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
     const headerWorkspaceId = request.auth?.workspaceId;
 
     if (!headerWorkspaceId) {
@@ -201,10 +192,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
     }
 
-    const parsed = UpdateWorkspaceMemberSchema.safeParse(request.body);
-    if (!parsed.success) {
-      throw new BadRequestError("INVALID_BODY", "Invalid member payload", parsed.error.flatten());
-    }
+    const body = request.body as any;
 
     const member = await prisma.workspaceMember.update({
       where: {
@@ -214,8 +202,8 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
         },
       },
       data: {
-        role: parsed.data.role ?? undefined,
-        status: parsed.data.status ?? undefined,
+        role: body.role ?? undefined,
+        status: body.status ?? undefined,
       },
     });
 

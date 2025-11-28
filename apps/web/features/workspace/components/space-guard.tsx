@@ -43,7 +43,11 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
         const session = await getCurrentSession();
         if (!session) {
           // Session invalid - clear auth state and redirect to login
+<<<<<<< HEAD:apps/web/features/workspace/components/space-guard.tsx
           console.warn("SpaceGuard: Session invalid, logging out user");
+=======
+          console.warn("WorkspaceGuard: Session invalid, logging out user");
+>>>>>>> origin/saj:apps/web/features/workspace/components/workspace-guard.tsx
           clearAccessToken();
           localStorage.removeItem("auth_user");
           apiCache.invalidate("session:current");
@@ -61,7 +65,11 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
           errorMessage.includes("UNAUTHORIZED") ||
           errorMessage.includes("Request failed with status 401")
         ) {
+<<<<<<< HEAD:apps/web/features/workspace/components/space-guard.tsx
           console.warn("SpaceGuard: Session invalid (401), logging out user:", errorMessage);
+=======
+          console.warn("WorkspaceGuard: Session invalid (401), logging out user:", errorMessage);
+>>>>>>> origin/saj:apps/web/features/workspace/components/workspace-guard.tsx
           clearAccessToken();
           localStorage.removeItem("auth_user");
           apiCache.invalidate("session:current");
@@ -71,7 +79,11 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
           return;
         }
         // Other errors - log but don't redirect (might be network issues)
+<<<<<<< HEAD:apps/web/features/workspace/components/space-guard.tsx
         console.error("SpaceGuard: Error verifying session:", error);
+=======
+        console.error("WorkspaceGuard: Error verifying session:", error);
+>>>>>>> origin/saj:apps/web/features/workspace/components/workspace-guard.tsx
       }
     })();
 

@@ -4,11 +4,10 @@ import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
 import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
 import { ensureDefaultWorkspaceRoles } from "./workspace-role.service.js";
-import { requireWorkspaceMatch } from "../../core/auth/require-workspace.js";
 
 export async function registerWorkspaceRoleRoutes(app: FastifyInstance) {
   app.get("/workspaces/:workspaceId/roles", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "List workspace roles with permissions",
@@ -66,6 +65,15 @@ export async function registerWorkspaceRoleRoutes(app: FastifyInstance) {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { workspaceId } = request.params as { workspaceId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
+    }
 
     // Backfill built-in roles if this workspace was created before defaults existed
     await ensureDefaultWorkspaceRoles(prisma, workspaceId);

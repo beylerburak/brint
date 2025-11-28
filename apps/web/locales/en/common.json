@@ -108,7 +108,11 @@
         "timezoneUpdated": "Timezone preference updated."
       },
       "notifications": "Notifications",
+<<<<<<< HEAD
       "connectionsLabel": "Connections",
+=======
+      "connections": "Connections",
+>>>>>>> origin/saj
       "account": "Account",
       "profileInfo": "Profile Information",
       "profileInfoDescription": "Manage your personal information",
@@ -131,7 +135,11 @@
       "twoStepVerificationDescription": "Add an additional layer of security to your account during login.",
       "addVerificationMethod": "Add verification method",
       "uploadImage": "Upload Image",
+<<<<<<< HEAD
       "maxFileSize": "Max file size: ",
+=======
+      "maxFileSize": "Max file size: 3MB",
+>>>>>>> origin/saj
       "addImage": "Add Image",
       "removeAvatar": "Remove avatar",
       "uploadAvatar": "Upload avatar",
@@ -143,6 +151,7 @@
       "avatarRemoveError": "Failed to remove avatar",
       "cropAvatar": "Crop Avatar",
       "cropAvatarDescription": "Adjust the crop area for your avatar. The image will be cropped to a square.",
+<<<<<<< HEAD
       "applyCrop": "Apply crop",
       "connections": {
         "title": "Connected Accounts",
@@ -169,6 +178,9 @@
           "connected": "Connected"
         }
       }
+=======
+      "applyCrop": "Apply crop"
+>>>>>>> origin/saj
     },
     "workspace": {
       "general": "General",

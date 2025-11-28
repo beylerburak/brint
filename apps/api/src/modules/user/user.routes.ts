@@ -1,46 +1,15 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { z } from "zod";
 import { userRepository } from "./user.repository.js";
 import { prisma } from "../../lib/prisma.js";
 import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
 import { storageConfig } from "../../config/index.js";
 import { MediaDeleteService } from "../media/application/media-delete.service.js";
-import { UnauthorizedError, NotFoundError, HttpError, BadRequestError } from "../../lib/http-errors.js";
-import { requireAuth } from "../../core/auth/require-auth.js";
 
 const storage = new S3StorageService();
 const mediaDeleteService = new MediaDeleteService(storage);
 
-type UpdateUserBody = {
-  name?: string | null;
-  username?: string | null;
-  locale?: string;
-  timezone?: string;
-  phone?: string | null;
-  avatarMediaId?: string | null;
-  completedOnboarding?: boolean;
-};
-
-const UpdateUserSchema = z.object({
-  name: z.string().trim().max(200).nullable().optional(),
-  username: z
-    .string()
-    .trim()
-    .min(3)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_.-]+$/)
-    .nullable()
-    .optional(),
-  locale: z.string().trim().min(2).max(10).optional(),
-  timezone: z.string().trim().min(2).max(50).optional(),
-  phone: z.string().trim().min(5).max(30).nullable().optional(),
-  avatarMediaId: z.string().uuid().nullable().optional(),
-  completedOnboarding: z.boolean().optional(),
-});
-
 export async function registerUserRoutes(app: FastifyInstance) {
   app.get("/users/me", {
-    preHandler: [requireAuth()],
     schema: {
       tags: ["Users"],
       summary: "Get current user profile",
@@ -65,7 +34,6 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 phone: { type: ["string", "null"] },
                 avatarMediaId: { type: ["string", "null"] },
                 avatarUrl: { type: ["string", "null"] },
-                googleId: { type: ["string", "null"] },
                 status: { type: "string" },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
@@ -77,18 +45,21 @@ export async function registerUserRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Body: UpdateUserBody }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.auth?.userId) {
+      return reply.status(401).send({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      });
+    }
 
     const user = await userRepository.findUserById(request.auth.userId);
     if (!user) {
-      throw new NotFoundError("USER_NOT_FOUND", "User not found");
+      return reply.status(404).send({
+        success: false,
+        error: { code: "USER_NOT_FOUND", message: "User not found" },
+      });
     }
-
-    // Get googleId from database
-    const dbUser = await prisma.user.findUnique({
-      where: { id: request.auth.userId },
-      select: { googleId: true },
-    });
 
     let avatarUrl: string | null = null;
     if (user.avatarMediaId) {
@@ -100,19 +71,10 @@ export async function registerUserRoutes(app: FastifyInstance) {
       }
     }
 
-    return reply.send({ 
-      success: true, 
-      data: { 
-        ...user.toJSON(), 
-        avatarMediaId: user.avatarMediaId, 
-        avatarUrl,
-        googleId: dbUser?.googleId ?? null,
-      } 
-    });
+    return reply.send({ success: true, data: { ...user.toJSON(), avatarMediaId: user.avatarMediaId, avatarUrl } });
   });
 
   app.patch("/users/me", {
-    preHandler: [requireAuth()],
     schema: {
       tags: ["Users"],
       summary: "Update current user profile",
@@ -149,7 +111,6 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 phone: { type: ["string", "null"] },
                 avatarMediaId: { type: ["string", "null"] },
                 avatarUrl: { type: ["string", "null"] },
-                googleId: { type: ["string", "null"] },
                 status: { type: "string" },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
@@ -162,18 +123,22 @@ export async function registerUserRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.auth?.userId) {
+      return reply.status(401).send({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      });
+    }
 
     const currentUser = await userRepository.findUserById(request.auth.userId);
     if (!currentUser) {
-      throw new NotFoundError("USER_NOT_FOUND", "User not found");
+      return reply.status(404).send({
+        success: false,
+        error: { code: "USER_NOT_FOUND", message: "User not found" },
+      });
     }
 
-    const parsed = UpdateUserSchema.safeParse(request.body);
-    if (!parsed.success) {
-      throw new BadRequestError("INVALID_BODY", "Invalid user payload", parsed.error.flatten());
-    }
-
-    const body = parsed.data;
+    const body = request.body as any;
     const completedOnboarding = body.completedOnboarding;
     const shouldRemoveAvatar = body.avatarMediaId === null;
     const avatarToDelete = shouldRemoveAvatar ? currentUser.avatarMediaId : null;
@@ -196,7 +161,10 @@ export async function registerUserRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         request.log.error({ error, avatarToDelete }, "Failed to delete avatar media");
-        throw new HttpError(500, "AVATAR_DELETE_FAILED", "Failed to delete avatar media");
+        return reply.status(500).send({
+          success: false,
+          error: { code: "AVATAR_DELETE_FAILED", message: "Failed to delete avatar media" },
+        });
       }
     }
 
@@ -210,95 +178,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
       }
     }
 
-    // Get googleId from database
-    const dbUser = await prisma.user.findUnique({
-      where: { id: request.auth.userId },
-      select: { googleId: true },
-    });
-
-    return reply.send({ 
-      success: true, 
-      data: { 
-        ...updated?.toJSON(), 
-        avatarMediaId: updated?.avatarMediaId ?? null, 
-        avatarUrl,
-        googleId: dbUser?.googleId ?? null,
-      } 
-    });
-  });
-
-  app.delete("/users/me/google-connection", {
-    preHandler: [requireAuth()],
-    schema: {
-      tags: ["Users"],
-      summary: "Disconnect Google account for current user",
-      security: [{ bearerAuth: [] }],
-      response: {
-        200: {
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            data: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                email: { type: "string" },
-                name: { type: ["string", "null"] },
-                username: { type: ["string", "null"] },
-                firstOnboardedAt: { type: ["string", "null"], format: "date-time" },
-                completedOnboarding: { type: "boolean" },
-                lastLoginAt: { type: ["string", "null"], format: "date-time" },
-                locale: { type: "string" },
-                timezone: { type: "string" },
-                phone: { type: ["string", "null"] },
-                avatarMediaId: { type: ["string", "null"] },
-                avatarUrl: { type: ["string", "null"] },
-                googleId: { type: ["string", "null"] },
-                status: { type: "string" },
-                createdAt: { type: "string", format: "date-time" },
-                updatedAt: { type: "string", format: "date-time" },
-              },
-              required: ["id", "email", "createdAt", "updatedAt", "completedOnboarding", "locale", "timezone", "status"],
-            },
-          },
-          required: ["success", "data"],
-        },
-      },
-    },
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
-
-    const user = await userRepository.findUserById(request.auth.userId);
-    if (!user) {
-      throw new NotFoundError("USER_NOT_FOUND", "User not found");
-    }
-
-    // Clear googleId
-    const updatedUser = await prisma.user.update({
-      where: { id: request.auth.userId },
-      data: { googleId: null },
-    });
-
-    const refreshedUser = await userRepository.findUserById(request.auth.userId);
-
-    let avatarUrl: string | null = null;
-    if (updatedUser.avatarMediaId) {
-      const media = await prisma.media.findUnique({ where: { id: updatedUser.avatarMediaId } });
-      if (media) {
-        avatarUrl = await storage.getPresignedDownloadUrl(media.objectKey, {
-          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
-        });
-      }
-    }
-
-    return reply.send({
-      success: true,
-      data: {
-        ...(refreshedUser?.toJSON() ?? updatedUser),
-        avatarMediaId: updatedUser.avatarMediaId ?? null,
-        avatarUrl,
-        googleId: null,
-      },
-    });
+    return reply.send({ success: true, data: { ...updated?.toJSON(), avatarMediaId: updated?.avatarMediaId ?? null, avatarUrl } });
   });
 
   app.get("/users/check-username/:username", {
@@ -331,12 +211,21 @@ export async function registerUserRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.auth?.userId) {
+      return reply.status(401).send({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      });
+    }
 
     const params = request.params as { username: string };
     const username = params.username.trim().toLowerCase();
 
     if (!username) {
-      throw new BadRequestError("INVALID_USERNAME", "Username is required");
+      return reply.status(400).send({
+        success: false,
+        error: { code: "INVALID_USERNAME", message: "Username is required" },
+      });
     }
 
     // Check if username is already taken by another user

@@ -3,8 +3,13 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+<<<<<<< HEAD
 import { SpaceSidebar } from "@/features/workspace/components/sidebar/space-sidebar";
 import { SpaceHeader } from "@/features/workspace/components/space-header";
+=======
+import { AppSidebar } from "@/features/workspace/components/sidebar/app-sidebar";
+import { WorkspaceHeader } from "@/features/workspace/components/workspace-header";
+>>>>>>> origin/saj
 import { ProfileCompletionDialog } from "@/features/workspace/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/workspace/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";

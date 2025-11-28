@@ -1,234 +1,21 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomUUID } from "crypto";
-import { z } from "zod";
 import { workspaceInviteService } from "./workspace-invite.service.js";
 import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
 import { prisma } from "../../lib/prisma.js";
-import { BadRequestError, ForbiddenError, UnauthorizedError, NotFoundError } from "../../lib/http-errors.js";
+import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
 import { sendWorkspaceInviteEmail } from "../../core/email/email.service.js";
 import { appUrlConfig } from "../../config/index.js";
 import { logger } from "../../lib/logger.js";
 import { setAuthCookies } from "../../core/auth/auth.cookies.js";
 import { tokenService } from "../../core/auth/token.service.js";
 import { sessionService } from "../../core/auth/session.service.js";
-import { requireWorkspaceMatch } from "../../core/auth/require-workspace.js";
-
-type WorkspaceParams = {
-  workspaceId: string;
-};
-
-type WorkspaceInviteParams = WorkspaceParams & {
-  inviteId: string;
-};
-
-type InviteTokenParam = {
-  token: string;
-};
-
-type CreateInviteBody = {
-  email: string;
-  expiresAt?: string | null;
-};
-
-const CreateInviteSchema = z.object({
-  email: z.string().trim().email(),
-  expiresAt: z.string().datetime().nullable().optional(),
-});
-
-const markDeprecated = (reply: FastifyReply, successor: string) => {
-  reply.header("Deprecation", "true");
-  reply.header("Link", `<${successor}>; rel="successor-version"`);
-};
-
-async function getInviteDetailsHandler(
-  request: FastifyRequest<{ Params: InviteTokenParam }>,
-  reply: FastifyReply
-) {
-  const { token } = request.params;
-  const invite = await workspaceInviteService.getByToken(token);
-  
-    if (!invite) {
-      throw new NotFoundError("INVITE_NOT_FOUND", "Invite not found");
-    }
-
-    if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
-      throw new BadRequestError("INVITE_EXPIRED", "Invite expired or already used");
-    }
-
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: invite.workspaceId },
-    select: { id: true, name: true, slug: true },
-  });
-
-    if (!workspace) {
-      throw new NotFoundError("WORKSPACE_NOT_FOUND", "Workspace not found");
-    }
-
-  let inviterName: string | null = null;
-  if (invite.invitedBy) {
-    const inviter = await prisma.user.findUnique({
-      where: { id: invite.invitedBy },
-      select: { name: true, email: true },
-    });
-    inviterName = inviter?.name ?? inviter?.email ?? null;
-  }
-
-  return reply.send({
-    success: true,
-    data: {
-      id: invite.id,
-      email: invite.email,
-      workspaceId: invite.workspaceId,
-      workspaceName: workspace.name,
-      workspaceSlug: workspace.slug,
-      invitedBy: invite.invitedBy,
-      invitedByName: inviterName,
-      status: invite.status,
-      expiresAt: invite.expiresAt.toISOString(),
-    },
-  });
-}
-
-async function loginWithInviteHandler(
-  request: FastifyRequest<{ Params: InviteTokenParam }>,
-  reply: FastifyReply
-) {
-  const { token } = request.params;
-  
-  const invite = await workspaceInviteService.getByToken(token);
-  
-  if (!invite) {
-    throw new NotFoundError("INVITE_NOT_FOUND", "Invite not found");
-  }
-
-  if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
-    throw new BadRequestError("INVITE_EXPIRED", "Invite expired or already used");
-  }
-
-  try {
-    let user = await prisma.user.findUnique({
-      where: { email: invite.email },
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: invite.email,
-          name: null,
-          emailVerified: new Date(),
-        },
-      });
-    } else if (!user.emailVerified) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerified: new Date() },
-      });
-    }
-
-    const tid = randomUUID();
-    await sessionService.createSession({
-      userId: user.id,
-      tid,
-      userAgent: request.headers["user-agent"] ?? null,
-      ipAddress: request.ip ?? null,
-    });
-
-    const accessToken = tokenService.signAccessToken({
-      sub: user.id,
-    });
-
-    const refreshToken = tokenService.signRefreshToken({
-      sub: user.id,
-      tid,
-    });
-
-    setAuthCookies(reply, {
-      accessToken,
-      refreshToken,
-    });
-
-    logger.info(
-      {
-        userId: user.id,
-        inviteId: invite.id,
-        email: invite.email,
-      },
-      "User logged in with invite token"
-    );
-
-    return reply.send({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-        accessToken,
-      },
-    });
-  } catch (error) {
-    logger.error(
-      {
-        error,
-        inviteId: invite.id,
-        email: invite.email,
-      },
-      "Error logging in with invite token"
-    );
-    throw new BadRequestError("INVITE_LOGIN_FAILED", "An unexpected error occurred", error);
-  }
-}
-
-async function acceptInviteHandler(
-  request: FastifyRequest<{ Params: InviteTokenParam }>,
-  reply: FastifyReply
-) {
-    if (!request.auth?.userId) {
-      throw new UnauthorizedError("UNAUTHORIZED");
-    }
-    const { token } = request.params;
-    const invite = await workspaceInviteService.getByToken(token);
-    if (!invite) {
-      throw new NotFoundError("INVITE_NOT_FOUND", "Invite not found");
-    }
-    if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
-      throw new BadRequestError("INVITE_EXPIRED", "Invite expired or already used");
-    }
-
-  await prisma.workspaceMember.upsert({
-    where: {
-      userId_workspaceId: {
-        userId: request.auth.userId,
-        workspaceId: invite.workspaceId,
-      },
-    },
-    update: {
-      role: "MEMBER",
-      status: "active",
-      joinedAt: new Date(),
-    },
-    create: {
-      userId: request.auth.userId,
-      workspaceId: invite.workspaceId,
-      role: "MEMBER",
-      status: "active",
-      invitedBy: invite.invitedBy,
-      invitedAt: invite.invitedAt ?? new Date(),
-      joinedAt: new Date(),
-    },
-  });
-
-  await workspaceInviteService.updateStatus(invite.id, "ACCEPTED");
-
-  return reply.send({ success: true, data: { workspaceId: invite.workspaceId, status: "ACCEPTED" } });
-}
 
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   // List invites for a workspace
   app.get("/workspaces/:workspaceId/invites", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "List workspace invites",
@@ -277,9 +64,26 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Params: WorkspaceParams }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: { code: "WORKSPACE_ID_REQUIRED", message: "X-Workspace-Id header is required" } 
+      });
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      return reply.status(403).send({ 
+        success: false, 
+        error: { code: "WORKSPACE_MISMATCH", message: "Workspace ID mismatch" } 
+      });
+    }
+
     const invites = await prisma.workspaceInvite.findMany({
-      where: { workspaceId: request.params.workspaceId },
+      where: { workspaceId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -302,7 +106,7 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
   // Create invite
   app.post("/workspaces/:workspaceId/invites", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Create a workspace invite",
@@ -332,17 +136,30 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Params: WorkspaceParams; Body: CreateInviteBody }>, reply: FastifyReply) => {
-    const parsed = CreateInviteSchema.safeParse(request.body);
-    if (!parsed.success) {
-      throw new BadRequestError("INVALID_BODY", "Invalid invite payload", parsed.error.flatten());
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: { code: "WORKSPACE_ID_REQUIRED", message: "X-Workspace-Id header is required" } 
+      });
     }
 
+    if (headerWorkspaceId !== workspaceId) {
+      return reply.status(403).send({ 
+        success: false, 
+        error: { code: "WORKSPACE_MISMATCH", message: "Workspace ID mismatch" } 
+      });
+    }
+
+    const body = request.body as any;
     const token = randomUUID();
-    const expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    const expiresAt = body.expiresAt ? new Date(body.expiresAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
     const invite = await workspaceInviteService.create({
-      email: parsed.data.email,
+      email: body.email,
       workspaceId,
       invitedBy: request.auth?.userId ?? "system",
       token,
@@ -375,7 +192,7 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
   // Cancel invite (expire) before acceptance
   app.delete("/workspaces/:workspaceId/invites/:inviteId", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Cancel a workspace invite (sets status to EXPIRED)",
@@ -405,12 +222,21 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Params: WorkspaceInviteParams }>, reply: FastifyReply) => {
-    const { workspaceId, inviteId } = request.params;
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, inviteId } = request.params as { workspaceId: string; inviteId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
+    }
 
     const invite = await workspaceInviteService.getById(inviteId);
     if (!invite) {
-      throw new NotFoundError("INVITE_NOT_FOUND", "Invite not found");
+      return reply.status(404).send({ success: false, error: { code: "INVITE_NOT_FOUND", message: "Invite not found" } });
     }
 
     if (invite.workspaceId !== workspaceId) {
@@ -418,7 +244,10 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
     }
 
     if (invite.status !== "PENDING") {
-      throw new BadRequestError("INVITE_NOT_CANCELLABLE", "Invite is not pending");
+      return reply.status(400).send({
+        success: false,
+        error: { code: "INVITE_NOT_CANCELLABLE", message: "Invite is not pending" },
+      });
     }
 
     const updated = await workspaceInviteService.updateStatus(invite.id, "EXPIRED");
@@ -474,24 +303,62 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request, reply) => {
-    markDeprecated(reply, "/public/invites/:token");
-    return getInviteDetailsHandler(request, reply);
-  });
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { token } = request.params as { token: string };
+    const invite = await workspaceInviteService.getByToken(token);
+    
+    if (!invite) {
+      return reply.status(404).send({ 
+        success: false, 
+        error: { code: "INVITE_NOT_FOUND", message: "Invite not found" } 
+      });
+    }
 
-  app.get("/public/invites/:token", {
-    schema: {
-      tags: ["Workspaces"],
-      summary: "Get workspace invite details by token (public prefix)",
-      params: {
-        type: "object",
-        properties: {
-          token: { type: "string" },
-        },
-        required: ["token"],
+    if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: { code: "INVITE_EXPIRED", message: "Invite expired or already used" } 
+      });
+    }
+
+    // Get workspace details
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: invite.workspaceId },
+      select: { id: true, name: true, slug: true },
+    });
+
+    if (!workspace) {
+      return reply.status(404).send({ 
+        success: false, 
+        error: { code: "WORKSPACE_NOT_FOUND", message: "Workspace not found" } 
+      });
+    }
+
+    // Get inviter name if available
+    let inviterName: string | null = null;
+    if (invite.invitedBy) {
+      const inviter = await prisma.user.findUnique({
+        where: { id: invite.invitedBy },
+        select: { name: true, email: true },
+      });
+      inviterName = inviter?.name ?? inviter?.email ?? null;
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        id: invite.id,
+        email: invite.email,
+        workspaceId: invite.workspaceId,
+        workspaceName: workspace.name,
+        workspaceSlug: workspace.slug,
+        invitedBy: invite.invitedBy,
+        invitedByName: inviterName,
+        status: invite.status,
+        expiresAt: invite.expiresAt.toISOString(),
       },
-    },
-  }, getInviteDetailsHandler);
+    });
+  });
 
   // Login with invite token (public endpoint)
   app.post("/workspace-invites/:token/login", {
@@ -542,24 +409,111 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request, reply) => {
-    markDeprecated(reply, "/public/invites/:token/login");
-    return loginWithInviteHandler(request, reply);
-  });
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { token } = request.params as { token: string };
+    
+    // Get invite by token
+    const invite = await workspaceInviteService.getByToken(token);
+    
+    if (!invite) {
+      return reply.status(404).send({ 
+        success: false, 
+        error: { code: "INVITE_NOT_FOUND", message: "Invite not found" } 
+      });
+    }
 
-  app.post("/public/invites/:token/login", {
-    schema: {
-      tags: ["Workspaces"],
-      summary: "Login with workspace invite token (public prefix)",
-      params: {
-        type: "object",
-        properties: {
-          token: { type: "string" },
+    if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
+      return reply.status(400).send({ 
+        success: false, 
+        error: { code: "INVITE_EXPIRED", message: "Invite expired or already used" } 
+      });
+    }
+
+    try {
+      // Find or create user by invite email
+      let user = await prisma.user.findUnique({
+        where: { email: invite.email },
+      });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: invite.email,
+            name: null,
+            emailVerified: new Date(),
+          },
+        });
+      } else if (!user.emailVerified) {
+        // Update emailVerified if not set
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: new Date() },
+        });
+      }
+
+      // Create session
+      const tid = randomUUID();
+      await sessionService.createSession({
+        userId: user.id,
+        tid,
+        userAgent: request.headers["user-agent"] ?? null,
+        ipAddress: request.ip ?? null,
+      });
+
+      // Generate tokens
+      const accessToken = tokenService.signAccessToken({
+        sub: user.id,
+      });
+
+      const refreshToken = tokenService.signRefreshToken({
+        sub: user.id,
+        tid,
+      });
+
+      // Set auth cookies
+      setAuthCookies(reply, {
+        accessToken,
+        refreshToken,
+      });
+
+      logger.info(
+        {
+          userId: user.id,
+          inviteId: invite.id,
+          email: invite.email,
         },
-        required: ["token"],
-      },
-    },
-  }, loginWithInviteHandler);
+        "User logged in with invite token"
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          },
+          accessToken,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          inviteId: invite.id,
+          email: invite.email,
+        },
+        "Error logging in with invite token"
+      );
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred",
+        },
+      });
+    }
+  });
 
   // Accept invite by token
   app.post("/workspace-invites/:token/accept", {
@@ -584,22 +538,45 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request, reply) => {
-    markDeprecated(reply, "/public/invites/:token/accept");
-    return acceptInviteHandler(request, reply);
-  });
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.auth?.userId) {
+      return reply.status(401).send({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } });
+    }
+    const { token } = request.params as { token: string };
+    const invite = await workspaceInviteService.getByToken(token);
+    if (!invite) {
+      return reply.status(404).send({ success: false, error: { code: "INVITE_NOT_FOUND", message: "Invite not found" } });
+    }
+    if (invite.status !== "PENDING" || invite.expiresAt < new Date()) {
+      return reply.status(400).send({ success: false, error: { code: "INVITE_EXPIRED", message: "Invite expired or already used" } });
+    }
 
-  app.post("/public/invites/:token/accept", {
-    schema: {
-      tags: ["Workspaces"],
-      summary: "Accept a workspace invite (public prefix)",
-      params: {
-        type: "object",
-        properties: {
-          token: { type: "string" },
+    // Upsert workspace member as MEMBER
+    await prisma.workspaceMember.upsert({
+      where: {
+        userId_workspaceId: {
+          userId: request.auth.userId,
+          workspaceId: invite.workspaceId,
         },
-        required: ["token"],
       },
-    },
-  }, acceptInviteHandler);
+      update: {
+        role: "MEMBER",
+        status: "active",
+        joinedAt: new Date(),
+      },
+      create: {
+        userId: request.auth.userId,
+        workspaceId: invite.workspaceId,
+        role: "MEMBER",
+        status: "active",
+        invitedBy: invite.invitedBy,
+        invitedAt: invite.invitedAt ?? new Date(),
+        joinedAt: new Date(),
+      },
+    });
+
+    await workspaceInviteService.updateStatus(invite.id, "ACCEPTED");
+
+    return reply.send({ success: true, data: { workspaceId: invite.workspaceId, status: "ACCEPTED" } });
+  });
 }

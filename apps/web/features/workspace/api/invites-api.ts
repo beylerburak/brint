@@ -98,7 +98,11 @@ export interface GetInviteDetailsResponse {
  */
 export async function getInviteDetails(token: string): Promise<GetInviteDetailsResponse["data"]> {
   const response = await httpClient.get<GetInviteDetailsResponse>(
+<<<<<<< HEAD
     `/public/invites/${token}`,
+=======
+    `/workspace-invites/${token}`,
+>>>>>>> origin/saj
     {
       skipAuth: true, // Public endpoint, no auth required
     }
@@ -132,7 +136,11 @@ export interface LoginWithInviteTokenResponse {
  */
 export async function loginWithInviteToken(token: string): Promise<LoginWithInviteTokenResponse["data"]> {
   const response = await httpClient.post<LoginWithInviteTokenResponse>(
+<<<<<<< HEAD
     `/public/invites/${token}/login`,
+=======
+    `/workspace-invites/${token}/login`,
+>>>>>>> origin/saj
     undefined,
     {
       skipAuth: true, // Public endpoint, no auth required

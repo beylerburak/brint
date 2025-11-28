@@ -4,7 +4,6 @@ import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
 import { MediaUploadService } from './application/media-upload.service.js';
 import { storageConfig } from '../../config/index.js';
 import { createHash } from 'crypto';
-import { BadRequestError, ConflictError, HttpError, NotFoundError } from '../../lib/http-errors.js';
 
 const storage = new S3StorageService();
 const mediaUploadService = new MediaUploadService(storage);
@@ -129,7 +128,13 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         select: { id: true },
       });
       if (!workspace) {
-        throw new NotFoundError('WORKSPACE_NOT_FOUND', 'Workspace not found');
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'WORKSPACE_NOT_FOUND',
+            message: 'Workspace not found',
+          },
+        });
       }
 
       const presign = await storage.getPresignedUploadUrl({
@@ -143,7 +148,13 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.send({ success: true, data: presign });
     } catch (error: any) {
-      throw new BadRequestError(error?.message ?? 'MEDIA_PRESIGN_ERROR', 'Failed to create presigned upload URL');
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: error?.message ?? 'MEDIA_PRESIGN_ERROR',
+          message: 'Failed to create presigned upload URL',
+        },
+      });
     }
   });
 
@@ -225,17 +236,14 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         details = error.details;
       }
       
-      if (status === 400) {
-        throw new BadRequestError(code, message, details);
-      }
-      if (status === 404) {
-        throw new NotFoundError(code, message, details);
-      }
-      if (status === 409) {
-        throw new ConflictError(code, message, details);
-      }
-
-      throw new HttpError(status, code, message, details);
+      return reply.status(status).send({
+        success: false,
+        error: {
+          code,
+          message,
+          ...(details && { details }),
+        },
+      });
     }
   });
 
@@ -254,7 +262,7 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const media = await prisma.media.findUnique({ where: { id: request.params.id } });
     if (!media) {
-      throw new NotFoundError('MEDIA_NOT_FOUND', 'Media not found');
+      return reply.status(404).send({ success: false, error: { code: 'MEDIA_NOT_FOUND', message: 'Media not found' } });
     }
 
     const url = await storage.getPresignedDownloadUrl(media.objectKey, {
@@ -279,7 +287,7 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const media = await prisma.media.findUnique({ where: { id: request.params.id } });
     if (!media) {
-      throw new NotFoundError('MEDIA_NOT_FOUND', 'Media not found');
+      return reply.status(404).send({ success: false, error: { code: 'MEDIA_NOT_FOUND', message: 'Media not found' } });
     }
 
     const variants = media.variants as Record<string, { key: string }> | null;

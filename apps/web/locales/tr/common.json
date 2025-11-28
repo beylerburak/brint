@@ -108,7 +108,11 @@
         "timezoneUpdated": "Saat dilimi tercihi güncellendi."
       },
       "notifications": "Bildirimler",
+<<<<<<< HEAD
       "connectionsLabel": "Bağlantılar",
+=======
+      "connections": "Bağlantılar",
+>>>>>>> origin/saj
       "account": "Hesap",
       "profileInfo": "Profil Bilgileri",
       "profileInfoDescription": "Kişisel bilgilerinizi yönetin",
@@ -131,7 +135,11 @@
       "twoStepVerificationDescription": "Giriş sırasında hesabınıza ek bir güvenlik katmanı ekleyin.",
       "addVerificationMethod": "Doğrulama yöntemi ekle",
       "uploadImage": "Resim Yükle",
+<<<<<<< HEAD
       "maxFileSize": "Maksimum dosya boyutu: ",
+=======
+      "maxFileSize": "Maksimum dosya boyutu: 3MB",
+>>>>>>> origin/saj
       "addImage": "Resim Ekle",
       "removeAvatar": "Avatarı kaldır",
       "uploadAvatar": "Avatar yükle",
@@ -143,6 +151,7 @@
       "avatarRemoveError": "Avatar kaldırılırken hata oluştu",
       "cropAvatar": "Avatar Kırp",
       "cropAvatarDescription": "Avatarınız için kırpma alanını ayarlayın. Görüntü kare olarak kırpılacaktır.",
+<<<<<<< HEAD
       "applyCrop": "Kırpmayı Uygula",
       "connections": {
         "title": "Bağlı Hesaplar",
@@ -169,6 +178,9 @@
           "connected": "Bağlı"
         }
       }
+=======
+      "applyCrop": "Kırpmayı Uygula"
+>>>>>>> origin/saj
     },
     "workspace": {
       "general": "Genel",

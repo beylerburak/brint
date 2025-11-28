@@ -33,10 +33,17 @@ function getBaseKeyWithoutExt(key: string): string {
   return key.slice(0, idx);
 }
 
+type VariantsConfig = typeof storageConfig.assets['content-image']['variants'];
+
 export async function generateImageVariants(
-  input: GenerateVariantsInput
+  input: GenerateVariantsInput & { variantsConfig?: VariantsConfig }
 ): Promise<{ variants: MediaVariants; files: GeneratedVariantFile[] }> {
-  const { buffer, contentType, baseKey } = input;
+  const {
+    buffer,
+    contentType,
+    baseKey,
+    variantsConfig = storageConfig.assets['content-image'].variants,
+  } = input;
 
   // Video ise variant üretme
   if (contentType.startsWith('video/')) {
@@ -51,8 +58,8 @@ export async function generateImageVariants(
   const variants: MediaVariants = {};
 
   // Thumbnail (crop)
-  if (storageConfig.variants.thumbnail) {
-    const { width, height, quality } = storageConfig.variants.thumbnail;
+  if (variantsConfig.thumbnail) {
+    const { width, height, quality } = variantsConfig.thumbnail;
     const key = `${base}-${VARIANT_SUFFIX.thumbnail}.${outputExt}`;
     variants.thumbnail = { width, height, key };
     variantTasks.push(
@@ -66,7 +73,7 @@ export async function generateImageVariants(
 
   // sm/md/lg
   (['sm', 'md', 'lg'] as const).forEach((sizeKey) => {
-    const cfg = storageConfig.variants[sizeKey];
+    const cfg = variantsConfig[sizeKey];
     if (!cfg) return;
     const { width, quality } = cfg;
     const key = `${base}-${VARIANT_SUFFIX[sizeKey]}.${outputExt}`;

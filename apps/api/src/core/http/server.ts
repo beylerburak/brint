@@ -13,6 +13,7 @@ import { registerUserRoutes } from '../../modules/user/user.routes.js';
 import { workspaceInviteRoutes } from '../../modules/workspace/workspace-invite.routes.js';
 import { registerSubscriptionRoutes } from '../../modules/workspace/subscription.routes.js';
 import { registerWorkspaceMemberRoutes } from '../../modules/workspace/workspace-member.routes.js';
+import { registerWorkspaceRoleRoutes } from '../../modules/workspace/workspace-role.routes.js';
 import { registerUsageRoutes } from '../../modules/workspace/usage.routes.js';
 import { registerWorkspaceRoutes } from '../../modules/workspace/workspace.routes.js';
 import { appConfig } from '../../config/index.js';
@@ -82,6 +83,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerUserRoutes(app);
   await registerSubscriptionRoutes(app);
   await registerWorkspaceMemberRoutes(app);
+  await registerWorkspaceRoleRoutes(app);
   await workspaceInviteRoutes(app);
   await registerUsageRoutes(app);
   await registerWorkspaceRoutes(app);

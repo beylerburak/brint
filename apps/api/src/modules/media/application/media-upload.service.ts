@@ -1,7 +1,9 @@
 import { prisma } from '../../../lib/prisma.js';
 import type { StorageService } from '../../../lib/storage/storage.service.js';
+import type { AssetType } from '../../../lib/storage/storage.types.js';
 import { generateImageVariants } from '../lib/image-optimizer.js';
 import { logger } from '../../../lib/logger.js';
+import { storageConfig } from '../../../config/index.js';
 
 export type FinalizeUploadInput = {
   objectKey: string;
@@ -9,13 +11,20 @@ export type FinalizeUploadInput = {
   brandId?: string;
   originalName: string;
   contentType?: string;
+  assetType?: AssetType;
 };
 
 export class MediaUploadService {
   constructor(private storage: StorageService) {}
 
   async finalizeUpload(input: FinalizeUploadInput) {
-    const { objectKey, workspaceId: workspaceIdOrSlug, brandId, originalName } = input;
+    const {
+      objectKey,
+      workspaceId: workspaceIdOrSlug,
+      brandId,
+      originalName,
+      assetType = 'content-image',
+    } = input;
 
     // 0) Workspace ID'yi bul (slug ise lookup yap)
     let workspaceId: string;
@@ -60,10 +69,14 @@ export class MediaUploadService {
     const sizeBytes = original.contentLength ?? original.buffer.byteLength;
 
     // 2) Image ise variant üret
+    const assetConfig =
+      storageConfig.assets[assetType] ?? storageConfig.assets['content-image'];
+
     const { variants, files } = await generateImageVariants({
       buffer: original.buffer,
       contentType,
       baseKey: objectKey,
+      variantsConfig: assetConfig.variants,
     });
 
     // 3) Variant'ları S3'e yükle

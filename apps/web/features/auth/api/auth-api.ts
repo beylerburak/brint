@@ -48,12 +48,16 @@ export interface GoogleCallbackResult {
 /**
  * Request a magic link email
  */
-export async function requestMagicLink(email: string): Promise<MagicLinkRequestResult> {
+export async function requestMagicLink(
+  email: string,
+  redirectTo?: string
+): Promise<MagicLinkRequestResult> {
   const response = await httpClient.post<{
     success: boolean;
     message: string;
   }>("/auth/magic-link", {
     email,
+    redirectTo,
   });
 
   if (!response.ok) {
@@ -202,6 +206,12 @@ export async function getCurrentSession(): Promise<{
         }>("/auth/me");
 
         if (!response.ok) {
+          // If 401, invalidate cache and throw error
+          if (response.status === 401) {
+            apiCache.invalidate("session:current");
+            apiCache.invalidate("user:profile");
+            throw new Error("Request failed with status 401");
+          }
           return null;
         }
 
@@ -216,6 +226,10 @@ export async function getCurrentSession(): Promise<{
           invites: response.data.data.invites,
         };
       } catch (error) {
+        // Re-throw 401 errors so ProtectedLayout can handle them
+        if (error instanceof Error && error.message.includes("401")) {
+          throw error;
+        }
         console.error("Error getting current session:", error);
         return null;
       }

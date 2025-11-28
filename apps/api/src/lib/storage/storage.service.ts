@@ -1,9 +1,12 @@
+import type { AssetType } from './storage.types.js';
+
 export type PresignedUploadRequest = {
   workspaceId: string;
   brandId?: string;
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  assetType?: AssetType;
 };
 
 export type PresignedUploadResponse = {

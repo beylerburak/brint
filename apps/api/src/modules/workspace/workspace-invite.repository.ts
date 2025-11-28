@@ -27,6 +27,12 @@ export class WorkspaceInviteRepository {
     });
   }
 
+  async findById(id: string) {
+    return prisma.workspaceInvite.findUnique({
+      where: { id },
+    });
+  }
+
   async updateStatus(id: string, status: "PENDING" | "ACCEPTED" | "EXPIRED") {
     return prisma.workspaceInvite.update({
       where: { id },

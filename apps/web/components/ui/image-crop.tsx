@@ -73,19 +73,38 @@ const getCroppedPngImage = async (
     throw new Error("Context is null, this should never happen.");
   }
 
-  const scaleX = imageSrc.naturalWidth / imageSrc.width;
-  const scaleY = imageSrc.naturalHeight / imageSrc.height;
+  // Get the actual rendered dimensions (what ReactCrop sees with object-contain)
+  // For object-contain images, we need to use the actual displayed size
+  const renderedWidth = imageSrc.offsetWidth || imageSrc.clientWidth || imageSrc.width;
+  const renderedHeight = imageSrc.offsetHeight || imageSrc.clientHeight || imageSrc.height;
+  const naturalWidth = imageSrc.naturalWidth;
+  const naturalHeight = imageSrc.naturalHeight;
 
-  ctx.imageSmoothingEnabled = false;
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  // Calculate scale factors: ReactCrop gives us coordinates in rendered pixels,
+  // but we need to map them to natural image pixels
+  const scaleX = naturalWidth / renderedWidth;
+  const scaleY = naturalHeight / renderedHeight;
 
+  // Calculate the actual crop dimensions in natural image coordinates
+  const cropX = Math.round(pixelCrop.x * scaleX);
+  const cropY = Math.round(pixelCrop.y * scaleY);
+  const cropWidth = Math.round(pixelCrop.width * scaleX);
+  const cropHeight = Math.round(pixelCrop.height * scaleY);
+
+  // Set canvas size to the crop dimensions
+  canvas.width = cropWidth;
+  canvas.height = cropHeight;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Draw the cropped portion of the image
   ctx.drawImage(
     imageSrc,
-    pixelCrop.x * scaleX,
-    pixelCrop.y * scaleY,
-    pixelCrop.width * scaleX,
-    pixelCrop.height * scaleY,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
     0,
     0,
     canvas.width,
@@ -196,9 +215,15 @@ export const ImageCrop = ({
 
   const applyCrop = async () => {
     if (!(imgRef.current && completedCrop)) {
+      console.error("Cannot apply crop: missing imgRef or completedCrop", {
+        hasImgRef: !!imgRef.current,
+        hasCompletedCrop: !!completedCrop,
+        completedCrop
+      });
       return;
     }
 
+    try {
     const croppedImage = await getCroppedPngImage(
       imgRef.current,
       1,
@@ -207,6 +232,9 @@ export const ImageCrop = ({
     );
 
     onCrop?.(croppedImage);
+    } catch (error) {
+      console.error("Error applying crop:", error);
+    }
   };
 
   const resetCrop = () => {
@@ -263,26 +291,54 @@ export const ImageCropContent = ({
     "--rc-focus-color": "var(--color-primary)",
   } as CSSProperties;
 
+  const reactCropClassName = cn(
+    // Container'ın tüm yüksekliğini kullan
+    "h-full w-full",
+    "[&_.ReactCrop__child-wrapper]:flex",
+    "[&_.ReactCrop__child-wrapper]:h-full",
+    "[&_.ReactCrop__child-wrapper]:w-full",
+    "[&_.ReactCrop__child-wrapper]:items-center",
+    "[&_.ReactCrop__child-wrapper]:justify-center",
+    // img container'ın tüm alanını kullanarak contain olsun
+    "[&_.ReactCrop__child-wrapper>img]:h-full",
+    "[&_.ReactCrop__child-wrapper>img]:w-full",
+    "[&_.ReactCrop__child-wrapper>img]:object-contain",
+    "[&_.ReactCrop__child-wrapper>img]:object-center"
+  );
+
   return (
-    <ReactCrop
-      className={cn("max-h-[277px] max-w-full", className)}
-      crop={crop}
-      onChange={handleChange}
-      onComplete={handleComplete}
-      style={{ ...shadcnStyle, ...style }}
-      {...reactCropProps}
-    >
-      {imgSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          alt="crop"
-          className="size-full"
-          onLoad={onImageLoad}
-          ref={imgRef}
-          src={imgSrc}
-        />
+    <div
+      className={cn(
+        // Container'ın tüm yüksekliğini kullan
+        "relative flex h-full w-full items-center justify-center overflow-hidden",
+        className
       )}
-    </ReactCrop>
+      style={style}
+    >
+      <ReactCrop
+        className={reactCropClassName}
+        crop={crop}
+        onChange={handleChange}
+        onComplete={handleComplete}
+        style={{ ...shadcnStyle, display: "flex", height: "100%", width: "100%" }}
+        {...reactCropProps}
+      >
+        {imgSrc && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            alt="crop"
+            className="block h-full w-full"
+            style={{
+              objectFit: "contain",
+              objectPosition: "center",
+            }}
+            onLoad={onImageLoad}
+            ref={imgRef}
+            src={imgSrc}
+          />
+        )}
+      </ReactCrop>
+    </div>
   );
 };
 

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { createLimitGuard } from '../../core/subscription/limit-checker.js';
 import { prisma } from '../../lib/prisma.js';
+import { ensureDefaultWorkspaceRoles } from './workspace-role.service.js';
 
 interface CreateWorkspaceBody {
   name: string;
@@ -66,6 +67,9 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
               slug,
             },
           });
+
+          // Ensure built-in roles + permissions exist for this workspace
+          await ensureDefaultWorkspaceRoles(tx, workspace.id);
 
           await tx.workspaceMember.create({
             data: {

@@ -9,6 +9,10 @@ export class WorkspaceInviteService {
     return workspaceInviteRepository.findByToken(token);
   }
 
+  async getById(id: string) {
+    return workspaceInviteRepository.findById(id);
+  }
+
   async updateStatus(id: string, status: "PENDING" | "ACCEPTED" | "EXPIRED") {
     return workspaceInviteRepository.updateStatus(id, status);
   }

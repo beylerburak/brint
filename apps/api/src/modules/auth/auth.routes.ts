@@ -861,9 +861,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Get all workspace memberships
+      // Get all active workspace memberships
       const allMemberships = await prisma.workspaceMember.findMany({
-        where: { userId },
+        where: { 
+          userId,
+          status: 'active', // Only return active memberships
+        },
         include: { workspace: true },
       });
 

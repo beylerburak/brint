@@ -5,6 +5,9 @@ import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { getCurrentSession } from "@/features/auth/api/auth-api";
+import { clearAccessToken } from "@/shared/auth/token-storage";
+import { apiCache } from "@/shared/api/cache";
 
 interface WorkspaceGuardProps {
   children: React.ReactNode;
@@ -33,6 +36,44 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
     if (!isAuthenticated) {
       return;
     }
+
+    // Verify session is still valid (security check)
+    void (async () => {
+      try {
+        const session = await getCurrentSession();
+        if (!session) {
+          // Session invalid - clear auth state and redirect to login
+          console.warn("WorkspaceGuard: Session invalid, logging out user");
+          clearAccessToken();
+          localStorage.removeItem("auth_user");
+          apiCache.invalidate("session:current");
+          apiCache.invalidate("user:profile");
+          const localePrefix = locale === "en" ? "" : `/${locale}`;
+          router.replace(`${localePrefix}/login`);
+          return;
+        }
+      } catch (error) {
+        // 401 or other auth error - logout and redirect to login
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes("401") ||
+          errorMessage.includes("Authentication") ||
+          errorMessage.includes("UNAUTHORIZED") ||
+          errorMessage.includes("Request failed with status 401")
+        ) {
+          console.warn("WorkspaceGuard: Session invalid (401), logging out user:", errorMessage);
+          clearAccessToken();
+          localStorage.removeItem("auth_user");
+          apiCache.invalidate("session:current");
+          apiCache.invalidate("user:profile");
+          const localePrefix = locale === "en" ? "" : `/${locale}`;
+          router.replace(`${localePrefix}/login`);
+          return;
+        }
+        // Other errors - log but don't redirect (might be network issues)
+        console.error("WorkspaceGuard: Error verifying session:", error);
+      }
+    })();
 
     // Don't redirect on public routes (login, signup, auth routes)
     const localePrefix = locale === "en" ? "" : `/${locale}`;

@@ -48,12 +48,16 @@ export interface GoogleCallbackResult {
 /**
  * Request a magic link email
  */
-export async function requestMagicLink(email: string): Promise<MagicLinkRequestResult> {
+export async function requestMagicLink(
+  email: string,
+  redirectTo?: string
+): Promise<MagicLinkRequestResult> {
   const response = await httpClient.post<{
     success: boolean;
     message: string;
   }>("/auth/magic-link", {
     email,
+    redirectTo,
   });
 
   if (!response.ok) {
@@ -194,7 +198,7 @@ export async function getCurrentSession(): Promise<{
         const response = await httpClient.get<{
           success: boolean;
           data: {
-            user: { id: string; email: string; name?: string | null };
+            user: { id: string; email: string; name?: string | null; googleId?: string | null };
             ownerWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
             memberWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
             invites?: Array<{ id: string; updatedAt?: string | null }>;
@@ -202,6 +206,12 @@ export async function getCurrentSession(): Promise<{
         }>("/auth/me");
 
         if (!response.ok) {
+          // If 401, invalidate cache and throw error
+          if (response.status === 401) {
+            apiCache.invalidate("session:current");
+            apiCache.invalidate("user:profile");
+            throw new Error("Request failed with status 401");
+          }
           return null;
         }
 
@@ -210,12 +220,17 @@ export async function getCurrentSession(): Promise<{
             id: response.data.data.user.id,
             email: response.data.data.user.email,
             name: response.data.data.user.name ?? undefined,
+            googleId: response.data.data.user.googleId ?? null,
           },
           ownerWorkspaces: response.data.data.ownerWorkspaces,
           memberWorkspaces: response.data.data.memberWorkspaces,
           invites: response.data.data.invites,
         };
       } catch (error) {
+        // Re-throw 401 errors so ProtectedLayout can handle them
+        if (error instanceof Error && error.message.includes("401")) {
+          throw error;
+        }
         console.error("Error getting current session:", error);
         return null;
       }

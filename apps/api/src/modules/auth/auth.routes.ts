@@ -779,6 +779,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
                     id: { type: 'string' },
                     email: { type: 'string' },
                     name: { type: ['string', 'null'] },
+                    googleId: { type: ['string', 'null'] },
                   },
                   required: ['id', 'email'],
                 },
@@ -861,9 +862,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Get all workspace memberships
+      // Get all active workspace memberships
       const allMemberships = await prisma.workspaceMember.findMany({
-        where: { userId },
+        where: { 
+          userId,
+          status: 'active', // Only return active memberships
+        },
         include: { workspace: true },
       });
 
@@ -898,6 +902,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
             id: user.id,
             email: user.email,
             name: user.name,
+            googleId: user.googleId ?? null,
           },
           ownerWorkspaces,
           memberWorkspaces,

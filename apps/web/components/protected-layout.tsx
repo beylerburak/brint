@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/features/auth/context/auth-context";
-import { getAccessToken } from "@/shared/auth/token-storage";
+import { getAccessToken, clearAccessToken } from "@/shared/auth/token-storage";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { routeResolver } from "@/shared/routing/route-resolver";
-import { useRef } from "react";
+import { apiCache } from "@/shared/api/cache";
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -23,14 +23,20 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const hasRedirectedFromPublic = useRef(false);
 
   // Check if current route is public
-  const publicRoutes = ["/login", "/signup", "/sign-up"];
+  const publicRoutes = ["/login", "/signup", "/sign-up", "/invites"];
   const isPublicRoute = publicRoutes.some((route) => {
     const localePrefix = locale === "en" ? "" : `/${locale}`;
-    return pathname === `${localePrefix}${route}` || pathname.startsWith(`${localePrefix}${route}/`);
+    return (
+      pathname === `${localePrefix}${route}` ||
+      pathname.startsWith(`${localePrefix}${route}/`) ||
+      // For default-locale paths when localePrefix is "as-needed"
+      (localePrefix === "" && (pathname === route || pathname.startsWith(`${route}/`)))
+    );
   });
 
   // Also allow auth routes (magic link verify, etc.)
@@ -55,6 +61,11 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
     // Don't redirect if already authenticated
     if (isAuthenticated && isPublic) {
+      // If on invites page with token, don't redirect - let user accept invite
+      if (pathname.includes("/invites") && searchParams.get("token")) {
+        return;
+      }
+
       // Prevent repeated redirects on the same public path
       if (hasRedirectedFromPublic.current) {
         return;
@@ -85,6 +96,46 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
       return;
     }
 
+    // For protected routes, verify session with backend
+    if (isAuthenticated && !isPublic) {
+      void (async () => {
+        try {
+          // Verify session is still valid by calling /auth/me
+          // This will throw if 401, or return null if invalid
+          const session = await getCurrentSession();
+          if (!session) {
+            // Session invalid - clear auth state and redirect to login
+            console.warn("Session invalid, logging out user");
+            clearAccessToken();
+            localStorage.removeItem("auth_user");
+            apiCache.invalidate("session:current");
+            apiCache.invalidate("user:profile");
+            router.replace(`${localePrefix}/login`);
+            return;
+          }
+        } catch (error) {
+          // 401 or other auth error - logout and redirect to login
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (
+            errorMessage.includes("401") ||
+            errorMessage.includes("Authentication") ||
+            errorMessage.includes("UNAUTHORIZED") ||
+            errorMessage.includes("Request failed with status 401")
+          ) {
+            console.warn("Session invalid (401), logging out user:", errorMessage);
+            clearAccessToken();
+            localStorage.removeItem("auth_user");
+            apiCache.invalidate("session:current");
+            apiCache.invalidate("user:profile");
+            router.replace(`${localePrefix}/login`);
+          } else {
+            console.error("ProtectedLayout session verification error:", error);
+          }
+        }
+      })();
+      return;
+    }
+
     if (isAuthenticated) {
       return;
     }
@@ -97,7 +148,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
     // Redirect to login
     const loginPath = localePrefix ? `${localePrefix}/login` : "/login";
     router.replace(loginPath);
-  }, [isAuthenticated, loading, router, pathname, locale, isPublic]);
+  }, [isAuthenticated, loading, router, pathname, locale, isPublic, searchParams]);
 
   // For public routes, always show children (even if not authenticated)
   if (isPublic) {

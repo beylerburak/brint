@@ -109,6 +109,24 @@ async function main() {
   });
   console.log('✅ Role: workspace-admin');
 
+  // workspace-member role (minimal permissions)
+  const memberRole = await prisma.role.upsert({
+    where: {
+      workspaceId_key: {
+        workspaceId: workspace.id,
+        key: 'workspace-member',
+      },
+    },
+    update: {},
+    create: {
+      workspaceId: workspace.id,
+      key: 'workspace-member',
+      name: 'Workspace Member',
+      description: 'Basic access to workspace content',
+    },
+  });
+  console.log('✅ Role: workspace-member');
+
   // 6. RolePermission
   // workspace-owner → all permissions
   for (const permission of permissions) {
@@ -154,6 +172,29 @@ async function main() {
     });
   }
   console.log(`✅ workspace-admin → ${adminPermissions.length} permissions`);
+
+  // workspace-member → minimal permissions (brand view)
+  const memberPermissionKeys = new Set([PERMISSIONS.STUDIO_BRAND_VIEW]);
+  const memberPermissions = permissions.filter((p) =>
+    memberPermissionKeys.has(p.key)
+  );
+
+  for (const permission of memberPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: memberRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: memberRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+  console.log(`✅ workspace-member → ${memberPermissions.length} permissions`);
 
   console.log('🎉 Seed completed successfully!');
 }

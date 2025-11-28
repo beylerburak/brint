@@ -51,6 +51,16 @@ export default function MagicLinkVerifyPage() {
         console.log("[Magic Link Verify] Result:", result);
         console.log("[Magic Link Verify] VerifyData:", verifyData);
 
+        const redirectTo = verifyData?.redirectTo ?? result.verifyData?.redirectTo ?? null;
+
+        if (redirectTo) {
+          const url = redirectTo.startsWith("http")
+            ? redirectTo
+            : new URL(redirectTo, window.location.origin).toString();
+          window.location.href = url;
+          return;
+        }
+
         const redirectPath = routeResolver({
           locale,
           hasToken: true,

@@ -32,11 +32,11 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import {
-  ImageCrop,
-  ImageCropApply,
-  ImageCropContent,
-  ImageCropReset,
-} from "@/components/ui/image-crop";
+  Cropper,
+  CropperImage,
+  CropperArea,
+  type CropperAreaData,
+} from "@/components/ui/cropper";
 import { createBrand } from "@/features/studio/api/brand-api";
 import { presignUpload, finalizeUpload } from "@/shared/api/media";
 import { apiCache } from "@/shared/api/cache";
@@ -67,8 +67,15 @@ export function CreateBrandDialog({
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [isCropApplied, setIsCropApplied] = React.useState(false);
   const [cropDialogOpen, setCropDialogOpen] = React.useState(false);
+  const [logoImageSrc, setLogoImageSrc] = React.useState<string | null>(null);
+  const [cropState, setCropState] = React.useState({ x: 0, y: 0 });
+  const [zoomState, setZoomState] = React.useState(1);
+  const [rotationState, setRotationState] = React.useState(0);
+  const [lastCropArea, setLastCropArea] = React.useState<CropperAreaData | null>(null);
+  const [shouldApplyCrop, setShouldApplyCrop] = React.useState(false);
   const [slugManuallyEdited, setSlugManuallyEdited] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
   const [formData, setFormData] = React.useState({
     name: "",
@@ -115,20 +122,93 @@ export function CreateBrandDialog({
     if (!file) return;
     setSelectedFile(file);
     setUploadFile(null);
-    setPreviewUrl(null); // Don't set preview until crop is applied
+    setPreviewUrl(null);
     setIsCropApplied(false);
-    setCropDialogOpen(true); // Open crop dialog when file is selected
+    setCropState({ x: 0, y: 0 });
+    setZoomState(1);
+    setRotationState(0);
+    
+    // Read file as data URL for cropper
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setLogoImageSrc(event.target?.result as string);
+      setCropDialogOpen(true);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleCrop = async (croppedDataUrl: string) => {
-    const res = await fetch(croppedDataUrl);
-    const blob = await res.blob();
+  const processCrop = React.useCallback((croppedAreaPixels: CropperAreaData) => {
+    if (!logoImageSrc || !canvasRef.current) return;
+
+    const image = new window.Image();
+    image.src = logoImageSrc;
+    image.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      canvas.width = croppedAreaPixels.width;
+      canvas.height = croppedAreaPixels.height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(
+        image,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+      );
+
+      const croppedDataUrl = canvas.toDataURL("image/png");
+      
+      fetch(croppedDataUrl)
+        .then((res) => res.blob())
+        .then((blob) => {
     const croppedFile = new File([blob], "brand-logo.png", { type: "image/png" });
     setUploadFile(croppedFile);
     setPreviewUrl(croppedDataUrl);
     setIsCropApplied(true);
-    setCropDialogOpen(false); // Close crop dialog after applying crop
-  };
+          setCropDialogOpen(false);
+        })
+        .catch((error) => {
+          console.error("Failed to process cropped image:", error);
+          toast({
+            title: "Error",
+            description: "Failed to process cropped image",
+            variant: "destructive",
+          });
+        });
+    };
+  }, [logoImageSrc, toast]);
+
+  const handleCropAreaChange = React.useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels);
+    
+    if (shouldApplyCrop && croppedAreaPixels) {
+      setShouldApplyCrop(false);
+      processCrop(croppedAreaPixels);
+    }
+  }, [shouldApplyCrop, processCrop]);
+
+  const handleCropComplete = React.useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels);
+    
+    if (shouldApplyCrop) {
+      setShouldApplyCrop(false);
+      processCrop(croppedAreaPixels);
+    }
+  }, [shouldApplyCrop, processCrop]);
 
 
   const uploadLogo = async (file: File): Promise<string | null> => {
@@ -218,6 +298,7 @@ export function CreateBrandDialog({
       setSelectedFile(null);
       setUploadFile(null);
       setPreviewUrl(null);
+      setLogoImageSrc(null);
       setIsCropApplied(false);
       if (inputRef.current) {
         inputRef.current.value = "";
@@ -244,6 +325,7 @@ export function CreateBrandDialog({
     setSelectedFile(null);
     setUploadFile(null);
     setPreviewUrl(null);
+    setLogoImageSrc(null);
     setIsCropApplied(false);
     setCropDialogOpen(false);
     if (inputRef.current) {
@@ -458,8 +540,12 @@ export function CreateBrandDialog({
           // If dialog is closed without applying crop, reset file selection
           if (!open && !isCropApplied) {
             setSelectedFile(null);
+            setLogoImageSrc(null);
             setPreviewUrl(null);
             setUploadFile(null);
+            setCropState({ x: 0, y: 0 });
+            setZoomState(1);
+            setRotationState(0);
             if (inputRef.current) {
               inputRef.current.value = "";
             }
@@ -473,29 +559,58 @@ export function CreateBrandDialog({
               Adjust the crop area for your brand logo. The image will be cropped to a square.
             </DialogDescription>
           </DialogHeader>
-          {selectedFile && (
+          {logoImageSrc && (
             <div className="space-y-4">
-              <ImageCrop
-                file={selectedFile}
-                aspect={1}
-                onCrop={handleCrop}
-              >
-                <div className="space-y-4">
-                  <ImageCropContent className="rounded-md border" />
+              <div className="relative w-full h-[400px] overflow-hidden rounded-lg border bg-muted">
+                <Cropper
+                  aspectRatio={1}
+                  zoom={zoomState}
+                  rotation={rotationState}
+                  crop={cropState}
+                  onCropChange={setCropState}
+                  onZoomChange={setZoomState}
+                  onRotationChange={setRotationState}
+                  onCropAreaChange={handleCropAreaChange}
+                  onCropComplete={handleCropComplete}
+                  minZoom={1}
+                  maxZoom={3}
+                  shape="rectangle"
+                  withGrid
+                >
+                  <CropperImage src={logoImageSrc} alt="Crop logo" />
+                  <CropperArea />
+                </Cropper>
+              </div>
                   <div className="flex gap-2 justify-end">
-                    <ImageCropReset asChild>
-                      <Button type="button" size="sm" variant="ghost">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setCropState({ x: 0, y: 0 });
+                    setZoomState(1);
+                    setRotationState(0);
+                  }}
+                >
                         Reset
                       </Button>
-                    </ImageCropReset>
-                    <ImageCropApply asChild>
-                      <Button type="button" size="sm" variant="default">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    if (lastCropArea) {
+                      processCrop(lastCropArea);
+                    } else {
+                      setShouldApplyCrop(true);
+                      setCropState((prev) => ({ ...prev }));
+                    }
+                  }}
+                >
                         Apply crop
                       </Button>
-                    </ImageCropApply>
                   </div>
-                </div>
-              </ImageCrop>
+              <canvas ref={canvasRef} className="hidden" />
             </div>
           )}
         </DialogContent>

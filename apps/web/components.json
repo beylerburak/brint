@@ -18,5 +18,7 @@
     "lib": "@/shared",
     "hooks": "@/shared/hooks"
   },
-  "registries": {}
+  "registries": {
+    "@blocks": "https://blocks.so/r/{name}.json"
+  }
 }

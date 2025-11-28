@@ -86,3 +86,54 @@ export async function sendMagicLinkEmail(to: string, url: string): Promise<void>
   }
 }
 
+/**
+ * Send workspace invite email
+ * Falls back to logging when SMTP is not configured.
+ */
+export async function sendWorkspaceInviteEmail(to: string, inviteUrl: string): Promise<void> {
+  if (!transporter) {
+    console.warn('[EMAIL] SMTP disabled, invite URL:', inviteUrl);
+    logger.info(
+      {
+        service: 'workspace',
+        type: 'workspace-invite-stub',
+        to,
+        inviteUrl,
+      },
+      'Workspace invite email stub (SMTP not configured)'
+    );
+    console.log(`\n📧 Workspace invite for ${to}:`);
+    console.log(`   ${inviteUrl}\n`);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: emailConfig.from,
+      to,
+      subject: 'You have been invited to a workspace',
+      html: `
+        <p>Hi,</p>
+        <p>You’ve been invited to join a workspace. Click the link below to continue:</p>
+        <p><a href="${inviteUrl}">${inviteUrl}</a></p>
+        <p>If you did not expect this invitation, you can ignore this email.</p>
+      `,
+    });
+
+    logger.info(
+      {
+        to,
+        inviteUrl: inviteUrl.substring(0, 80) + '...',
+      },
+      'Workspace invite email sent successfully'
+    );
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        to,
+      },
+      'Failed to send workspace invite email'
+    );
+  }
+}

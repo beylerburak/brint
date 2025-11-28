@@ -96,7 +96,11 @@ export class UserRepository {
         phone: data.phone ?? undefined,
         completedOnboarding: data.completedOnboarding ?? undefined,
         firstOnboardedAt: data.firstOnboardedAt ?? undefined,
-        avatarMediaId: data.avatarMediaId ?? undefined,
+        // allow explicit null to clear avatar
+        avatarMediaId:
+          data.avatarMediaId === null
+            ? null
+            : data.avatarMediaId ?? undefined,
       },
     });
 

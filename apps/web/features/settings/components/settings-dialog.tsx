@@ -9,13 +9,17 @@ import {
   FileText,
   HelpCircle,
   Link2,
+  Lock,
   Plug,
+  Plus,
   Settings,
   Share2,
   Shield,
   Sliders,
   User,
+  UserRoundIcon,
   Users,
+  X,
   Zap,
 } from "lucide-react"
 
@@ -29,8 +33,11 @@ import {
 } from "@/components/ui/breadcrumb"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
@@ -45,15 +52,96 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { useTranslations } from "next-intl"
-import { usePathname } from "next/navigation"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { useTranslations, useLocale } from "next-intl"
+import { usePathname, useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import { useAuth } from "@/features/auth/context/auth-context"
-import { getUserProfile } from "@/features/workspace/api/user-api"
+import { useWorkspace } from "@/features/workspace/context/workspace-context"
+import { presignUpload, finalizeUpload, getMediaConfig, type MediaConfig } from "@/shared/api/media"
+import { getUserProfile, updateUserProfile, checkUsernameAvailability, disconnectGoogleConnection, type UserProfile } from "@/features/workspace/api/user-api"
+import { apiCache } from "@/shared/api/cache"
+import { getCurrentSession, refreshToken, getGoogleOAuthUrl } from "@/features/auth/api/auth-api"
+import { getAccessToken } from "@/shared/auth/token-storage"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useToast } from "@/components/ui/use-toast"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  Cropper,
+  CropperImage,
+  CropperArea,
+  useCropper,
+  type CropperAreaData,
+} from "@/components/ui/cropper"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { CheckIcon, ChevronsUpDown } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { ChevronDown } from "lucide-react"
+import { locales, type Locale } from "@/shared/i18n/locales"
+import { WorkspaceMembersTable } from "./workspace-members-table"
+import { InviteMemberDialog } from "./invite-member-dialog"
+import { ConnectionCard } from "./connection-card"
 
 type NavItem = {
   id: string
@@ -89,7 +177,7 @@ const navGroups: NavGroup[] = [
       },
       {
         id: "connections",
-        translationKey: "settings.account.connections",
+        translationKey: "settings.account.connectionsLabel",
         icon: Link2,
       },
     ],
@@ -105,7 +193,7 @@ const navGroups: NavGroup[] = [
       },
       {
         id: "people",
-        translationKey: "settings.workspace.people",
+        translationKey: "settings.workspace.people.title",
         icon: Users,
       },
       {
@@ -178,17 +266,324 @@ function getInitials(name: string | null | undefined, email: string): string {
   return email.substring(0, 2).toUpperCase()
 }
 
+function ThemePreferenceSelect() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  const [open, setOpen] = React.useState(false)
+  const t = useTranslations("common")
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <button
+        className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground opacity-50 cursor-not-allowed rounded-md"
+        disabled
+      >
+        {t("settings.account.preferencesTheme") || "Theme"}
+        <ChevronDown className="h-3 w-3" />
+      </button>
+    )
+  }
+
+  const currentTheme = theme || "system"
+  const themeLabels = {
+    light: t("settings.account.preferencesThemeLight") || "Light",
+    dark: t("settings.account.preferencesThemeDark") || "Dark",
+    system: t("settings.account.preferencesThemeSystem") || "System",
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
+        >
+          {themeLabels[currentTheme as keyof typeof themeLabels]}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[180px]" align="end">
+        <DropdownMenuItem
+          onClick={() => {
+            setTheme("light")
+            setOpen(false)
+          }}
+          className={currentTheme === "light" ? "bg-accent" : ""}
+        >
+          {themeLabels.light}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setTheme("dark")
+            setOpen(false)
+          }}
+          className={currentTheme === "dark" ? "bg-accent" : ""}
+        >
+          {themeLabels.dark}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setTheme("system")
+            setOpen(false)
+          }}
+          className={currentTheme === "system" ? "bg-accent" : ""}
+        >
+          {themeLabels.system}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function LanguagePreferenceSelect() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentLocale = useLocale() as Locale
+  const [open, setOpen] = React.useState(false)
+  const t = useTranslations("common")
+
+  const localeLabels: Record<Locale, string> = {
+    en: "English",
+    tr: "Türkçe",
+  }
+
+  const switchLocale = (newLocale: Locale) => {
+    let pathWithoutLocale = pathname
+    if (currentLocale !== "en" || pathname.startsWith(`/${currentLocale}`)) {
+      pathWithoutLocale = pathname.replace(`/${currentLocale}`, "")
+    }
+    const newPath = newLocale === "en" 
+      ? pathWithoutLocale || "/"
+      : `/${newLocale}${pathWithoutLocale}`
+    router.push(newPath)
+    setOpen(false)
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
+        >
+          {localeLabels[currentLocale]}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[180px]" align="end">
+        {locales.map((locale) => (
+          <DropdownMenuItem
+            key={locale}
+            onClick={() => switchLocale(locale)}
+            className={currentLocale === locale ? "bg-accent" : ""}
+          >
+            {localeLabels[locale]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function TimezonePreferenceSelect() {
+  const [open, setOpen] = React.useState(false)
+  const [value, setValue] = React.useState("utc")
+  const t = useTranslations("common")
+
+  const timezones = [
+    { value: "utc", country: "UTC", offset: "UTC+0" },
+    { value: "est", country: "United States (Eastern)", offset: "UTC-5" },
+    { value: "pst", country: "United States (Pacific)", offset: "UTC-8" },
+  ]
+
+  const selectedTimezone = timezones.find(tz => tz.value === value)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors justify-between min-w-[200px]"
+        >
+          {selectedTimezone ? (
+            <span className="flex flex-col items-start">
+              <span className="font-medium">{selectedTimezone.country}</span>
+              <span className="text-xs text-muted-foreground">{selectedTimezone.offset}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Select timezone</span>
+          )}
+          <ChevronsUpDown className="h-3 w-3 text-muted-foreground/80 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0" align="end">
+        <Command>
+          <CommandInput placeholder="Search timezone..." />
+          <CommandList>
+            <CommandEmpty>No timezone found.</CommandEmpty>
+            <CommandGroup>
+              {timezones.map((tz) => (
+                <CommandItem
+                  key={tz.value}
+                  value={tz.country}
+                  onSelect={() => {
+                    setValue(tz.value === value ? "" : tz.value)
+                    setOpen(false)
+                  }}
+                >
+                  <span className="flex flex-col flex-1">
+                    <span className="font-medium">{tz.country}</span>
+                    <span className="text-muted-foreground text-sm">{tz.offset}</span>
+                  </span>
+                  {value === tz.value && <CheckIcon size={16} className="ml-auto" />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function CookieSettingsPopover() {
+  const [open, setOpen] = React.useState(false)
+  const [accepted, setAccepted] = React.useState(false)
+  const t = useTranslations("common")
+  const { toast } = useToast()
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="w-[180px]">
+          {t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[300px] p-4">
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium text-sm mb-2">
+              {t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings"}
+            </h4>
+            <p className="text-sm text-muted-foreground mb-4">
+              {t("settings.account.preferencesGroup.cookieSettingsDescription") || "Manage your cookie preferences."}
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm">
+              {t("settings.account.preferencesGroup.cookieAccepted") || "I accept cookies"}
+            </span>
+            <Switch
+              checked={accepted}
+              onCheckedChange={setAccepted}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel") || "Cancel"}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                // Save cookie preference
+                setOpen(false)
+                toast({
+                  title: t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings",
+                  description: t("settings.account.preferencesGroup.cookieSettingsSaved") || "Cookie preferences saved.",
+                })
+              }}
+            >
+              {t("save") || "Save"}
+            </Button>
+          </div>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function SettingsDialog({ children }: SettingsDialogProps) {
   const [open, setOpen] = React.useState(false)
   const [activeItem, setActiveItem] = React.useState<string | null>(null)
+  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false)
+  const [membersTableRefresh, setMembersTableRefresh] = React.useState(0)
+  const [isMobile, setIsMobile] = React.useState(false)
+  const [disconnectGoogleDialogOpen, setDisconnectGoogleDialogOpen] = React.useState(false)
   const t = useTranslations("common")
   const pathname = usePathname()
-  const { user: authUser } = useAuth()
-  const [profileUser, setProfileUser] = React.useState<{
-    name: string | null
-    email: string
-    avatarUrl: string | null | undefined
-  } | null>(null)
+  const { user: authUser, login } = useAuth()
+  const [profileUser, setProfileUser] = React.useState<UserProfile | null>(null)
+  const [usernameManuallyEdited, setUsernameManuallyEdited] = React.useState(false)
+  const [usernameAvailability, setUsernameAvailability] = React.useState<boolean | null>(null)
+  const [isCheckingUsername, setIsCheckingUsername] = React.useState(false)
+  const usernameCheckTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+  const { toast } = useToast()
+
+  const userProfileSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    username: z.string().min(1, "Username is required").regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+    email: z.string().email("Invalid email address"),
+    phone: z.string().optional(),
+  })
+
+  const [hasPassword, setHasPassword] = React.useState(false) // Static: false for now
+  const [originalName, setOriginalName] = React.useState<string>("")
+  const [isSavingName, setIsSavingName] = React.useState(false)
+  const [originalUsername, setOriginalUsername] = React.useState<string>("")
+  const [isSavingUsername, setIsSavingUsername] = React.useState(false)
+  const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
+  const [mediaConfig, setMediaConfig] = React.useState<MediaConfig | null>(null)
+  const [cropDialogOpen, setCropDialogOpen] = React.useState(false)
+  const [selectedAvatarFile, setSelectedAvatarFile] = React.useState<File | null>(null)
+  const [avatarImageSrc, setAvatarImageSrc] = React.useState<string | null>(null)
+  const [isCropApplied, setIsCropApplied] = React.useState(false)
+  const [cropState, setCropState] = React.useState({ x: 0, y: 0 })
+  const [zoomState, setZoomState] = React.useState(1)
+  const [rotationState, setRotationState] = React.useState(0)
+  const [lastCropArea, setLastCropArea] = React.useState<CropperAreaData | null>(null)
+  const [shouldApplyCrop, setShouldApplyCrop] = React.useState(false)
+  const avatarFileInputRef = React.useRef<HTMLInputElement>(null)
+  const canvasRef = React.useRef<HTMLCanvasElement>(null)
+  const { workspace, workspaceReady } = useWorkspace()
+  const [isGoogleActionLoading, setIsGoogleActionLoading] = React.useState(false)
+
+  type UserProfileFormData = z.infer<typeof userProfileSchema>
+
+  const form = useForm<UserProfileFormData>({
+    resolver: zodResolver(userProfileSchema),
+    defaultValues: {
+      name: "",
+      username: "",
+      email: "",
+      phone: "",
+    },
+  })
+
+  const watchedName = form.watch("name")
+  const watchedUsername = form.watch("username")
+  const googleConnected = !!((profileUser?.googleId ?? authUser?.googleId))
+  
+  // Track if name has changed
+  const nameHasChanged = watchedName !== originalName && watchedName.trim() !== ""
+  
+  // Track if username has changed
+  const usernameHasChanged = watchedUsername !== originalUsername && watchedUsername.trim() !== ""
+
+  // Check if mobile
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
 
   // Check if we're on a brand studio page: /[locale]/[workspace]/studio/[brandslug]/*
   const isBrandStudioPage = React.useMemo(() => {
@@ -209,9 +604,28 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     })
   }, [isBrandStudioPage])
 
+  // Load media config when dialog opens (used across multiple tabs)
+  React.useEffect(() => {
+    if (open && !mediaConfig) {
+      getMediaConfig()
+        .then((config) => {
+          setMediaConfig(config)
+        })
+        .catch((error) => {
+          console.error("Failed to load media config:", error)
+          // Continue with default values if config fails to load
+        })
+    }
+  }, [open, mediaConfig])
+
   React.useEffect(() => {
     if (!authUser) {
       setProfileUser(null)
+      return
+    }
+
+    // Don't load if dialog is closed
+    if (!open) {
       return
     }
 
@@ -219,20 +633,34 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
     const loadProfile = async () => {
       try {
+        // Invalidate cache when dialog opens to get fresh data (especially after OAuth callbacks)
+        apiCache.invalidate("user:profile")
+        
         const profile = await getUserProfile()
         if (cancelled) return
 
-        setProfileUser({
-          name: profile.name,
+        setProfileUser(profile)
+        const nameValue = profile.name || ""
+        const usernameValue = profile.username || ""
+        setOriginalName(nameValue)
+        setOriginalUsername(usernameValue)
+        form.reset({
+          name: nameValue,
+          username: usernameValue,
           email: profile.email,
-          avatarUrl: profile.avatarUrl,
+          phone: profile.phone || "",
         })
+        if (profile.username) {
+          setUsernameManuallyEdited(true)
+        }
       } catch (error) {
         if (!cancelled) {
-          setProfileUser({
-            name: authUser.name || null,
+          // Fallback to auth user data
+          form.reset({
+            name: authUser.name || "",
+            username: "",
             email: authUser.email,
-            avatarUrl: null,
+            phone: "",
           })
         }
       }
@@ -243,9 +671,455 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     return () => {
       cancelled = true
     }
-  }, [authUser])
+  }, [authUser, form, open])
 
-  const user = profileUser || (authUser
+  // Generate username from name (only if username hasn't been manually edited)
+  React.useEffect(() => {
+    if (watchedName && !usernameManuallyEdited && activeItem === "userProfile") {
+      const generatedUsername = watchedName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+      form.setValue("username", generatedUsername)
+    }
+  }, [watchedName, usernameManuallyEdited, form, activeItem])
+
+  // Check username availability when it changes
+  React.useEffect(() => {
+    if (activeItem !== "userProfile") return
+
+    // Clear previous timeout
+    if (usernameCheckTimeoutRef.current) {
+      clearTimeout(usernameCheckTimeoutRef.current)
+    }
+
+    // Don't check if username is empty
+    if (!watchedUsername?.trim()) {
+      setUsernameAvailability(null)
+      return
+    }
+
+    // Don't check if it's the same as current profile username
+    if (profileUser?.username === watchedUsername.trim().toLowerCase()) {
+      setUsernameAvailability(true)
+      return
+    }
+
+    // Debounce username check
+    setIsCheckingUsername(true)
+    let cancelled = false
+    usernameCheckTimeoutRef.current = setTimeout(async () => {
+      try {
+        const available = await checkUsernameAvailability(watchedUsername.trim().toLowerCase())
+        if (!cancelled) {
+          setUsernameAvailability(available)
+          setIsCheckingUsername(false)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          // Silently handle 401 errors - user might not be authenticated
+          if (error instanceof Error && error.message.includes("401")) {
+            setUsernameAvailability(null)
+            setIsCheckingUsername(false)
+            return
+          }
+          console.error("Error checking username availability:", error)
+          setUsernameAvailability(null)
+          setIsCheckingUsername(false)
+        }
+      }
+    }, 500)
+
+    return () => {
+      cancelled = true
+      if (usernameCheckTimeoutRef.current) {
+        clearTimeout(usernameCheckTimeoutRef.current)
+      }
+    }
+
+    return () => {
+      if (usernameCheckTimeoutRef.current) {
+        clearTimeout(usernameCheckTimeoutRef.current)
+      }
+    }
+  }, [watchedUsername, profileUser, activeItem])
+
+  const handleSaveName = async () => {
+    const currentName = watchedName.trim()
+    if (!currentName) {
+      toast({
+        title: t("error") || "Error",
+        description: t("fullName") + " " + (t("required") || "is required"),
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingName(true)
+    try {
+      const updated = await updateUserProfile({
+        name: currentName,
+      })
+
+      setProfileUser(updated)
+      setOriginalName(currentName)
+      toast({
+        title: t("profileUpdated") || "Profile updated",
+        description: t("profileUpdatedDescription") || "Your profile has been updated successfully.",
+      })
+    } catch (err) {
+      toast({
+        title: t("error") || "Error",
+        description: err instanceof Error ? err.message : t("profileUpdateError") || "Failed to update profile",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
+  const handleSaveUsername = async () => {
+    const currentUsername = watchedUsername.trim().toLowerCase()
+    if (!currentUsername) {
+      toast({
+        title: t("error") || "Error",
+        description: t("username") + " " + (t("required") || "is required"),
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate username availability before saving
+    if (usernameAvailability === false) {
+      toast({
+        title: t("error") || "Error",
+        description: t("usernameTaken") || "This username is already taken. Please choose a different one.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingUsername(true)
+    try {
+      const updated = await updateUserProfile({
+        username: currentUsername,
+      })
+
+      setProfileUser(updated)
+      setOriginalUsername(currentUsername)
+      toast({
+        title: t("profileUpdated") || "Profile updated",
+        description: t("profileUpdatedDescription") || "Your profile has been updated successfully.",
+      })
+    } catch (err) {
+      toast({
+        title: t("error") || "Error",
+        description: err instanceof Error ? err.message : t("profileUpdateError") || "Failed to update profile",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingUsername(false)
+    }
+  }
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Get limits from media config (default to 5MB per media-config.md if config not loaded)
+    const avatarLimits = mediaConfig?.assets?.avatar?.limits
+    const maxSizeBytes = avatarLimits?.maxFileSizeBytes || 5242880 // 5MB
+    const maxSizeMB = Math.round(maxSizeBytes / (1024 * 1024))
+    const allowedExtensions = avatarLimits?.allowedExtensions || ["jpg", "jpeg", "png", "webp"]
+    const allowedMimeTypes = avatarLimits?.allowedMimeTypes || ["image/jpeg", "image/png", "image/webp"]
+
+    // Check file size
+    if (file.size > maxSizeBytes) {
+      toast({
+        title: t("error") || "Error",
+        description: t("settings.account.avatarSizeError") || `File size exceeds ${maxSizeMB}MB limit`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check file extension
+    const fileExtension = file.name.split(".").pop()?.toLowerCase()
+    if (fileExtension && !allowedExtensions.includes(fileExtension)) {
+      toast({
+        title: t("error") || "Error",
+        description: t("settings.account.avatarExtensionError") || `File extension not allowed. Allowed extensions: ${allowedExtensions.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check MIME type
+    if (!allowedMimeTypes.includes(file.type)) {
+      toast({
+        title: t("error") || "Error",
+        description: t("settings.account.avatarMimeTypeError") || `File type not allowed. Allowed types: ${allowedMimeTypes.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Set file and open crop dialog
+    setSelectedAvatarFile(file)
+    setAvatarPreview(null)
+    setIsCropApplied(false)
+    setCropState({ x: 0, y: 0 })
+    setZoomState(1)
+    setRotationState(0)
+    
+    // Read file as data URL for cropper
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setAvatarImageSrc(event.target?.result as string)
+    setCropDialogOpen(true)
+  }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCropUpload = React.useCallback(async (croppedDataUrl: string, croppedFile: File) => {
+    // Set preview
+    setAvatarPreview(croppedDataUrl)
+    setIsCropApplied(true)
+    setCropDialogOpen(false)
+
+    // Upload avatar
+    if (!workspaceReady || !workspace?.id) {
+      toast({
+        title: t("error") || "Error",
+        description: t("settings.account.workspaceRequired") || "Workspace is required to upload avatar",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsUploadingAvatar(true)
+    try {
+      const presign = await presignUpload({
+        workspaceId: workspace.id,
+        fileName: croppedFile.name,
+        contentType: croppedFile.type,
+        sizeBytes: croppedFile.size,
+        assetType: "avatar",
+      })
+
+      await fetch(presign.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": croppedFile.type,
+        },
+        body: croppedFile,
+      })
+
+      const finalize = await finalizeUpload({
+        objectKey: presign.objectKey,
+        workspaceId: workspace.id,
+        originalName: croppedFile.name,
+        contentType: croppedFile.type,
+        assetType: "avatar",
+      })
+
+      // Update user profile with avatarMediaId
+      const updated = await updateUserProfile({
+        avatarMediaId: finalize.media.id,
+      })
+
+      setProfileUser(updated)
+      setAvatarPreview(null) // Clear preview after successful upload
+      setSelectedAvatarFile(null)
+      setAvatarImageSrc(null)
+      setIsCropApplied(false)
+      toast({
+        title: t("profileUpdated") || "Profile updated",
+        description: t("settings.account.avatarUploaded") || "Avatar uploaded successfully.",
+      })
+    } catch (err) {
+      console.error("Failed to upload avatar:", err)
+      toast({
+        title: t("error") || "Error",
+        description: err instanceof Error ? err.message : t("settings.account.avatarUploadError") || "Failed to upload avatar",
+        variant: "destructive",
+      })
+      setAvatarPreview(null)
+      setSelectedAvatarFile(null)
+      setAvatarImageSrc(null)
+      setIsCropApplied(false)
+    } finally {
+      setIsUploadingAvatar(false)
+      if (avatarFileInputRef.current) {
+        avatarFileInputRef.current.value = ""
+      }
+    }
+  }, [workspaceReady, workspace?.id, toast, t])
+
+  const processCrop = React.useCallback((croppedAreaPixels: CropperAreaData) => {
+    if (!avatarImageSrc || !canvasRef.current) return
+
+    // Create image from source
+    const image = new window.Image()
+    image.src = avatarImageSrc
+    image.onload = () => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      canvas.width = croppedAreaPixels.width
+      canvas.height = croppedAreaPixels.height
+
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
+
+      // Draw cropped portion
+      ctx.drawImage(
+        image,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+      )
+
+      const croppedDataUrl = canvas.toDataURL("image/png")
+      
+      // Convert cropped data URL to File
+      fetch(croppedDataUrl)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const croppedFile = new File([blob], "avatar.png", { type: "image/png" })
+          handleCropUpload(croppedDataUrl, croppedFile)
+        })
+        .catch((error) => {
+          console.error("Failed to process cropped image:", error)
+          toast({
+            title: t("error") || "Error",
+            description: t("settings.account.avatarCropError") || "Failed to process cropped image",
+            variant: "destructive",
+          })
+        })
+    }
+  }, [avatarImageSrc, handleCropUpload, toast, t])
+
+  const handleCropAreaChange = React.useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels)
+    
+    // If apply button was clicked, process the crop
+    if (shouldApplyCrop && croppedAreaPixels) {
+      setShouldApplyCrop(false)
+      processCrop(croppedAreaPixels)
+    }
+  }, [shouldApplyCrop, processCrop])
+
+  const handleCropComplete = React.useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels)
+    
+    // Only auto-process if apply button was clicked
+    if (shouldApplyCrop) {
+      setShouldApplyCrop(false)
+      processCrop(croppedAreaPixels)
+    }
+  }, [shouldApplyCrop, processCrop])
+
+
+  const handleRemoveAvatar = async () => {
+    setIsUploadingAvatar(true)
+    try {
+      const updated = await updateUserProfile({
+        avatarMediaId: null,
+      })
+
+      setProfileUser(updated)
+      setAvatarPreview(null)
+      
+      // Refresh session to update auth context
+      const session = await getCurrentSession()
+      if (session) {
+        const tokenResult = await refreshToken()
+        const allWorkspaces = [
+          ...session.ownerWorkspaces,
+          ...session.memberWorkspaces,
+        ].map((w) => ({
+          id: w.id,
+          slug: w.slug,
+          name: w.name,
+        }))
+        
+        await login({
+          user: session.user,
+          workspaces: allWorkspaces,
+          accessToken: tokenResult.accessToken,
+        })
+      }
+
+      toast({
+        title: t("profileUpdated") || "Profile updated",
+        description: t("settings.account.avatarRemoved") || "Avatar removed successfully.",
+      })
+    } catch (err) {
+      toast({
+        title: t("error") || "Error",
+        description: err instanceof Error ? err.message : t("settings.account.avatarRemoveError") || "Failed to remove avatar",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const triggerAvatarFileInput = () => {
+    avatarFileInputRef.current?.click()
+  }
+
+  const onSubmit = async (data: UserProfileFormData) => {
+    // Validate username availability before submitting
+    if (usernameAvailability === false) {
+      toast({
+        title: t("error") || "Error",
+        description: t("usernameTaken") || "This username is already taken. Please choose a different one.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const updated = await updateUserProfile({
+        name: data.name,
+        username: data.username.trim().toLowerCase(),
+        phone: data.phone || null,
+      })
+
+      setProfileUser(updated)
+      setOriginalName(data.name)
+      toast({
+        title: t("profileUpdated") || "Profile updated",
+        description: t("profileUpdatedDescription") || "Your profile has been updated successfully.",
+      })
+    } catch (err) {
+      toast({
+        title: t("error") || "Error",
+        description: err instanceof Error ? err.message : t("profileUpdateError") || "Failed to update profile",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const user = profileUser ? {
+    name: profileUser.name,
+    email: profileUser.email,
+    avatarUrl: profileUser.avatarUrl,
+  } : (authUser
     ? {
         name: authUser.name || null,
         email: authUser.email,
@@ -256,12 +1130,30 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const initials = user ? getInitials(user.name, user.email) : ""
   const displayName = user?.name || user?.email || ""
 
+  // Flatten all navigation items for mobile select
+  const allNavItems = React.useMemo(() => {
+    const items: Array<{ id: string; translationKey: string; groupId: string; groupName: string }> = []
+    visibleNavGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        items.push({
+          id: item.id,
+          translationKey: item.translationKey,
+          groupId: group.id,
+          groupName: group.translationKey,
+        })
+      })
+    })
+    return items
+  }, [visibleNavGroups])
+
+  const selectedNavItem = allNavItems.find((item) => item.id === activeItem)
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="overflow-hidden p-0 w-[70vw] h-[85vh] max-w-none sm:max-w-none">
+      <DialogContent className="overflow-hidden p-0 w-screen h-screen md:w-[70vw] md:h-[85vh] max-w-none sm:max-w-none" showCloseButton={!isMobile}>
         <DialogTitle className="sr-only">Settings</DialogTitle>
         <DialogDescription className="sr-only">
           Customize your settings here.
@@ -324,9 +1216,51 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               ))}
             </SidebarContent>
           </Sidebar>
+          {/* Tab content burada başlıyor */}
           <main className="flex h-full flex-1 flex-col overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-              <div className="flex items-center gap-2 px-4">
+              <div className="flex items-center gap-4 px-4 w-full">
+                {isMobile ? (
+                  <>
+                    <Select
+                      value={activeItem || ""}
+                      onValueChange={(value) => setActiveItem(value)}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder={t("settings.title")}>
+                          {selectedNavItem ? t(selectedNavItem.translationKey) : t("settings.title")}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {visibleNavGroups.map((group) => (
+                          <SelectGroup key={group.id}>
+                            <SelectLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                              {t(group.translationKey)}
+                            </SelectLabel>
+                            {group.items.map((item) => {
+                              // Skip userProfile in select as it's special
+                              if (item.id === "userProfile") return null
+                              return (
+                                <SelectItem key={item.id} value={item.id} className="pl-6">
+                                  <div className="flex items-center gap-2">
+                                    <item.icon className="h-4 w-4" />
+                                    <span>{t(item.translationKey)}</span>
+                                  </div>
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectGroup>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <DialogClose asChild>
+                      <button className="flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                      </button>
+                    </DialogClose>
+                  </>
+                ) : (
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem className="hidden md:block">
@@ -349,20 +1283,637 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                     })()}
                   </BreadcrumbList>
                 </Breadcrumb>
+                )}
               </div>
             </header>
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
-              {Array.from({ length: 10 }).map((_, i) => (
+            {/* Tab content burada başlıyor */}
+            {activeItem === "userProfile" ? (
+              <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 pt-0">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+                    {/* Account Section */}
+                    <div className="space-y-6">
+                      <h2 className="text-base font-semibold text-foreground">
+                        {t("settings.account.account") || "Account"}
+                      </h2>
+                      
+                      {/* Avatar and Preferred Name */}
+                      <div className="flex items-start gap-6">
+                        <div className="flex flex-col items-center">
+                          <div className="relative mb-2">
+                            <Avatar className="h-24 w-24 border-2 border-muted rounded-full">
+                              <AvatarImage src={avatarPreview || user?.avatarUrl || undefined} alt={displayName} />
+                              <AvatarFallback className="rounded-full">
+                                <UserRoundIcon
+                                  size={52}
+                                  className="text-muted-foreground"
+                                  aria-hidden="true"
+                                />
+                              </AvatarFallback>
+                            </Avatar>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute -top-0.5 -right-0.5 bg-accent rounded-full border-[3px] border-background h-8 w-8 hover:bg-accent"
+                              onClick={() => {
+                                if (avatarPreview || user?.avatarUrl) {
+                                  handleRemoveAvatar()
+                                } else {
+                                  triggerAvatarFileInput()
+                                }
+                              }}
+                              disabled={isUploadingAvatar}
+                            >
+                              {avatarPreview || user?.avatarUrl ? (
+                                <X className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Plus className="h-3 w-3 text-muted-foreground" />
+                              )}
+                              <span className="sr-only">
+                                {avatarPreview || user?.avatarUrl
+                                  ? (t("settings.account.removeAvatar") || "Remove avatar")
+                                  : (t("settings.account.uploadAvatar") || "Upload avatar")
+                                }
+                              </span>
+                            </Button>
+                          </div>
+                          {!(avatarPreview || user?.avatarUrl) && (
+                            <>
+                              <p className="text-center font-medium text-sm">
+                                {t("settings.account.uploadImage") || "Upload Image"}
+                              </p>
+                              <p className="text-center text-xs text-muted-foreground">
+                                {t("settings.account.maxFileSize") || "Max file size: "}{mediaConfig?.assets?.avatar?.limits?.maxFileSizeBytes ? Math.round(mediaConfig.assets.avatar.limits.maxFileSizeBytes / (1024 * 1024)) : 5}MB
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="mt-2"
+                                onClick={triggerAvatarFileInput}
+                                disabled={isUploadingAvatar}
+                              >
+                                {t("settings.account.addImage") || "Add Image"}
+                              </Button>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            ref={avatarFileInputRef}
+                            onChange={handleAvatarFileChange}
+                            accept="image/*"
+                            className="hidden"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-6">
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <div>
+                                <Label
+                                  htmlFor="name"
+                                  className="text-sm font-medium text-foreground mb-1.5 block"
+                                >
+                                  {t("settings.account.preferredName") || "Preferred name"}
+                                </Label>
+                                <FormControl>
+                                  <InputGroup className="max-w-md">
+                                    <InputGroupInput
+                                      {...field}
+                                      id="name"
+                                      placeholder={t("fullNamePlaceholder")}
+                                      disabled={form.formState.isSubmitting || isSavingName}
+                                    />
+                                    {nameHasChanged && (
+                                      <InputGroupAddon align="inline-end">
+                                        <InputGroupButton
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            handleSaveName()
+                                          }}
+                                          disabled={isSavingName}
+                                          variant="secondary"
+                                        >
+                                          {isSavingName ? t("saving") : t("save")}
+                                        </InputGroupButton>
+                                      </InputGroupAddon>
+                                    )}
+                                  </InputGroup>
+                                </FormControl>
+                                <FormMessage />
+                              </div>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="username"
+                            render={({ field }) => (
+                              <div>
+                                <Label
+                                  htmlFor="username"
+                                  className="text-sm font-medium text-foreground block mb-1.5"
+                                >
+                                  {t("username")}
+                                </Label>
+                                <FormControl>
+                                  <InputGroup
+                                    className={`max-w-md ${usernameHasChanged && watchedUsername?.trim() && usernameAvailability !== null
+                                      ? (usernameAvailability
+                                          ? "border-green-500 has-[[data-slot=input-group-control]:focus-visible]:border-green-500"
+                                          : "border-destructive has-[[data-slot=input-group-control]:focus-visible]:border-destructive")
+                                      : ""
+                                    }`}
+                                  >
+                                    <InputGroupAddon align="inline-start">
+                                      <span>@</span>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      {...field}
+                                      id="username"
+                                      onChange={(e) => {
+                                        setUsernameManuallyEdited(true)
+                                        field.onChange(e)
+                                      }}
+                                      placeholder={t("usernamePlaceholder")}
+                                      disabled={form.formState.isSubmitting || isSavingUsername}
+                                    />
+                                    {usernameHasChanged && (
+                                      <InputGroupAddon align="inline-end">
+                                        <InputGroupButton
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            handleSaveUsername()
+                                          }}
+                                          disabled={isSavingUsername || usernameAvailability === false}
+                                          variant="secondary"
+                                        >
+                                          {isSavingUsername ? t("saving") : t("save")}
+                                        </InputGroupButton>
+                                      </InputGroupAddon>
+                                    )}
+                                  </InputGroup>
+                                </FormControl>
+                                {usernameHasChanged && watchedUsername?.trim() && usernameAvailability !== null && (
+                                  <p className={`mt-1.5 text-xs ${usernameAvailability ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                                    <span className="inline-flex items-center gap-1.5">
+                                      {usernameAvailability ? (
+                                        <>
+                                          <CheckCircle2 className="size-3.5" />
+                                          <span>{t("usernameAvailable")}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <XCircle className="size-3.5" />
+                                          <span>{t("usernameTaken")}</span>
+                                        </>
+                                      )}
+                                    </span>
+                                  </p>
+                                )}
+                                {(!usernameHasChanged || !watchedUsername?.trim() || usernameAvailability === null) && (
+                                  <p className="mt-1.5 text-xs text-muted-foreground">
+                                    {t("usernameDescription")}
+                                  </p>
+                                )}
+                                <FormMessage />
+                              </div>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator className="my-8" />
+
+                    {/* Account security Section */}
+                    <div className="space-y-6">
+                      <h2 className="text-base font-semibold text-foreground">
+                        {t("settings.account.accountSecurity") || "Account security"}
+                      </h2>
+                      
+                      <div className="space-y-6">
+                        {/* Email */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <Label className="text-sm font-medium text-foreground block mb-1">
+                              {t("email")}
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              {form.watch("email") || user?.email}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              toast({
+                                title: t("settings.account.changeEmail") || "Change email",
+                                description: t("settings.account.changeEmailDescription") || "Email değiştirme özelliği yakında eklenecek",
+                              })
+                            }}
+                          >
+                            {t("settings.account.changeEmail") || "Change email"}
+                          </Button>
+                        </div>
+
+                        {/* Password */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <Label className="text-sm font-medium text-foreground block mb-1">
+                              {t("settings.account.password") || "Password"}
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              {t("settings.account.passwordDescription") || "Change your password to login to your account."}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled
+                          >
+                            {t("comingSoon") || "Yakında"}
+                          </Button>
+                        </div>
+
+                        {/* 2-step verification */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <Label className="text-sm font-medium text-foreground block mb-1">
+                              {t("settings.account.twoStepVerification") || "2-step verification"}
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              {t("settings.account.twoStepVerificationDescription") || "Add an additional layer of security to your account during login."}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled
+                          >
+                            {t("comingSoon") || "Yakında"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop-only bottom spacing */}
+                    <div className="hidden md:block h-[45px]" />
+                  </form>
+                </Form>
+              </div>
+            ) : (
+              <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-4 pt-0">
+                {activeItem === "people" ? (
+                 <div className="flex flex-col gap-6">
+                   <div className="flex items-center justify-between gap-4 rounded-lg border p-4 w-full">
+                     <div className="flex flex-col gap-2 flex-1 min-w-0">
+                       <div className="font-medium w-full break-words">{t("settings.workspace.people.inviteLinkTitle")}</div>
+                       <p className="text-sm text-muted-foreground w-full break-words">
+                         {t("settings.workspace.people.inviteLinkDescription")}
+                       </p>
+                     </div>
+                     <Button onClick={() => setInviteDialogOpen(true)} className="shrink-0">
+                       {t("settings.workspace.people.inviteButton")}
+                     </Button>
+                   </div>
+                  <Tabs defaultValue="members" className="w-full">
+                    <TabsList>
+                      <TabsTrigger value="members">{t("settings.workspace.people.tabs.members")}</TabsTrigger>
+                      <TabsTrigger value="contact">{t("settings.workspace.people.tabs.contact")}</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="members" className="mt-1">
+                      <WorkspaceMembersTable refreshTrigger={membersTableRefresh} />
+                    </TabsContent>
+                    <TabsContent value="contact" className="mt-1">
+                      <div className="flex items-center justify-center py-8">
+                        <span className="text-muted-foreground">{t("settings.workspace.people.contactContentComingSoon")}</span>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : activeItem === "preferences" ? (
+                <div className="flex flex-col gap-6">
+                  {/* Preferences Group */}
+                  <div className="space-y-4">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.account.preferences") || "Preferences"}
+                    </h2>
+                    <div className="rounded-lg border p-4 space-y-4">
+                      {/* Theme */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground block mb-1">
+                            {t("settings.account.preferencesTheme") || "Theme"}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {t("settings.account.preferencesThemeDescription") || "Choose your preferred theme for the application."}
+                          </p>
+                        </div>
+                        <ThemePreferenceSelect />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Language & Region Group */}
+                  <div className="space-y-4">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.account.preferencesGroup.languageRegion") || "Language & Region"}
+                    </h2>
+                    <div className="rounded-lg border p-4 space-y-4">
+                      {/* Language */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground block mb-1">
+                            {t("settings.account.preferencesGroup.language") || "Language"}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {t("settings.account.preferencesGroup.languageDescription") || "Choose your preferred language."}
+                          </p>
+                        </div>
+                        <LanguagePreferenceSelect />
+                      </div>
+
+                      {/* Start week on Monday */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground block mb-1">
+                            {t("settings.account.preferencesGroup.startWeekMonday") || "Start week on Monday"}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {t("settings.account.preferencesGroup.startWeekMondayDescription") || "Start the week on Monday instead of Sunday."}
+                          </p>
+                        </div>
+                        <Switch />
+                      </div>
+
+                      {/* Timezone */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground block mb-1">
+                            {t("settings.account.preferencesGroup.timezone") || "Timezone"}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {t("settings.account.preferencesGroup.timezoneDescription") || "Select your timezone."}
+                          </p>
+                        </div>
+                        <TimezonePreferenceSelect />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Privacy Group */}
+                  <div className="space-y-4">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.account.preferencesGroup.privacy") || "Privacy"}
+                    </h2>
+                    <div className="rounded-lg border p-4 space-y-4">
+                      {/* Cookie Settings */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground block mb-1">
+                            {t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings"}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {t("settings.account.preferencesGroup.cookieSettingsDescription") || "Manage your cookie preferences."}
+                          </p>
+                        </div>
+                        <CookieSettingsPopover />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : activeItem === "connections" ? (
+                <div className="flex flex-col gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.account.connections.title") || "Connected Accounts"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.account.connections.description") || "Manage your connected accounts and services."}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <ConnectionCard
+                      icon="/assets/🏢 Company=Google, 🏵️ Style=Original.svg"
+                      title={t("settings.account.connections.google.title") || "Google"}
+                      description={t("settings.account.connections.google.description") || "Connect your Google account to sign in and access Google services."}
+                      buttonText={
+                        googleConnected
+                          ? (isGoogleActionLoading ? "Disconnecting..." : (t("settings.account.connections.google.disconnect") || "Disconnect"))
+                          : (isGoogleActionLoading ? "Connecting..." : (t("settings.account.connections.google.connect") || "Connect"))
+                      }
+                      onButtonClick={async () => {
+                        if (googleConnected) {
+                          setDisconnectGoogleDialogOpen(true)
+                        } else {
+                          setIsGoogleActionLoading(true)
+                          try {
+                            const url = await getGoogleOAuthUrl()
+                            window.location.href = url
+                          } catch (error) {
+                            toast({
+                              title: t("error") || "Error",
+                              description: error instanceof Error ? error.message : t("settings.account.connections.google.connectDescription") || "Failed to start Google connection",
+                              variant: "destructive",
+                            })
+                          } finally {
+                            setIsGoogleActionLoading(false)
+                          }
+                        }
+                      }}
+                      connected={googleConnected}
+                      disabled={isGoogleActionLoading}
+                    />
+                    <ConnectionCard
+                      icon="/assets/🏢 Company=Telegram, 🏵️ Style=Original.svg"
+                      title={t("settings.account.connections.telegram.title") || "Telegram"}
+                      description={t("settings.account.connections.telegram.description") || "Connect your Telegram account to manage your messaging and notifications."}
+                      buttonText={t("comingSoon") || "Coming soon"}
+                      onButtonClick={() => {
+                        toast({
+                          title: t("comingSoon") || "Coming soon",
+                          description: t("settings.account.connections.telegram.comingSoonDescription") || "Telegram connection feature is coming soon.",
+                        })
+                      }}
+                      connected={false}
+                      disabled={true}
+                    />
+                  </div>
+                </div>
+              ) : (
+                Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
                   className="bg-muted/50 aspect-video rounded-xl"
                 />
-              ))}
-            </div>
+                ))
+              )}
+              </div>
+            )}
+            {/* Tab content burada bitiyor */}
           </main>
+          
         </SidebarProvider>
       </DialogContent>
+      
+      {/* Avatar Crop Dialog */}
+      <Dialog
+        open={cropDialogOpen}
+        onOpenChange={(open) => {
+          setCropDialogOpen(open)
+          // If dialog is closed without applying crop, reset file selection
+          if (!open && !isCropApplied) {
+            setSelectedAvatarFile(null)
+            setAvatarImageSrc(null)
+            setAvatarPreview(null)
+            setCropState({ x: 0, y: 0 })
+            setZoomState(1)
+            setRotationState(0)
+            if (avatarFileInputRef.current) {
+              avatarFileInputRef.current.value = ""
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] p-0 gap-0">
+          {avatarImageSrc && (
+            <>
+              <div className="p-6 w-full">
+                <DialogHeader className="mb-4">
+                  <DialogTitle>{t("settings.account.cropAvatar") || "Crop Avatar"}</DialogTitle>
+                  <DialogDescription>
+                    {t("settings.account.cropAvatarDescription") || "Adjust the crop area for your avatar. Drag to move, scroll to zoom, use arrow keys for fine adjustment."}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="w-full max-w-full max-h-[60vh] overflow-hidden flex items-center justify-center">
+                  <div className="relative w-full max-w-md h-[400px] overflow-hidden rounded-lg border bg-muted">
+                    <Cropper
+                      aspectRatio={1}
+                      zoom={zoomState}
+                      rotation={rotationState}
+                      crop={cropState}
+                      onCropChange={setCropState}
+                      onZoomChange={setZoomState}
+                      onRotationChange={setRotationState}
+                      onCropAreaChange={handleCropAreaChange}
+                      onCropComplete={handleCropComplete}
+                      minZoom={1}
+                      maxZoom={3}
+                      shape="circle"
+                      withGrid
+                    >
+                      <CropperImage src={avatarImageSrc} alt="Crop avatar" />
+                      <CropperArea />
+                    </Cropper>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 pt-0 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setCropState({ x: 0, y: 0 })
+                    setZoomState(1)
+                    setRotationState(0)
+                  }}
+                >
+                    {t("reset") || "Reset"}
+                  </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    // Use last crop area if available, otherwise trigger a crop area update
+                    if (lastCropArea) {
+                      processCrop(lastCropArea)
+                    } else {
+                      // Set flag to process on next crop area change
+                      setShouldApplyCrop(true)
+                      // Force a crop area update by triggering a small state change
+                      setCropState((prev) => ({ ...prev }))
+                    }
+                  }}
+                >
+                    {t("settings.account.applyCrop") || "Apply crop"}
+                  </Button>
+              </div>
+              <canvas ref={canvasRef} className="hidden" />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      {/* Disconnect Google Dialog */}
+      <Dialog open={disconnectGoogleDialogOpen} onOpenChange={setDisconnectGoogleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("settings.account.connections.google.disconnect") || "Disconnect Google"}</DialogTitle>
+            <DialogDescription>
+              {t("settings.account.connections.google.disconnectConfirmDescription") || "You will need to reconnect your Google account to use Google services again."}
+            </DialogDescription>
+          </DialogHeader>
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {t("settings.account.connections.google.disconnectAlert") || "To access your account again, you will need to use your email address:"} <strong>{authUser?.email || profileUser?.email}</strong>
+            </AlertDescription>
+          </Alert>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDisconnectGoogleDialogOpen(false)}
+              disabled={isGoogleActionLoading}
+            >
+              {t("cancel") || "Cancel"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsGoogleActionLoading(true)
+                try {
+                  const updatedProfile = await disconnectGoogleConnection()
+                  setProfileUser(updatedProfile)
+
+                  const token = getAccessToken()
+                  if (authUser && token) {
+                    await login({
+                      user: { ...authUser, googleId: null },
+                      workspaces: [],
+                      accessToken: token,
+                    })
+                  }
+
+                  setDisconnectGoogleDialogOpen(false)
+                  toast({
+                    title: t("settings.account.connections.google.disconnect") || "Disconnect Google",
+                    description: t("settings.account.connections.google.disconnectDescription") || "Google connection will be disconnected.",
+                  })
+                } catch (error) {
+                  toast({
+                    title: t("error") || "Error",
+                    description: error instanceof Error ? error.message : (t("settings.account.connections.google.disconnectDescription") || "Failed to disconnect Google"),
+                    variant: "destructive",
+                  })
+                } finally {
+                  setIsGoogleActionLoading(false)
+                }
+              }}
+              disabled={isGoogleActionLoading}
+            >
+              {isGoogleActionLoading ? (t("saving") || "Disconnecting...") : (t("settings.account.connections.google.disconnect") || "Disconnect")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <InviteMemberDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        onInviteSent={() => {
+          setMembersTableRefresh((prev) => prev + 1)
+        }}
+      />
     </Dialog>
   )
 }
-

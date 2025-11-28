@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { GalleryVerticalEnd } from "lucide-react"
 import { useTranslations, useLocale } from "next-intl"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -33,6 +34,7 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const t = useTranslations("common")
   const locale = useLocale()
+  const searchParams = useSearchParams()
   const signupPath = locale === "en" ? "/signup" : `/${locale}/signup`
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,7 +51,8 @@ export function LoginForm({
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true)
     try {
-      await requestMagicLink(data.email)
+      const redirectTo = searchParams.get("redirectTo") || undefined
+      await requestMagicLink(data.email, redirectTo)
       toast({
         title: "Magic link sent",
         description: "Check your email for the magic link to sign in.",

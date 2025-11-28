@@ -6,12 +6,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { presignUpload, finalizeUpload } from "@/shared/api/media";
 import { updateUserProfile } from "@/features/workspace/api/user-api";
 import {
-  ImageCrop,
-  ImageCropApply,
-  ImageCropContent,
-  ImageCropReset,
-} from "@/components/ui/image-crop";
-import type { PixelCrop } from "react-image-crop";
+  Cropper,
+  CropperImage,
+  CropperArea,
+  type CropperAreaData,
+} from "@/components/ui/cropper";
 
 type Props = {
   workspaceSlug: string;
@@ -19,12 +18,19 @@ type Props = {
 
 export function AvatarUploadDemo({ workspaceSlug }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isCropApplied, setIsCropApplied] = useState(false);
+  const [avatarImageSrc, setAvatarImageSrc] = useState<string | null>(null);
+  const [cropState, setCropState] = useState({ x: 0, y: 0 });
+  const [zoomState, setZoomState] = useState(1);
+  const [rotationState, setRotationState] = useState(0);
+  const [lastCropArea, setLastCropArea] = useState<CropperAreaData | null>(null);
+  const [shouldApplyCrop, setShouldApplyCrop] = useState(false);
 
   const handleSelectFile = () => {
     inputRef.current?.click();
@@ -34,9 +40,19 @@ export function AvatarUploadDemo({ workspaceSlug }: Props) {
     const file = event.target.files?.[0];
     if (!file) return;
     setSelectedFile(file);
-    setUploadFile(null); // Reset upload file - will be set when crop is applied
-    setPreviewUrl(URL.createObjectURL(file));
+    setUploadFile(null);
+    setPreviewUrl(null);
     setIsCropApplied(false);
+    setCropState({ x: 0, y: 0 });
+    setZoomState(1);
+    setRotationState(0);
+    
+    // Read file as data URL for cropper
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setAvatarImageSrc(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const uploadAvatar = async (file: File) => {
@@ -93,61 +109,77 @@ export function AvatarUploadDemo({ workspaceSlug }: Props) {
     void uploadAvatar(uploadFile);
   };
 
-  const handleCrop = async (croppedDataUrl: string) => {
-    const res = await fetch(croppedDataUrl);
-    const blob = await res.blob();
-    const croppedFile = new File([blob], "avatar-crop.png", { type: "image/png" });
-    setUploadFile(croppedFile);
-    setPreviewUrl(croppedDataUrl);
-    setIsCropApplied(true);
-  };
+  const processCrop = useCallback((croppedAreaPixels: CropperAreaData) => {
+    if (!avatarImageSrc || !canvasRef.current) return;
+    
+    const image = new window.Image();
+    image.src = avatarImageSrc;
+    image.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-  // Auto-apply crop when crop area changes
-  const applyCropToFile = useCallback(async (pixelCrop: PixelCrop) => {
-    if (!selectedFile) return;
-    
-    const img = new Image();
-    img.src = URL.createObjectURL(selectedFile);
-    
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = reject;
-    });
-    
-    const canvas = document.createElement("canvas");
+      canvas.width = croppedAreaPixels.width;
+      canvas.height = croppedAreaPixels.height;
+
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      URL.revokeObjectURL(img.src);
-      return;
-    }
-    
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
-    
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
+      if (!ctx) return;
     
     ctx.drawImage(
-      img,
-      pixelCrop.x * scaleX,
-      pixelCrop.y * scaleY,
-      pixelCrop.width * scaleX,
-      pixelCrop.height * scaleY,
+        image,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
       0,
       0,
-      canvas.width,
-      canvas.height
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
     );
     
     const croppedDataUrl = canvas.toDataURL("image/png");
-    const res = await fetch(croppedDataUrl);
-    const blob = await res.blob();
+      
+      fetch(croppedDataUrl)
+        .then((res) => res.blob())
+        .then((blob) => {
     const croppedFile = new File([blob], "avatar-crop.png", { type: "image/png" });
     setUploadFile(croppedFile);
+          setPreviewUrl(croppedDataUrl);
     setIsCropApplied(true);
+        })
+        .catch((error) => {
+          console.error("Failed to process cropped image:", error);
+          toast({
+            title: "Error",
+            description: "Failed to process cropped image",
+            variant: "destructive",
+          });
+        });
+    };
+  }, [avatarImageSrc, toast]);
+
+  const handleCropAreaChange = useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels);
     
-    URL.revokeObjectURL(img.src);
-  }, [selectedFile]);
+    if (shouldApplyCrop && croppedAreaPixels) {
+      setShouldApplyCrop(false);
+      processCrop(croppedAreaPixels);
+    }
+  }, [shouldApplyCrop, processCrop]);
+
+  const handleCropComplete = useCallback((
+    croppedAreaPercentages: CropperAreaData,
+    croppedAreaPixels: CropperAreaData,
+  ) => {
+    setLastCropArea(croppedAreaPixels);
+    
+    if (shouldApplyCrop) {
+      setShouldApplyCrop(false);
+      processCrop(croppedAreaPixels);
+    }
+  }, [shouldApplyCrop, processCrop]);
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -185,30 +217,57 @@ export function AvatarUploadDemo({ workspaceSlug }: Props) {
         </Button>
       </div>
 
-      {selectedFile && (
+      {avatarImageSrc && (
         <div className="space-y-2 rounded-md border p-3">
           <div className="text-sm font-medium">Crop</div>
-          <ImageCrop 
-            file={selectedFile} 
-            aspect={1} 
-            onCrop={handleCrop}
-            onComplete={async (pixelCrop) => {
-              // Auto-apply crop when crop area changes (for upload)
-              await applyCropToFile(pixelCrop);
-            }}
-          >
-            <div className="space-y-2">
-              <ImageCropContent className="rounded-md border" />
+          <div className="relative w-full h-[300px] overflow-hidden rounded-md border bg-muted">
+            <Cropper
+              aspectRatio={1}
+              zoom={zoomState}
+              rotation={rotationState}
+              crop={cropState}
+              onCropChange={setCropState}
+              onZoomChange={setZoomState}
+              onRotationChange={setRotationState}
+              onCropAreaChange={handleCropAreaChange}
+              onCropComplete={handleCropComplete}
+              minZoom={1}
+              maxZoom={3}
+              shape="circle"
+              withGrid
+            >
+              <CropperImage src={avatarImageSrc} alt="Crop avatar" />
+              <CropperArea />
+            </Cropper>
+          </div>
               <div className="flex gap-2">
-                <ImageCropApply asChild>
-                  <Button size="sm" variant="secondary">Apply crop</Button>
-                </ImageCropApply>
-                <ImageCropReset asChild>
-                  <Button size="sm" variant="ghost">Reset</Button>
-                </ImageCropReset>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setCropState({ x: 0, y: 0 });
+                setZoomState(1);
+                setRotationState(0);
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                if (lastCropArea) {
+                  processCrop(lastCropArea);
+                } else {
+                  setShouldApplyCrop(true);
+                  setCropState((prev) => ({ ...prev }));
+                }
+              }}
+            >
+              Apply crop
+            </Button>
               </div>
-            </div>
-          </ImageCrop>
+          <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
     </div>

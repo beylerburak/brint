@@ -3,15 +3,101 @@ import { prisma } from '../../lib/prisma.js';
 import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
 import { MediaUploadService } from './application/media-upload.service.js';
 import { storageConfig } from '../../config/index.js';
+import { createHash } from 'crypto';
 
 const storage = new S3StorageService();
 const mediaUploadService = new MediaUploadService(storage);
+
+const mediaConfigPayload = {
+  presign: storageConfig.presign,
+  cdnBaseUrl: storageConfig.cdnBaseUrl,
+  assets: storageConfig.assets,
+  allowedAssetTypes: Object.keys(storageConfig.assets),
+};
+const mediaConfigVersion = createHash('sha256')
+  .update(JSON.stringify(mediaConfigPayload))
+  .digest('hex')
+  .slice(0, 12);
 
 export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
   if (!prisma.media) {
     app.log.error('Prisma client does not have media model (did you run prisma generate?)');
     throw new Error('PRISMA_MEDIA_MODEL_MISSING');
   }
+
+  // GET /media/config
+  app.get('/media/config', {
+    schema: {
+      tags: ['Media'],
+      summary: 'Public media config (limits, variants, presign durations)',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            data: {
+              type: 'object',
+              properties: {
+                version: { type: 'string' },
+                presign: {
+                  type: 'object',
+                  properties: {
+                    uploadExpireSeconds: { type: 'number' },
+                    downloadExpireSeconds: { type: 'number' },
+                  },
+                },
+                cdnBaseUrl: { type: ['string', 'null'] },
+                allowedAssetTypes: { type: 'array', items: { type: 'string' } },
+                assets: {
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'object',
+                    properties: {
+                      limits: {
+                        type: 'object',
+                        properties: {
+                          maxFileSizeBytes: { type: 'number' },
+                          allowedExtensions: { type: 'array', items: { type: 'string' } },
+                          allowedMimeTypes: { type: 'array', items: { type: 'string' } },
+                        },
+                        required: ['maxFileSizeBytes'],
+                        additionalProperties: true,
+                      },
+                      variants: {
+                        type: 'object',
+                        additionalProperties: {
+                          type: 'object',
+                          properties: {
+                            width: { type: 'number' },
+                            height: { type: 'number' },
+                            quality: { type: 'number' },
+                          },
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ['limits', 'variants'],
+                    additionalProperties: true,
+                  },
+                },
+              },
+              required: ['version', 'presign', 'allowedAssetTypes', 'assets'],
+            },
+          },
+          required: ['success', 'data'],
+        },
+      },
+    },
+  }, async (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.send({
+      success: true,
+      data: {
+        version: mediaConfigVersion,
+        ...mediaConfigPayload,
+      },
+    });
+  });
+
   // POST /media/presign-upload
   app.post('/media/presign-upload', {
     schema: {
@@ -25,10 +111,11 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
           fileName: { type: 'string' },
           contentType: { type: 'string' },
           sizeBytes: { type: 'number' },
+          assetType: { type: 'string', enum: ['avatar', 'content-image', 'content-video'], description: 'Asset type for validation; defaults to content-image' },
         },
       },
     },
-  }, async (request: FastifyRequest<{ Body: { workspaceId: string; brandId?: string; fileName: string; contentType: string; sizeBytes: number } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<{ Body: { workspaceId: string; brandId?: string; fileName: string; contentType: string; sizeBytes: number; assetType?: 'avatar' | 'content-image' | 'content-video' } }>, reply: FastifyReply) => {
     try {
       // Look up workspace by ID or slug
       const workspace = await prisma.workspace.findFirst({
@@ -56,6 +143,7 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         fileName: request.body.fileName,
         contentType: request.body.contentType,
         sizeBytes: request.body.sizeBytes,
+        assetType: request.body.assetType,
       });
 
       return reply.send({ success: true, data: presign });
@@ -83,10 +171,11 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
           brandId: { type: 'string' },
           originalName: { type: 'string' },
           contentType: { type: 'string' },
+          assetType: { type: 'string', enum: ['avatar', 'content-image', 'content-video'], description: 'Asset type for variants and processing; defaults to content-image' },
         },
       },
     },
-  }, async (request: FastifyRequest<{ Body: { objectKey: string; workspaceId: string; brandId?: string; originalName: string; contentType?: string } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<{ Body: { objectKey: string; workspaceId: string; brandId?: string; originalName: string; contentType?: string; assetType?: 'avatar' | 'content-image' | 'content-video' } }>, reply: FastifyReply) => {
     try {
       const { media, variants } = await mediaUploadService.finalizeUpload({
         objectKey: request.body.objectKey,
@@ -94,6 +183,7 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         brandId: request.body.brandId,
         originalName: request.body.originalName,
         contentType: request.body.contentType,
+        assetType: request.body.assetType,
       });
 
       return reply.send({ success: true, data: { media, variants } });

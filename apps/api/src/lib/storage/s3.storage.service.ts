@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { storageConfig } from '../../config/index.js';
 import { buildMediaObjectKey } from './key-builder.js';
 import type { PresignedUploadRequest, PresignedUploadResponse, StorageService } from './storage.service.js';
+import type { AssetType } from './storage.types.js';
 import { logger } from '../logger.js';
 
 export class S3StorageService implements StorageService {
@@ -17,15 +18,22 @@ export class S3StorageService implements StorageService {
     });
   }
 
+  private getAssetLimits(assetType: AssetType | undefined) {
+    const key = assetType && storageConfig.assets[assetType] ? assetType : 'content-image';
+    return storageConfig.assets[key].limits;
+  }
+
   private validateUploadRequest(req: PresignedUploadRequest) {
-    if (req.sizeBytes > storageConfig.limits.maxFileSizeBytes) {
+    const limits = this.getAssetLimits(req.assetType);
+
+    if (req.sizeBytes > limits.maxFileSizeBytes) {
       throw new Error('FILE_TOO_LARGE');
     }
     const ext = (req.fileName.split('.').pop() || '').toLowerCase();
-    if (!storageConfig.limits.allowedExtensions.includes(ext)) {
+    if (!limits.allowedExtensions.includes(ext)) {
       throw new Error('FILE_EXTENSION_NOT_ALLOWED');
     }
-    if (!storageConfig.limits.allowedMimeTypes.includes(req.contentType)) {
+    if (!limits.allowedMimeTypes.includes(req.contentType)) {
       throw new Error('MIME_TYPE_NOT_ALLOWED');
     }
   }

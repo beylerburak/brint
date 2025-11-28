@@ -14,6 +14,7 @@ export interface UserProfile {
   phone: string | null;
   avatarMediaId: string | null;
   avatarUrl?: string | null;
+  googleId: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -66,6 +67,51 @@ export async function updateUserProfile(
     throw new Error(response.message || "Failed to update profile");
   }
 
+  // Invalidate caches after successful update
+  apiCache.invalidate("user:profile");
+  apiCache.invalidate("session:current");
+
   return response.data.data;
 }
 
+export async function disconnectGoogleConnection(): Promise<UserProfile> {
+  const response = await httpClient.delete<{ success: boolean; data: UserProfile }>(
+    "/users/me/google-connection"
+  );
+
+  if (!response.ok) {
+    throw new Error(response.message || "Failed to disconnect Google");
+  }
+
+  // Invalidate caches so auth/session info refreshes
+  apiCache.invalidate("user:profile");
+  apiCache.invalidate("session:current");
+
+  return response.data.data;
+}
+
+export interface CheckUsernameAvailabilityResponse {
+  success: boolean;
+  data: {
+    available: boolean;
+  };
+}
+
+/**
+ * Check if username is available
+ */
+export async function checkUsernameAvailability(username: string): Promise<boolean> {
+  if (!username.trim()) {
+    return false;
+  }
+
+  const response = await httpClient.get<CheckUsernameAvailabilityResponse>(
+    `/users/check-username/${encodeURIComponent(username.trim().toLowerCase())}`
+  );
+
+  if (!response.ok) {
+    throw new Error(response.message || "Failed to check username availability");
+  }
+
+  return response.data.data.available;
+}

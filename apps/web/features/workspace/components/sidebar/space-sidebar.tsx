@@ -29,6 +29,7 @@ import { useTranslations } from "next-intl";
 import { Settings, LifeBuoy } from "lucide-react";
 import { cn } from "@/shared/utils";
 import { SettingsDialog } from "@/features/settings";
+import { Badge } from "@/components/ui/badge";
 
 // Memoized navigation menu item to prevent unnecessary re-renders
 const NavMenuItem = React.memo<{
@@ -37,20 +38,31 @@ const NavMenuItem = React.memo<{
   isActive: boolean;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-}>(({ itemId, href, isActive, icon: Icon, label }) => {
+  isStudio?: boolean;
+}>(({ itemId, href, isActive, icon: Icon, label, isStudio = false }) => {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         asChild
         className={cn(
-          "text-sidebar-foreground",
-          isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+          isStudio
+            ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-sidebar-foreground hover:from-purple-500/20 hover:to-pink-500/20 hover:border-purple-500/30 font-medium"
+            : "text-sidebar-foreground",
+          isActive && !isStudio && "bg-sidebar-accent text-sidebar-accent-foreground",
+          isActive && isStudio && "from-purple-500/20 to-pink-500/20 border-purple-500/30"
         )}
         tooltip={label}
       >
         <Link href={href}>
-          <Icon />
+          <Icon className={cn(isStudio && "text-purple-500 dark:text-purple-400")} />
           <span>{label}</span>
+          {isStudio && (
+            <Badge
+              className="ml-auto bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-[10px] px-1.5 py-0 h-4 font-semibold shrink-0"
+            >
+              NEW
+            </Badge>
+          )}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -227,6 +239,7 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
               const itemHref = item.href(navCtx);
               const isActive = pathname === itemHref || pathname.startsWith(itemHref + "/");
               const translatedLabel = item.label[locale as "en" | "tr"] ?? item.label.en;
+              const isStudio = item.id === "studio";
               // Memoize each menu item to prevent unnecessary re-renders
               return (
                 <NavMenuItem
@@ -236,6 +249,7 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
                   isActive={isActive}
                   icon={item.icon}
                   label={translatedLabel}
+                  isStudio={isStudio}
                 />
               );
             })}

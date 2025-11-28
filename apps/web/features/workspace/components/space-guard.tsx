@@ -98,7 +98,7 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
 
     const segments = pathname.split("/").filter(Boolean);
     const candidateWorkspace = segments.length >= 2 ? segments[1] : null;
-    const reservedCandidates = ["login", "signup", "sign-up", "onboarding", "invites", "auth"];
+    const reservedCandidates = ["login", "signup", "sign-up", "onboarding", "invites", "auth", "not-found", "404"];
 
     // If no workspace and not on onboarding/invites, but also no valid workspace in URL → redirect to onboarding
     const hasValidWorkspaceInUrl =

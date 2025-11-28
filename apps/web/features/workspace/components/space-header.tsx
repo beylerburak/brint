@@ -7,17 +7,24 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/features/auth/components/language-switcher";
 import { useSubscription } from "@/features/subscription";
 import { AlertTriangle } from "lucide-react";
+import { locales } from "@/shared/i18n/locales";
 
 function getPageTitle(pathname: string, workspace: string): string {
-  // Extract locale from pathname (first segment)
   const segments = pathname.split("/").filter(Boolean);
   
-  // Remove locale and workspace from segments
-  const workspaceSegments = segments.slice(2); // Skip locale and workspace
+  // Determine if first segment is locale
+  const firstSegment = segments[0];
+  const firstIsLocale = (locales as readonly string[]).includes(firstSegment);
   
-  // If no segments, return Dashboard
+  // Calculate workspace index: 0 if no locale, 1 if locale exists
+  const workspaceIndex = firstIsLocale ? 1 : 0;
+  
+  // Get segments after workspace
+  const workspaceSegments = segments.slice(workspaceIndex + 1);
+  
+  // If no segments (workspace root), return Dashboard
   if (workspaceSegments.length === 0) {
-    return workspace ? `@${workspace}` : "Dashboard";
+    return "Dashboard";
   }
   
   // Get the last segment as page title

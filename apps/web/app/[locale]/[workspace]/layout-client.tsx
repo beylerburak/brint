@@ -25,6 +25,7 @@ export function WorkspaceLayoutClient({
   // Don't show workspace sidebar in studio routes (both /studio and /studio/[brand])
   const isStudioRoute = pathname?.includes("/studio");
 
+
   // Check if user profile needs completion
   useEffect(() => {
     if (authLoading || !isAuthenticated || hasCheckedProfile) {
@@ -79,6 +80,11 @@ export function WorkspaceLayoutClient({
     // Refresh user profile
     getUserProfile().then(setUserProfile).catch(console.error);
   };
+
+  // Show nothing while auth is loading
+  if (authLoading || !isAuthenticated) {
+    return null;
+  }
 
   if (isStudioRoute) {
     // In studio routes, only render children (studio sidebar will be in studio layout)

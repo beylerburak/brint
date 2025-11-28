@@ -170,6 +170,8 @@ function deriveWorkspace(paramSlug?: string, pathname?: string | null): Workspac
     "onboarding",
     "invites",
     "auth",
+    "not-found",
+    "404",
   ];
 
   // Determine locale prefix

@@ -47,6 +47,9 @@ export function useIsOwner(): boolean {
  * Returns permissions state and owner status
  * Use this at the top of page components to ensure permissions are loaded
  * 
+ * Note: isOwner is only for UI labels (e.g., showing "Owner" badge).
+ * Permission checks should use permissions array only (backend snapshot).
+ * 
  * @example
  * ```tsx
  * export function MyPage() {
@@ -56,11 +59,13 @@ export function useIsOwner(): boolean {
  *     return <div>Loading...</div>;
  *   }
  *   
- *   const canCreate = isOwner || permissions.includes("studio:brand.create");
+ *   // Backend snapshot'a göre - owner bypass yok
+ *   const canCreate = permissions.includes("studio:brand.create");
  *   
  *   return (
  *     <div>
  *       {canCreate && <Button>Create</Button>}
+ *       {isOwner && <Badge>Owner</Badge>}
  *     </div>
  *   );
  * }

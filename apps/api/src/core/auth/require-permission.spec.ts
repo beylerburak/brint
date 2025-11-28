@@ -41,19 +41,19 @@ async function main() {
     console.log(`   User: ${ownerUser.email} (${ownerUser.id})`);
     console.log(`   Workspace: ${demoWorkspace.slug} (${demoWorkspace.id})\n`);
 
-    // 2. Verify owner has workspace:settings.view permission (sanity check)
-    console.log('📋 Sanity check: Owner has workspace:settings.view permission');
+    // 2. Verify owner has workspace:settings.manage permission (sanity check)
+    console.log('📋 Sanity check: Owner has workspace:settings.manage permission');
     const ownerHasPermission = await permissionService.hasPermission({
       userId: ownerUser.id,
       workspaceId: demoWorkspace.id,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     });
 
     if (!ownerHasPermission) {
-      throw new Error('Owner should have workspace:settings.view permission');
+      throw new Error('Owner should have workspace:settings.manage permission');
     }
 
-    console.log('   ✅ Owner has workspace:settings.view permission\n');
+    console.log('   ✅ Owner has workspace:settings.manage permission\n');
 
     // 3. Create Fastify server
     console.log('📋 Creating Fastify server...');
@@ -90,9 +90,9 @@ async function main() {
       throw new Error(`Expected success: true, got ${JSON.stringify(allowedBody)}`);
     }
 
-    if (allowedBody.message !== 'You have workspace:settings.view') {
+    if (allowedBody.message !== 'You have workspace:settings.manage') {
       throw new Error(
-        `Expected message "You have workspace:settings.view", got "${allowedBody.message}"`
+        `Expected message "You have workspace:settings.manage", got "${allowedBody.message}"`
       );
     }
 
@@ -125,20 +125,20 @@ async function main() {
     console.log(`   ✅ Created test user: ${testUser.email}`);
     console.log(`   ✅ Created workspace member with role: ADMIN`);
 
-    // Verify admin does NOT have workspace:settings.view
+    // Verify admin HAS workspace:settings.manage (admin should have this permission)
     const adminHasPermission = await permissionService.hasPermission({
       userId: testUser.id,
       workspaceId: demoWorkspace.id,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     });
 
-    if (adminHasPermission) {
+    if (!adminHasPermission) {
       throw new Error(
-        'Workspace admin should NOT have workspace:settings.view permission'
+        'Workspace admin should have workspace:settings.manage permission'
       );
     }
 
-    console.log('   ✅ Verified: Workspace admin does NOT have workspace:settings.view\n');
+    console.log('   ✅ Verified: Workspace admin has workspace:settings.manage\n');
 
     // 7. Generate access token for workspace-admin
     console.log('📋 Generating access token for workspace-admin...');
@@ -148,9 +148,9 @@ async function main() {
     });
     console.log('   ✅ Workspace admin token generated\n');
 
-    // 8. Test forbidden case: Workspace admin accessing /debug/protected
-    console.log('📋 Test 2 (continued): Forbidden case - Workspace admin accessing /debug/protected');
-    const forbiddenResponse = await app.inject({
+    // 8. Test allowed case: Workspace admin accessing /debug/protected (admin now has permission)
+    console.log('📋 Test 2 (continued): Allowed case - Workspace admin accessing /debug/protected');
+    const adminResponse = await app.inject({
       method: 'GET',
       url: '/debug/protected',
       headers: {
@@ -159,38 +159,28 @@ async function main() {
       },
     });
 
-    if (forbiddenResponse.statusCode !== 403) {
+    if (adminResponse.statusCode !== 200) {
       throw new Error(
-        `Expected 403, got ${forbiddenResponse.statusCode}. Body: ${forbiddenResponse.body}`
+        `Expected 200, got ${adminResponse.statusCode}. Body: ${adminResponse.body}`
       );
     }
 
-    const forbiddenBody = JSON.parse(forbiddenResponse.body);
-    if (forbiddenBody.success !== false) {
+    const adminBody = JSON.parse(adminResponse.body);
+    if (!adminBody.success) {
       throw new Error(
-        `Expected success: false, got ${JSON.stringify(forbiddenBody)}`
+        `Expected success: true, got ${JSON.stringify(adminBody)}`
       );
     }
 
-    if (forbiddenBody.error?.code !== 'PERMISSION_DENIED') {
+    if (adminBody.message !== 'You have workspace:settings.manage') {
       throw new Error(
-        `Expected error.code: "PERMISSION_DENIED", got "${forbiddenBody.error?.code}"`
+        `Expected message "You have workspace:settings.manage", got "${adminBody.message}"`
       );
     }
 
-    if (
-      !forbiddenBody.error?.message ||
-      !forbiddenBody.error.message.includes('permission')
-    ) {
-      throw new Error(
-        `Expected error message about permission, got "${forbiddenBody.error?.message}"`
-      );
-    }
-
-    console.log('   ✅ Status: 403');
-    console.log('   ✅ Body: success: false');
-    console.log('   ✅ Error code: FORBIDDEN');
-    console.log('   ✅ Error message correct\n');
+    console.log('   ✅ Status: 200');
+    console.log('   ✅ Body: success: true');
+    console.log('   ✅ Message correct\n');
 
     // 9. Test unauthorized case: No auth header
     console.log('📋 Test 3: Unauthorized case - No auth header');

@@ -11,6 +11,12 @@ export interface Workspace {
   id: string;
   slug: string;
   name?: string;
+  subscription?: {
+    plan: string;
+    status: string;
+    renewsAt: string | null;
+  } | null;
+  permissions?: string[];
 }
 
 export interface LoginResult {
@@ -182,11 +188,23 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Get current user session and workspaces
+ * Get current user session and workspaces with profile and subscription info
  * Uses global cache to prevent duplicate requests
+ * This endpoint now returns full user profile and workspace subscriptions in a single call
  */
 export async function getCurrentSession(): Promise<{
-  user: AuthUser;
+  user: AuthUser & {
+    username?: string | null;
+    completedOnboarding: boolean;
+    locale: string;
+    timezone: string;
+    phone?: string | null;
+    avatarMediaId?: string | null;
+    avatarUrl?: string | null;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  };
   ownerWorkspaces: Array<Workspace & { updatedAt: string }>;
   memberWorkspaces: Array<Workspace & { updatedAt: string }>;
   invites?: Array<{ id: string; updatedAt?: string | null }>;
@@ -198,9 +216,46 @@ export async function getCurrentSession(): Promise<{
         const response = await httpClient.get<{
           success: boolean;
           data: {
-            user: { id: string; email: string; name?: string | null; googleId?: string | null };
-            ownerWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
-            memberWorkspaces: Array<{ id: string; slug: string; name: string; updatedAt: string }>;
+            user: {
+              id: string;
+              email: string;
+              name?: string | null;
+              username?: string | null;
+              googleId?: string | null;
+              completedOnboarding: boolean;
+              locale: string;
+              timezone: string;
+              phone?: string | null;
+              avatarMediaId?: string | null;
+              avatarUrl?: string | null;
+              status: string;
+              createdAt: string;
+              updatedAt: string;
+            };
+            ownerWorkspaces: Array<{
+              id: string;
+              slug: string;
+              name: string;
+              updatedAt: string;
+              subscription?: {
+                plan: string;
+                status: string;
+                renewsAt: string | null;
+              } | null;
+              permissions: string[];
+            }>;
+            memberWorkspaces: Array<{
+              id: string;
+              slug: string;
+              name: string;
+              updatedAt: string;
+              subscription?: {
+                plan: string;
+                status: string;
+                renewsAt: string | null;
+              } | null;
+              permissions: string[];
+            }>;
             invites?: Array<{ id: string; updatedAt?: string | null }>;
           };
         }>("/auth/me");
@@ -215,16 +270,78 @@ export async function getCurrentSession(): Promise<{
           return null;
         }
 
+        const { user: userData, ownerWorkspaces, memberWorkspaces, invites } = response.data.data;
+
+        // Cache user profile data separately for backward compatibility
+        apiCache.set("user:profile", {
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          username: userData.username,
+          firstOnboardedAt: null,
+          completedOnboarding: userData.completedOnboarding,
+          lastLoginAt: null,
+          locale: userData.locale,
+          timezone: userData.timezone,
+          phone: userData.phone,
+          avatarMediaId: userData.avatarMediaId,
+          avatarUrl: userData.avatarUrl,
+          googleId: userData.googleId,
+          status: userData.status,
+          createdAt: userData.createdAt,
+          updatedAt: userData.updatedAt,
+        });
+
+        // Cache subscriptions and permissions for each workspace
+        const allWorkspaces = [...ownerWorkspaces, ...memberWorkspaces];
+        for (const workspace of allWorkspaces) {
+          if (workspace.subscription) {
+            apiCache.set(`subscription:${workspace.id}`, {
+              workspaceId: workspace.id,
+              plan: workspace.subscription.plan,
+              status: workspace.subscription.status,
+              renewsAt: workspace.subscription.renewsAt,
+            });
+          }
+          // Cache permissions for each workspace
+          if (workspace.permissions) {
+            const permissionsCacheKey = `permissions:${userData.id}:${workspace.id}`;
+            apiCache.set(permissionsCacheKey, {
+              workspaceId: workspace.id,
+              permissions: workspace.permissions,
+            });
+            // Also store in localStorage for offline access
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(permissionsCacheKey, JSON.stringify(workspace.permissions));
+              } catch (error) {
+                // Ignore localStorage errors (quota exceeded, etc.)
+                console.warn('Failed to cache permissions in localStorage:', error);
+              }
+            }
+          }
+        }
+
         return {
           user: {
-            id: response.data.data.user.id,
-            email: response.data.data.user.email,
-            name: response.data.data.user.name ?? undefined,
-            googleId: response.data.data.user.googleId ?? null,
+            id: userData.id,
+            email: userData.email,
+            name: userData.name ?? undefined,
+            googleId: userData.googleId ?? null,
+            username: userData.username,
+            completedOnboarding: userData.completedOnboarding,
+            locale: userData.locale,
+            timezone: userData.timezone,
+            phone: userData.phone,
+            avatarMediaId: userData.avatarMediaId,
+            avatarUrl: userData.avatarUrl,
+            status: userData.status,
+            createdAt: userData.createdAt,
+            updatedAt: userData.updatedAt,
           },
-          ownerWorkspaces: response.data.data.ownerWorkspaces,
-          memberWorkspaces: response.data.data.memberWorkspaces,
-          invites: response.data.data.invites,
+          ownerWorkspaces,
+          memberWorkspaces,
+          invites,
         };
       } catch (error) {
         // Re-throw 401 errors so ProtectedLayout can handle them

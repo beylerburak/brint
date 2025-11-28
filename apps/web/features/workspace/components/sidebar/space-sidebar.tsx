@@ -10,8 +10,6 @@ import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { useBrand } from "@/features/brand/context/brand-context";
 import { usePermissions } from "@/permissions";
 import { useSubscription } from "@/features/subscription";
-import { apiCache } from "@/shared/api/cache";
-import type { SubscriptionSnapshot } from "@/shared/api/subscription";
 import { NavUser } from "@/features/workspace/components/sidebar/nav-user";
 import { SpaceSwitcher } from "@/features/workspace/components/sidebar/space-switcher";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
@@ -32,6 +30,34 @@ import { Settings, LifeBuoy } from "lucide-react";
 import { cn } from "@/shared/utils";
 import { SettingsDialog } from "@/features/settings";
 
+// Memoized navigation menu item to prevent unnecessary re-renders
+const NavMenuItem = React.memo<{
+  itemId: string;
+  href: string;
+  isActive: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}>(({ itemId, href, isActive, icon: Icon, label }) => {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        className={cn(
+          "text-sidebar-foreground",
+          isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+        )}
+        tooltip={label}
+      >
+        <Link href={href}>
+          <Icon />
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+});
+NavMenuItem.displayName = "NavMenuItem";
+
 export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const locale = useLocale();
   const pathname = usePathname();
@@ -43,7 +69,12 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
   const { plan: subscriptionPlan } = useSubscription();
   const [role, setRole] = React.useState<NavigationContext["role"]>(null);
   const [availableWorkspaces, setAvailableWorkspaces] = React.useState<
-    Array<{ id: string; slug: string; name?: string | null }>
+    Array<{
+      id: string;
+      slug: string;
+      name?: string | null;
+      subscription?: { plan: string; status: string; renewsAt: string | null } | null;
+    }>
   >([]);
 
   // Derive role from backend session
@@ -69,7 +100,12 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
             ...(session.memberWorkspaces ?? []),
           ];
           setAvailableWorkspaces(
-            all.map((w) => ({ id: w.id, slug: w.slug, name: w.name }))
+            all.map((w) => ({
+              id: w.id,
+              slug: w.slug,
+              name: w.name,
+              subscription: w.subscription,
+            }))
           );
         } else {
           setAvailableWorkspaces([]);
@@ -109,17 +145,24 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
     };
   }, [workspace?.slug]);
 
-  const navCtx: NavigationContext = {
+  // Memoize navigation context to prevent unnecessary re-renders
+  const navCtx: NavigationContext = React.useMemo(() => ({
     locale,
     workspace: workspace?.slug ?? null,
     brand: brand?.slug ?? null,
     permissions,
     subscriptionPlan,
     role,
-  };
+  }), [locale, workspace?.slug, brand?.slug, permissions, subscriptionPlan, role]);
 
-  const items = sidebarNavigation.filter((item) => item.show(navCtx));
-  const secondaryItems = [
+  // Memoize filtered navigation items
+  const items = React.useMemo(
+    () => sidebarNavigation.filter((item) => item.show(navCtx)),
+    [navCtx]
+  );
+
+  // Memoize secondary items (they don't change)
+  const secondaryItems = React.useMemo(() => [
     {
       id: "preferences",
       label: t("preferences"),
@@ -132,81 +175,44 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
       icon: LifeBuoy,
       href: "#",
     },
-  ];
+  ], [t]);
 
-  // Get subscription plans for all workspaces from cache
-  // Use useMemo to recalculate when availableWorkspaces, current subscription, or workspace changes
-  const [prefetchTrigger, setPrefetchTrigger] = React.useState(0);
-  
-  // Listen for prefetch completion and subscription update events
-  React.useEffect(() => {
-    const handlePrefetch = () => {
-      setPrefetchTrigger((prev) => prev + 1);
-    };
-    
-    const handleSubscriptionUpdate = () => {
-      setPrefetchTrigger((prev) => prev + 1);
-    };
-    
-    window.addEventListener("subscriptions-prefetched", handlePrefetch);
-    window.addEventListener("subscription-updated", handleSubscriptionUpdate);
-    return () => {
-      window.removeEventListener("subscriptions-prefetched", handlePrefetch);
-      window.removeEventListener("subscription-updated", handleSubscriptionUpdate);
-    };
-  }, []);
-  
-  const workspacePlans = React.useMemo(() => {
-    const plans = new Map<string, string>();
-    
-    availableWorkspaces.forEach((ws) => {
-      const cached = apiCache.get<SubscriptionSnapshot | null>(
-        `subscription:${ws.id}`,
-        60000 // 60 seconds TTL
-      );
-      
-      if (cached?.plan) {
-        plans.set(ws.id, cached.plan);
-      } else {
-        // Default to FREE if not cached
-        plans.set(ws.id, "FREE");
-      }
-    });
-    
-    return plans;
-  }, [availableWorkspaces, subscriptionPlan, workspace?.id, prefetchTrigger]); // Recalculate when workspaces, current subscription, workspace changes, or prefetch completes
-
-  // Format plan for display
-  const formatPlan = (plan: string | undefined): string => {
+  // Format plan for display (memoized function)
+  const formatPlan = React.useCallback((plan: string | undefined): string => {
     if (!plan) return "Free";
     const upperPlan = plan.toUpperCase();
     if (upperPlan === "FREE") return "Free";
     if (upperPlan === "PRO") return "Pro";
     if (upperPlan === "ENTERPRISE") return "Enterprise";
     return plan;
-  };
+  }, []);
 
-  const teams =
-    availableWorkspaces.length > 0
-      ? availableWorkspaces.map((ws) => {
-          const plan = workspacePlans.get(ws.id) ?? subscriptionPlan ?? "FREE";
-          return {
-            name: ws.name ? ws.name : `@${ws.slug}`,
-            slug: ws.slug,
-            logo: sidebarNavigation[0]?.icon,
-            plan: formatPlan(plan),
-          };
-        })
-      : workspace
-        ? [
-            {
-              name: `@${workspace.slug}`,
-              slug: workspace.slug,
-              logo: sidebarNavigation[0]?.icon,
-              plan: formatPlan(subscriptionPlan),
-            },
-          ]
-        : [];
+  // Memoize teams array - only recalculate when workspaces or subscription changes
+  const teams = React.useMemo(() => {
+    if (availableWorkspaces.length > 0) {
+      return availableWorkspaces.map((ws) => {
+        // Get plan from workspace subscription (from /auth/me) or fallback to current subscription or FREE
+        const plan = ws.subscription?.plan ?? subscriptionPlan ?? "FREE";
+        return {
+          name: ws.name ? ws.name : `@${ws.slug}`,
+          slug: ws.slug,
+          logo: sidebarNavigation[0]?.icon,
+          plan: formatPlan(plan),
+        };
+      });
+    }
+    if (workspace) {
+      return [
+        {
+          name: `@${workspace.slug}`,
+          slug: workspace.slug,
+          logo: sidebarNavigation[0]?.icon,
+          plan: formatPlan(subscriptionPlan),
+        },
+      ];
+    }
+    return [];
+  }, [availableWorkspaces, workspace?.slug, subscriptionPlan, formatPlan]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -221,22 +227,16 @@ export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
               const itemHref = item.href(navCtx);
               const isActive = pathname === itemHref || pathname.startsWith(itemHref + "/");
               const translatedLabel = item.label[locale as "en" | "tr"] ?? item.label.en;
+              // Memoize each menu item to prevent unnecessary re-renders
               return (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    asChild
-                    className={cn(
-                      "text-sidebar-foreground",
-                      isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
-                    )}
-                    tooltip={translatedLabel}
-                  >
-                    <Link href={itemHref}>
-                      <item.icon />
-                      <span>{translatedLabel}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <NavMenuItem
+                  key={item.id}
+                  itemId={item.id}
+                  href={itemHref}
+                  isActive={isActive}
+                  icon={item.icon}
+                  label={translatedLabel}
+                />
               );
             })}
           </SidebarMenu>

@@ -1,4 +1,5 @@
 import { httpClient } from "@/shared/http";
+import { getWorkspaceId } from "@/shared/http/workspace-header";
 
 export interface CreateWorkspaceInviteRequest {
   email: string;
@@ -34,8 +35,11 @@ export interface GetWorkspaceInvitesResponse {
 export async function getWorkspaceInvites(
   workspaceId: string
 ): Promise<WorkspaceInvite[]> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
   const response = await httpClient.get<GetWorkspaceInvitesResponse>(
-    `/workspaces/${workspaceId}/invites`
+    `/workspaces/${resolvedWorkspaceId}/invites`
   );
 
   if (!response.ok) {
@@ -52,8 +56,11 @@ export async function createWorkspaceInvite(
   workspaceId: string,
   payload: CreateWorkspaceInviteRequest
 ): Promise<WorkspaceInvite> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
   const response = await httpClient.post<CreateWorkspaceInviteResponse>(
-    `/workspaces/${workspaceId}/invites`,
+    `/workspaces/${resolvedWorkspaceId}/invites`,
     payload
   );
 
@@ -166,8 +173,11 @@ export async function cancelWorkspaceInvite(
   workspaceId: string,
   inviteId: string
 ): Promise<void> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
   const response = await httpClient.delete<CancelWorkspaceInviteResponse>(
-    `/workspaces/${workspaceId}/invites/${inviteId}`
+    `/workspaces/${resolvedWorkspaceId}/invites/${inviteId}`
   );
 
   if (!response.ok) {

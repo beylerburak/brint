@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   verifyMagicLink,
@@ -65,18 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (session) {
             setUser(session.user);
             setTokenReady(true);
-            
-            // Prefetch subscriptions for all accessible workspaces
-            const allWorkspaces = [
-              ...(session.ownerWorkspaces ?? []),
-              ...(session.memberWorkspaces ?? []),
-            ];
-            if (allWorkspaces.length > 0) {
-              // Prefetch in background (don't await - let it run async)
-              import("@/features/subscription/utils/prefetch-subscriptions").then(({ prefetchSubscriptionsForWorkspaces }) => {
-                void prefetchSubscriptionsForWorkspaces(allWorkspaces);
-              });
-            }
+            // Subscription info is now included in /auth/me response, no need to prefetch
           } else {
             setTokenReady(false);
           }
@@ -112,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [router]);
 
-  const login = async (result: LoginResult) => {
+  const login = useCallback(async (result: LoginResult) => {
     setUser(result.user);
     setAccessToken(result.accessToken);
     setTokenReady(true);
@@ -120,30 +109,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear cache on login to force fresh data fetch
     apiCache.invalidate("session:current");
     apiCache.invalidate("user:profile");
-    
-    // Prefetch subscriptions for all accessible workspaces
-    if (result.workspaces && result.workspaces.length > 0) {
-      // Prefetch in background (don't await - let it run async)
-      import("@/features/subscription/utils/prefetch-subscriptions").then(({ prefetchSubscriptionsForWorkspaces }) => {
-        void prefetchSubscriptionsForWorkspaces(result.workspaces);
-      });
-    }
-  };
+    // Subscription info will be fetched with next getCurrentSession() call
+  }, []);
 
-  const loginWithSession = async (result: LoginResult) => {
+  const loginWithSession = useCallback(async (result: LoginResult) => {
     // Same as login, but explicitly named for session-based login
     await login(result);
-  };
+  }, [login]);
 
-  const verifyMagicLinkToken = async (
+  const verifyMagicLinkToken = useCallback(async (
     token: string
   ): Promise<LoginResult & { verifyData?: MagicLinkVerifyResult }> => {
     const result = await verifyMagicLink(token);
     await login(result);
     return result;
-  };
+  }, [login]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await logoutApi();
     } catch (error) {
@@ -158,19 +140,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       apiCache.invalidate("session:current");
       apiCache.invalidate("user:profile");
     }
-  };
+  }, []);
 
-  const value: AuthContextValue = {
+  const accessToken = getAccessToken();
+
+  const value: AuthContextValue = useMemo(() => ({
     user,
     isAuthenticated: user !== null,
     loading,
-    accessToken: getAccessToken(),
+    accessToken,
     tokenReady,
     login,
     loginWithSession,
     logout,
     verifyMagicLinkToken,
-  };
+  }), [user, loading, accessToken, tokenReady, login, loginWithSession, logout, verifyMagicLinkToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

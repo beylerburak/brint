@@ -67,12 +67,57 @@ export function PermissionProvider({
 
     setLoading(true);
     try {
+      // First, try to get permissions from cache (set by /auth/me)
+      const { apiCache } = await import("@/shared/api/cache");
+      const permissionsCacheKey = `permissions:${user.id}:${workspace.id}`;
+      const cached = apiCache.get<{ workspaceId: string; permissions: string[] }>(
+        permissionsCacheKey,
+        300000 // 5 minutes TTL
+      );
+
+      if (cached?.permissions) {
+        setPermissions(cached.permissions as any);
+        if (storageKey && typeof window !== "undefined") {
+          localStorage.setItem(storageKey, JSON.stringify(cached.permissions));
+        }
+        setLoading(false);
+        return;
+      }
+
+      // If not in cache, try localStorage
+      if (storageKey && typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem(permissionsCacheKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              setPermissions(parsed as any);
+              // Also set in memory cache
+              apiCache.set(permissionsCacheKey, {
+                workspaceId: workspace.id,
+                permissions: parsed,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {
+          // Ignore localStorage errors
+        }
+      }
+
+      // Fallback to API call if not in cache
       const snapshot = await fetchPermissionsSnapshot();
       if (snapshot?.permissions) {
         setPermissions(snapshot.permissions);
         if (storageKey && typeof window !== "undefined") {
           localStorage.setItem(storageKey, JSON.stringify(snapshot.permissions));
         }
+        // Cache in memory
+        apiCache.set(permissionsCacheKey, {
+          workspaceId: workspace.id,
+          permissions: snapshot.permissions,
+        });
       } else {
         setPermissions([]);
       }

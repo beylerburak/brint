@@ -63,10 +63,11 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/features/auth/context/auth-context"
 import { useWorkspace } from "@/features/workspace/context/workspace-context"
+import { useHasPermission, PERMISSIONS } from "@/permissions"
 import { presignUpload, finalizeUpload, getMediaConfig, type MediaConfig } from "@/shared/api/media"
-import { getUserProfile, updateUserProfile, checkUsernameAvailability, disconnectGoogleConnection, type UserProfile } from "@/features/workspace/api/user-api"
-import { apiCache } from "@/shared/api/cache"
+import { updateUserProfile, checkUsernameAvailability, disconnectGoogleConnection, type UserProfile } from "@/features/workspace/api/user-api"
 import { getCurrentSession, refreshToken, getGoogleOAuthUrl } from "@/features/auth/api/auth-api"
+import { apiCache } from "@/shared/api/cache"
 import { getAccessToken } from "@/shared/auth/token-storage"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -142,6 +143,51 @@ import { locales, type Locale } from "@/shared/i18n/locales"
 import { WorkspaceMembersTable } from "./workspace-members-table"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { ConnectionCard } from "./connection-card"
+
+// Memoized User Profile Menu Item to prevent unnecessary re-renders
+const UserProfileMenuItem = React.memo<{
+  user: { name: string | null; email: string; avatarUrl: string | null };
+  initials: string;
+  displayName: string;
+  isActive: boolean;
+  onItemClick: () => void;
+}>(({ user, initials, displayName, isActive, onItemClick }) => {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={isActive}
+        onClick={onItemClick}
+        size="lg"
+      >
+        <a href="#">
+          <Avatar className="h-8 w-8 rounded-lg">
+            {user.avatarUrl && (
+              <AvatarImage src={user.avatarUrl} alt={displayName} />
+            )}
+            <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="grid flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-medium">{displayName}</span>
+            <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+          </div>
+        </a>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if user data, initials, displayName, or isActive changes
+  return (
+    prevProps.user.name === nextProps.user.name &&
+    prevProps.user.email === nextProps.user.email &&
+    prevProps.user.avatarUrl === nextProps.user.avatarUrl &&
+    prevProps.initials === nextProps.initials &&
+    prevProps.displayName === nextProps.displayName &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.onItemClick === nextProps.onItemClick
+  );
+});
+UserProfileMenuItem.displayName = "UserProfileMenuItem";
 
 type NavItem = {
   id: string
@@ -340,10 +386,12 @@ function ThemePreferenceSelect() {
 
 function LanguagePreferenceSelect({ 
   currentLocale: initialLocale, 
-  onLocaleChange 
+  onLocaleChange,
+  onBeforeNavigate
 }: { 
   currentLocale: string | undefined
   onLocaleChange: (locale: string) => Promise<void>
+  onBeforeNavigate?: () => void
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -368,8 +416,15 @@ function LanguagePreferenceSelect({
       const newPath = newLocale === "en" 
         ? pathWithoutLocale || "/"
         : `/${newLocale}${pathWithoutLocale}`
-      router.push(newPath)
+      
+      // Close dropdown and dialog before navigation to prevent overlay from staying
       setOpen(false)
+      onBeforeNavigate?.()
+      
+      // Use setTimeout to ensure dialog closes before navigation
+      setTimeout(() => {
+        router.push(newPath)
+      }, 0)
     } catch (error) {
       console.error("Failed to update locale:", error)
     } finally {
@@ -620,6 +675,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const { workspace, workspaceReady } = useWorkspace()
   const [isGoogleActionLoading, setIsGoogleActionLoading] = React.useState(false)
+  const hasWorkspaceSettingsManage = useHasPermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)
 
   type UserProfileFormData = z.infer<typeof userProfileSchema>
 
@@ -663,14 +719,18 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   }, [pathname])
 
   // Filter nav groups to exclude brand group if not on brand studio page
+  // and exclude workspace group if user doesn't have workspace:settings.manage permission
   const visibleNavGroups = React.useMemo(() => {
     return navGroups.filter((group) => {
       if (group.id === "brand") {
         return isBrandStudioPage
       }
+      if (group.id === "workspace") {
+        return hasWorkspaceSettingsManage
+      }
       return true
     })
-  }, [isBrandStudioPage])
+  }, [isBrandStudioPage, hasWorkspaceSettingsManage])
 
   // Load media config when dialog opens (used across multiple tabs)
   React.useEffect(() => {
@@ -701,11 +761,28 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
     const loadProfile = async () => {
       try {
-        // Invalidate cache when dialog opens to get fresh data (especially after OAuth callbacks)
-        apiCache.invalidate("user:profile")
+        // First try to read from cache (getCurrentSession populates user:profile cache)
+        let profile: UserProfile | null = apiCache.get<UserProfile>("user:profile", 30000) ?? null
         
-        const profile = await getUserProfile()
-        if (cancelled) return
+        // If not in cache, get from session (this will populate cache)
+        if (!profile) {
+          const session = await getCurrentSession()
+          if (cancelled || !session) return
+          
+          // Read from cache again (getCurrentSession populates it)
+          profile = apiCache.get<UserProfile>("user:profile", 30000) ?? null
+        }
+        
+        if (cancelled || !profile) {
+          // Fallback to auth user data
+          form.reset({
+            name: authUser.name || "",
+            username: "",
+            email: authUser.email,
+            phone: "",
+          })
+          return
+        }
 
         setProfileUser(profile)
         const nameValue = profile.name || ""
@@ -1183,20 +1260,41 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     }
   }
 
-  const user = profileUser ? {
-    name: profileUser.name,
-    email: profileUser.email,
-    avatarUrl: profileUser.avatarUrl,
-  } : (authUser
-    ? {
-        name: authUser.name || null,
-        email: authUser.email,
-        avatarUrl: null,
-      }
-    : null)
+  // Extract primitive values to use as dependencies - prevents re-renders when profileUser object reference changes
+  const profileUserName = profileUser?.name ?? null;
+  const profileUserEmail = profileUser?.email ?? "";
+  const profileUserAvatarUrl = profileUser?.avatarUrl ?? null;
+  const authUserName = authUser?.name ?? null;
+  const authUserEmail = authUser?.email ?? "";
 
-  const initials = user ? getInitials(user.name, user.email) : ""
-  const displayName = user?.name || user?.email || ""
+  // Memoize user object - only recreate when name, email, or avatarUrl changes
+  // This prevents unnecessary re-renders when other profile fields (like timezone) change
+  const user = React.useMemo(() => {
+    if (profileUser) {
+      return {
+        name: profileUserName,
+        email: profileUserEmail,
+        avatarUrl: profileUserAvatarUrl,
+      };
+    }
+    if (authUser) {
+      return {
+        name: authUserName,
+        email: authUserEmail,
+        avatarUrl: null,
+      };
+    }
+    return null;
+  }, [profileUserName, profileUserEmail, profileUserAvatarUrl, authUserName, authUserEmail]);
+
+  // Memoize initials and displayName to prevent unnecessary recalculations
+  const initials = React.useMemo(() => {
+    return user ? getInitials(user.name, user.email) : "";
+  }, [user?.name, user?.email]);
+
+  const displayName = React.useMemo(() => {
+    return user?.name || user?.email || "";
+  }, [user?.name, user?.email]);
 
   // Flatten all navigation items for mobile select
   const allNavItems = React.useMemo(() => {
@@ -1215,6 +1313,15 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   }, [visibleNavGroups])
 
   const selectedNavItem = allNavItems.find((item) => item.id === activeItem)
+
+  // Memoize click handlers to prevent unnecessary re-renders
+  const handleUserProfileClick = React.useCallback(() => {
+    setActiveItem("userProfile");
+  }, []);
+
+  const handleNavItemClick = React.useCallback((itemId: string) => {
+    setActiveItem(itemId);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1240,27 +1347,14 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                         // Special rendering for User Profile item
                         if (item.id === "userProfile" && user) {
                           return (
-                            <SidebarMenuItem key={item.id}>
-                              <SidebarMenuButton
-                                asChild
-                                isActive={activeItem === item.id}
-                                onClick={() => setActiveItem(item.id)}
-                                size="lg"
-                              >
-                                <a href="#">
-                                  <Avatar className="h-8 w-8 rounded-lg">
-                                    {user.avatarUrl && (
-                                      <AvatarImage src={user.avatarUrl} alt={displayName} />
-                                    )}
-                                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                                  </Avatar>
-                                  <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{displayName}</span>
-                                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                                  </div>
-                                </a>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            <UserProfileMenuItem
+                              key={item.id}
+                              user={user}
+                              initials={initials}
+                              displayName={displayName}
+                              isActive={activeItem === item.id}
+                              onItemClick={handleUserProfileClick}
+                            />
                           )
                         }
                         return (
@@ -1268,7 +1362,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                             <SidebarMenuButton
                               asChild
                               isActive={activeItem === item.id}
-                              onClick={() => setActiveItem(item.id)}
+                              onClick={() => handleNavItemClick(item.id)}
                             >
                               <a href="#">
                                 <item.icon />
@@ -1702,11 +1796,16 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                         currentLocale={profileUser?.locale}
                         onLocaleChange={async (locale: string) => {
                           const updated = await updateUserProfile({ locale })
-                          setProfileUser(updated)
+                          // Only update locale field, preserve other fields to prevent unnecessary re-renders
+                          setProfileUser((prev) => prev ? { ...prev, locale: updated.locale } : updated)
                           toast({
                             title: t("settings.account.preferencesGroup.language") || "Language",
                             description: t("settings.account.preferencesGroup.languageUpdated") || "Language preference updated.",
                           })
+                        }}
+                        onBeforeNavigate={() => {
+                          // Close dialog before navigation to prevent overlay from staying
+                          setOpen(false)
                         }}
                       />
                     </div>
@@ -1725,7 +1824,8 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                         currentTimezone={profileUser?.timezone}
                         onTimezoneChange={async (timezone: string) => {
                           const updated = await updateUserProfile({ timezone })
-                          setProfileUser(updated)
+                          // Only update timezone field, preserve other fields to prevent unnecessary re-renders
+                          setProfileUser((prev) => prev ? { ...prev, timezone: updated.timezone } : updated)
                           toast({
                             title: t("settings.account.preferencesGroup.timezone") || "Timezone",
                             description: t("settings.account.preferencesGroup.timezoneUpdated") || "Timezone preference updated.",

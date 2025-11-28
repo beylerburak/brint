@@ -1,4 +1,5 @@
 import { httpClient } from "@/shared/http";
+import { getWorkspaceId } from "@/shared/http/workspace-header";
 
 export interface WorkspaceMember {
   id: string;
@@ -27,8 +28,11 @@ export interface GetWorkspaceMembersResponse {
 export async function getWorkspaceMembers(
   workspaceId: string
 ): Promise<WorkspaceMember[]> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
   const response = await httpClient.get<GetWorkspaceMembersResponse>(
-    `/workspaces/${workspaceId}/members`
+    `/workspaces/${resolvedWorkspaceId}/members`
   );
 
   if (!response.ok) {
@@ -56,8 +60,11 @@ export async function updateWorkspaceMember(
   userId: string,
   payload: UpdateWorkspaceMemberRequest
 ): Promise<WorkspaceMember> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
   const response = await httpClient.patch<UpdateWorkspaceMemberResponse>(
-    `/workspaces/${workspaceId}/members/${userId}`,
+    `/workspaces/${resolvedWorkspaceId}/members/${userId}`,
     payload
   );
 

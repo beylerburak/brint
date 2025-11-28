@@ -30,7 +30,7 @@ const UpsertSubscriptionSchema = z.object({
 export async function registerSubscriptionRoutes(app: FastifyInstance) {
   // Workspace-scoped subscription (uses X-Workspace-Id)
   app.get("/workspace/subscription", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Get current workspace subscription (header-based)",
@@ -84,7 +84,7 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
   });
 
   app.get("/workspaces/:workspaceId/subscription", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE), requireWorkspaceMatch()],
     schema: {
       tags: ["Workspaces"],
       summary: "Get workspace subscription",
@@ -144,7 +144,7 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
   });
 
   app.put("/workspaces/:workspaceId/subscription", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE), requireWorkspaceMatch()],
     schema: {
       tags: ["Workspaces"],
       summary: "Upsert workspace subscription",

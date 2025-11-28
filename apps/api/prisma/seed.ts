@@ -50,7 +50,7 @@ async function main() {
   const permissionKeys = getAllPermissionKeys();
 
   const permissionDescriptions: Record<string, string> = {
-    [PERMISSIONS.WORKSPACE_SETTINGS_VIEW]: 'View workspace settings',
+    [PERMISSIONS.WORKSPACE_SETTINGS_MANAGE]: 'Manage workspace settings',
     [PERMISSIONS.WORKSPACE_MEMBERS_MANAGE]: 'Manage workspace members',
     [PERMISSIONS.STUDIO_BRAND_VIEW]: 'View brands in studio',
     [PERMISSIONS.STUDIO_BRAND_CREATE]: 'Create new brands',
@@ -146,8 +146,9 @@ async function main() {
   }
   console.log(`✅ workspace-owner → ${permissions.length} permissions`);
 
-  // workspace-admin → only: studio:brand.view, studio:content.create, studio:content.publish
+  // workspace-admin → workspace:settings.manage, studio:brand.view, studio:content.create, studio:content.publish
   const adminPermissionKeys = new Set([
+    PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     PERMISSIONS.STUDIO_BRAND_VIEW,
     PERMISSIONS.STUDIO_CONTENT_CREATE,
     PERMISSIONS.STUDIO_CONTENT_PUBLISH,

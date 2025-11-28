@@ -28,7 +28,7 @@ function testRequiredPermissionsExist() {
   console.log('🧪 Test 2: Checking required permissions exist...');
   
   const required = [
-    'workspace:settings.view',
+    'workspace:settings.manage',
     'workspace:members.manage',
     'studio:brand.view',
     'studio:brand.create',
@@ -58,7 +58,7 @@ function testTypeSafeUsage() {
   }
   
   // Valid usage - should compile
-  requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW);
+  requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE);
   requirePermission(PERMISSIONS.STUDIO_BRAND_CREATE);
   
   // Test that getAllPermissionKeys returns PermissionKey[]
@@ -74,7 +74,7 @@ function testTypeSafeUsage() {
 function testIsPermissionKey() {
   console.log('🧪 Test 4: Testing isPermissionKey type guard...');
   
-  const validKey = PERMISSIONS.WORKSPACE_SETTINGS_VIEW;
+  const validKey = PERMISSIONS.WORKSPACE_SETTINGS_MANAGE;
   const invalidKey = 'invalid:permission.key';
   
   if (!isPermissionKey(validKey)) {

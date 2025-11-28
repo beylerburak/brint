@@ -4,7 +4,7 @@ import { PERMISSIONS, getAllPermissionKeys } from '../../core/auth/permissions.r
 type TxClient = PrismaClient | Prisma.TransactionClient;
 
 const permissionDescriptions: Record<string, string> = {
-  [PERMISSIONS.WORKSPACE_SETTINGS_VIEW]: 'View workspace settings',
+  [PERMISSIONS.WORKSPACE_SETTINGS_MANAGE]: 'Manage workspace settings',
   [PERMISSIONS.WORKSPACE_MEMBERS_MANAGE]: 'Manage workspace members',
   [PERMISSIONS.STUDIO_BRAND_VIEW]: 'View brands in studio',
   [PERMISSIONS.STUDIO_BRAND_CREATE]: 'Create new brands',
@@ -13,6 +13,7 @@ const permissionDescriptions: Record<string, string> = {
 };
 
 const ADMIN_PERMISSION_KEYS = [
+  PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
   PERMISSIONS.STUDIO_BRAND_VIEW,
   PERMISSIONS.STUDIO_CONTENT_CREATE,
   PERMISSIONS.STUDIO_CONTENT_PUBLISH,

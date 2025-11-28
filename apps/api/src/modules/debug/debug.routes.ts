@@ -5,7 +5,7 @@ import { requirePermission } from '../../core/auth/require-permission.js';
 /**
  * Registers debug routes for development and testing
  * - GET /debug/auth - Returns current auth context
- * - GET /debug/protected - Protected endpoint (requires workspace:settings.view)
+ * - GET /debug/protected - Protected endpoint (requires workspace:settings.manage)
  */
 export async function registerDebugRoutes(app: FastifyInstance): Promise<void> {
   app.get(
@@ -66,13 +66,13 @@ export async function registerDebugRoutes(app: FastifyInstance): Promise<void> {
     '/debug/protected',
     {
       preHandler: [
-        requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW),
+        requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE),
       ],
       schema: {
         tags: ['Debug'],
-        summary: 'Protected debug endpoint (requires workspace:settings.view)',
+        summary: 'Protected debug endpoint (requires workspace:settings.manage)',
         description:
-          'Protected endpoint that requires workspace:settings.view permission. ' +
+          'Protected endpoint that requires workspace:settings.manage permission. ' +
           'Requires Authorization: Bearer <token> header and X-Workspace-Id header.',
         response: {
           200: {
@@ -132,7 +132,7 @@ export async function registerDebugRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       return reply.status(200).send({
         success: true,
-        message: 'You have workspace:settings.view',
+        message: 'You have workspace:settings.manage',
         auth: request.auth
           ? {
               userId: request.auth.userId,

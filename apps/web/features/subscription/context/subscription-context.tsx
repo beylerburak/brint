@@ -71,7 +71,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     console.debug("[Subscription] Loading subscription for workspace:", workspace.id);
 
     // Skip subscription fetch if user doesn't have permission
-    // This endpoint requires the subscription permission (workspace:settings.view)
+    // This endpoint requires the subscription permission (workspace:settings.manage)
     if (!hasSettingsPermission) {
       setSubscription(null);
       setLoading(false);

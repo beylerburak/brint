@@ -22,7 +22,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-export function SpaceSwitcher({
+function SpaceSwitcherComponent({
   teams,
 }: {
   teams: {
@@ -112,3 +112,28 @@ export function SpaceSwitcher({
     </SidebarMenu>
   );
 }
+
+// Memoize SpaceSwitcher to prevent re-renders when teams array reference changes but content is the same
+export const SpaceSwitcher = React.memo(SpaceSwitcherComponent, (prevProps, nextProps) => {
+  // Compare teams arrays by their slugs (teams are identified by slug)
+  if (prevProps.teams.length !== nextProps.teams.length) {
+    return false; // Re-render if length changed
+  }
+  
+  // Check if all team slugs are the same and in the same order
+  const prevSlugs = prevProps.teams.map(t => t.slug).join(',');
+  const nextSlugs = nextProps.teams.map(t => t.slug).join(',');
+  
+  if (prevSlugs !== nextSlugs) {
+    return false; // Re-render if slugs changed
+  }
+  
+  // Check if plans changed for any team
+  for (let i = 0; i < prevProps.teams.length; i++) {
+    if (prevProps.teams[i].plan !== nextProps.teams[i].plan) {
+      return false; // Re-render if plan changed
+    }
+  }
+  
+  return true; // Don't re-render if content is the same
+});

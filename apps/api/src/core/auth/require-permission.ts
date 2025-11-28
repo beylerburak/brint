@@ -33,6 +33,9 @@ export function requirePermission(permission: PermissionKey) {
     const { userId, workspaceId } = request.auth ?? {};
 
     if (!userId || !workspaceId) {
+      const authHeader = request.headers['authorization'];
+      const workspaceHeader = request.headers['x-workspace-id'];
+      
       logger.warn(
         {
           permission,
@@ -41,11 +44,26 @@ export function requirePermission(permission: PermissionKey) {
           url: request.url,
           userId,
           workspaceId,
+          hasAuthHeader: !!authHeader,
+          hasWorkspaceHeader: !!workspaceHeader,
+          authHeaderType: typeof authHeader,
+          workspaceHeaderValue: workspaceHeader,
         },
         'Permission check failed: missing auth context'
       );
 
-      throw new UnauthorizedError('AUTH_REQUIRED');
+      // Provide more specific error message
+      if (!authHeader) {
+        throw new UnauthorizedError('AUTH_REQUIRED', 'Authorization header is required');
+      }
+      if (!workspaceHeader) {
+        throw new UnauthorizedError('AUTH_REQUIRED', 'X-Workspace-Id header is required');
+      }
+      if (!userId) {
+        throw new UnauthorizedError('AUTH_REQUIRED', 'Invalid or expired access token');
+      }
+      
+      throw new UnauthorizedError('AUTH_REQUIRED', 'Authentication required');
     }
 
     // Check if user has the required permission

@@ -116,9 +116,9 @@ async function main() {
   console.log('   permissions:', ownerRole.permissions.length);
   console.log('   member role:', ownerMember.role);
 
-  // View-only workspace: settings.view + brand.view
+  // View-only workspace: settings.manage + brand.view
   const viewPerms = [
-    PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+    PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     PERMISSIONS.STUDIO_BRAND_VIEW,
   ];
   const memberRole = await upsertRoleWithPermissions({

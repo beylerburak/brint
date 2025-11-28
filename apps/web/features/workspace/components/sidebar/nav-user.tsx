@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo, useCallback } from "react"
 import {
   BadgeCheck,
   Bell,
@@ -33,7 +33,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/features/auth/context/auth-context"
-import { getUserProfile } from "@/features/workspace/api/user-api"
+import { apiCache } from "@/shared/api/cache"
 
 function getInitials(name: string | null | undefined, email: string): string {
   if (name) {
@@ -46,79 +46,54 @@ function getInitials(name: string | null | undefined, email: string): string {
   return email.substring(0, 2).toUpperCase()
 }
 
-export function NavUser() {
+function NavUserComponent() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations("common")
   const { logout, user: authUser, loading: authLoading } = useAuth()
-  const [profileUser, setProfileUser] = useState<{
-    userId: string
-    name: string | null
-    email: string
-    avatarUrl: string | null | undefined
-  } | null>(null)
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null | undefined>(null)
 
-  // Use auth context user as primary source, try to enhance with profile data
-  useEffect(() => {
-    if (!authUser) {
-      setProfileUser(null);
+  // Get avatarUrl from cache (getCurrentSession populates user:profile cache)
+  // Only read from cache, never trigger API calls
+  // This prevents re-renders when workspace changes or settings dialog opens
+  // Use effect to read from cache only when userId changes, not on every render
+  React.useEffect(() => {
+    if (!authUser?.id) {
+      setAvatarUrl(null);
       return;
     }
 
-    let cancelled = false;
+    // Read from cache without triggering fetch
+    const cachedProfile = apiCache.get<{
+      id: string;
+      email: string;
+      name: string | null;
+      avatarUrl?: string | null;
+    }>("user:profile", 30000); // 30 seconds TTL
+    
+    setAvatarUrl(cachedProfile?.avatarUrl ?? null);
+  }, [authUser?.id]) // Only depend on userId, cache will update when getCurrentSession is called elsewhere
 
-    // getUserProfile now uses global cache, so no need for local cache
-    const loadProfile = async () => {
-      const currentUserId = authUser.id;
-      try {
-        const profile = await getUserProfile();
-        if (cancelled || authUser.id !== currentUserId) {
-          return;
-        }
-
-        const profileData = {
-          userId: currentUserId,
-          name: profile.name,
-          email: profile.email,
-          avatarUrl: profile.avatarUrl,
-        };
-
-        if (!cancelled) {
-          setProfileUser(profileData);
-        }
-      } catch (error) {
-        // Silently fail - we'll use auth context user instead
-        console.warn("Failed to load user profile, using auth context user:", error);
-        if (!cancelled) {
-          setProfileUser(null);
-        }
-      }
+  // Memoize user data to prevent unnecessary re-renders
+  // Use auth context user as primary source, enhance with avatarUrl from cache
+  const user = useMemo(() => {
+    if (!authUser) {
+      return null;
+    }
+    return {
+      name: authUser.name || null,
+      email: authUser.email,
+      avatarUrl: avatarUrl,
     };
+  }, [authUser?.id, authUser?.name, authUser?.email, avatarUrl]) // Only depend on specific user fields
 
-    loadProfile();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser])
-
-  // Determine which user data to use
-  const user = profileUser && authUser && profileUser.userId === authUser.id
-    ? profileUser
-    : authUser
-      ? {
-          name: authUser.name || null,
-          email: authUser.email,
-          avatarUrl: null,
-        }
-      : null
-
-  const handleLogout = async () => {
+  // Memoize logout handler to prevent unnecessary re-renders
+  const handleLogout = useCallback(async () => {
     await logout()
     const localePrefix = locale === "en" ? "" : `/${locale}`
     router.push(`${localePrefix}/login`)
-  }
+  }, [logout, locale, router])
 
   // Show loading state while auth is loading
   if (authLoading || !user) {
@@ -215,3 +190,6 @@ export function NavUser() {
     </SidebarMenu>
   )
 }
+
+// Export component - memoization is handled internally via useMemo
+export const NavUser = NavUserComponent

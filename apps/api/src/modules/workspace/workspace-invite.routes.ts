@@ -15,7 +15,7 @@ import { sessionService } from "../../core/auth/session.service.js";
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   // List invites for a workspace
   app.get("/workspaces/:workspaceId/invites", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "List workspace invites",
@@ -106,7 +106,7 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
   // Create invite
   app.post("/workspaces/:workspaceId/invites", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Create a workspace invite",
@@ -192,7 +192,7 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
   // Cancel invite (expire) before acceptance
   app.delete("/workspaces/:workspaceId/invites/:inviteId", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Cancel a workspace invite (sets status to EXPIRED)",

@@ -121,6 +121,7 @@ async function main() {
 
     // Expected permissions for admin (from seed)
     const expectedAdminPermissions = new Set([
+      PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
       PERMISSIONS.STUDIO_BRAND_VIEW,
       PERMISSIONS.STUDIO_CONTENT_CREATE,
       PERMISSIONS.STUDIO_CONTENT_PUBLISH,
@@ -144,10 +145,10 @@ async function main() {
       );
     }
 
-    // Check that admin does NOT have workspace permissions
-    if (actualAdminPermissions.has(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)) {
+    // Check that admin has workspace:settings.manage but NOT workspace:members.manage
+    if (!actualAdminPermissions.has(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)) {
       throw new Error(
-        'Workspace admin should NOT have workspace:settings.view permission'
+        'Workspace admin should have workspace:settings.manage permission'
       );
     }
 
@@ -164,31 +165,31 @@ async function main() {
     // Test 4: hasPermission helper
     console.log('📋 Test 4: hasPermission helper');
     
-    // Owner should have workspace:settings.view
-    const ownerHasSettingsView = await permissionService.hasPermission({
+    // Owner should have workspace:settings.manage
+    const ownerHasSettingsManage = await permissionService.hasPermission({
       userId: ownerUser.id,
       workspaceId: demoWorkspace.id,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     });
 
-    if (!ownerHasSettingsView) {
-      throw new Error('Owner should have workspace:settings.view permission');
+    if (!ownerHasSettingsManage) {
+      throw new Error('Owner should have workspace:settings.manage permission');
     }
 
-    console.log('   ✅ Owner has workspace:settings.view');
+    console.log('   ✅ Owner has workspace:settings.manage');
 
-    // Fake user should NOT have workspace:settings.view
-    const fakeUserHasSettingsView = await permissionService.hasPermission({
+    // Fake user should NOT have workspace:settings.manage
+    const fakeUserHasSettingsManage = await permissionService.hasPermission({
       userId: fakeUserId,
       workspaceId: demoWorkspace.id,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     });
 
-    if (fakeUserHasSettingsView) {
-      throw new Error('Fake user should NOT have workspace:settings.view permission');
+    if (fakeUserHasSettingsManage) {
+      throw new Error('Fake user should NOT have workspace:settings.manage permission');
     }
 
-    console.log('   ✅ Fake user does NOT have workspace:settings.view');
+    console.log('   ✅ Fake user does NOT have workspace:settings.manage');
 
     // Content manager should have studio:brand.view
     const contentManagerHasBrandView = await permissionService.hasPermission({
@@ -203,18 +204,18 @@ async function main() {
 
     console.log('   ✅ Content manager has studio:brand.view');
 
-    // Content manager should NOT have workspace:settings.view
-    const contentManagerHasSettingsView = await permissionService.hasPermission({
+    // Content manager should have workspace:settings.manage (admin has this permission)
+    const contentManagerHasSettingsManage = await permissionService.hasPermission({
       userId: testUser.id,
       workspaceId: demoWorkspace.id,
-      permission: PERMISSIONS.WORKSPACE_SETTINGS_VIEW,
+      permission: PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
     });
 
-    if (contentManagerHasSettingsView) {
-      throw new Error('Content manager should NOT have workspace:settings.view permission');
+    if (!contentManagerHasSettingsManage) {
+      throw new Error('Content manager should have workspace:settings.manage permission');
     }
 
-    console.log('   ✅ Content manager does NOT have workspace:settings.view\n');
+    console.log('   ✅ Content manager has workspace:settings.manage\n');
 
     // Test 5: Cache + invalidate
     console.log('📋 Test 5: Permission cache + invalidate');

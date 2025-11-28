@@ -19,7 +19,7 @@ export async function registerUsageRoutes(app: FastifyInstance) {
   app.get(
     '/workspaces/:workspaceId/usage',
     {
-      preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
+      preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE), requireWorkspaceMatch()],
       schema: {
         tags: ['Workspaces'],
         summary: 'Get usage for a subscription limit key',

@@ -11,7 +11,7 @@ const storage = new S3StorageService();
 
 export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
   app.get("/workspaces/:workspaceId/members", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Get workspace members list",
@@ -150,7 +150,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
   });
 
   app.patch("/workspaces/:workspaceId/members/:userId", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
       summary: "Update workspace member role/status",

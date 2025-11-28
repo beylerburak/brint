@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { redis } from '../../lib/redis.js';
-import { oauthConfig, authConfig, appUrlConfig } from '../../config/index.js';
+import { oauthConfig, authConfig, appUrlConfig, storageConfig } from '../../config/index.js';
 import { loginOrRegisterWithGoogle, type GoogleProfile } from './google-oauth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../../core/auth/auth.cookies.js';
 import { tokenService } from '../../core/auth/token.service.js';
@@ -13,6 +13,7 @@ import { magicLinkService } from './magic-link.service.js';
 import { sendMagicLinkEmail } from '../../core/email/email.service.js';
 import { permissionService } from '../../core/auth/permission.service.js';
 import { BadRequestError, UnauthorizedError, ForbiddenError, HttpError, NotFoundError } from '../../lib/http-errors.js';
+import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
 
 /**
  * Registers authentication routes
@@ -681,7 +682,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     schema: {
       tags: ['Auth'],
       summary: 'Get current user information',
-      description: 'Returns current authenticated user and their workspace memberships',
+      description: 'Returns current authenticated user profile, workspace memberships, and subscription info',
         response: {
         200: {
           type: 'object',
@@ -696,9 +697,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
                     id: { type: 'string' },
                     email: { type: 'string' },
                     name: { type: ['string', 'null'] },
+                    username: { type: ['string', 'null'] },
                     googleId: { type: ['string', 'null'] },
+                    completedOnboarding: { type: 'boolean' },
+                    locale: { type: 'string' },
+                    timezone: { type: 'string' },
+                    phone: { type: ['string', 'null'] },
+                    avatarMediaId: { type: ['string', 'null'] },
+                    avatarUrl: { type: ['string', 'null'] },
+                    status: { type: 'string' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
                   },
-                  required: ['id', 'email'],
+                  required: ['id', 'email', 'completedOnboarding', 'locale', 'timezone', 'status', 'createdAt', 'updatedAt'],
                 },
                 ownerWorkspaces: {
                   type: 'array',
@@ -709,8 +720,20 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
                       slug: { type: 'string' },
                       name: { type: 'string' },
                       updatedAt: { type: 'string' },
+                      subscription: {
+                        type: ['object', 'null'],
+                        properties: {
+                          plan: { type: 'string' },
+                          status: { type: 'string' },
+                          renewsAt: { type: ['string', 'null'], format: 'date-time' },
+                        },
+                      },
+                      permissions: {
+                        type: 'array',
+                        items: { type: 'string' },
+                      },
                     },
-                    required: ['id', 'slug', 'name', 'updatedAt'],
+                    required: ['id', 'slug', 'name', 'updatedAt', 'permissions'],
                   },
                 },
                 memberWorkspaces: {
@@ -722,8 +745,20 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
                       slug: { type: 'string' },
                       name: { type: 'string' },
                       updatedAt: { type: 'string' },
+                      subscription: {
+                        type: ['object', 'null'],
+                        properties: {
+                          plan: { type: 'string' },
+                          status: { type: 'string' },
+                          renewsAt: { type: ['string', 'null'], format: 'date-time' },
+                        },
+                      },
+                      permissions: {
+                        type: 'array',
+                        items: { type: 'string' },
+                      },
                     },
-                    required: ['id', 'slug', 'name', 'updatedAt'],
+                    required: ['id', 'slug', 'name', 'updatedAt', 'permissions'],
                   },
                 },
               },
@@ -756,6 +791,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const userId = request.auth.userId;
+    const storage = new S3StorageService();
 
     try {
       // Get user
@@ -767,13 +803,30 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         throw new UnauthorizedError('USER_NOT_FOUND', undefined, 'User not found');
       }
 
-      // Get all active workspace memberships
+      // Get avatar URL if exists
+      let avatarUrl: string | null = null;
+      if (user.avatarMediaId) {
+        const media = await prisma.media.findUnique({ where: { id: user.avatarMediaId } });
+        if (media) {
+          avatarUrl = await storage.getPresignedDownloadUrl(media.objectKey, {
+            expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+          });
+        }
+      }
+
+      // Get all active workspace memberships with subscriptions
       const allMemberships = await prisma.workspaceMember.findMany({
         where: { 
           userId,
           status: 'active', // Only return active memberships
         },
-        include: { workspace: true },
+        include: { 
+          workspace: {
+            include: {
+              subscription: true,
+            },
+          },
+        },
       });
 
       // Sort by workspace updatedAt (most recently updated first)
@@ -781,24 +834,50 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
       );
 
+      // Fetch permissions for all workspaces in parallel
+      const workspacePermissionsPromises = allMemberships.map(async (m) => {
+        try {
+          const { permissions } = await permissionService.getEffectivePermissionsForUserWorkspace({
+            userId,
+            workspaceId: m.workspace.id,
+          });
+          return { workspaceId: m.workspace.id, permissions };
+        } catch (error) {
+          logger.warn(
+            { error, userId, workspaceId: m.workspace.id },
+            'Failed to fetch permissions for workspace'
+          );
+          return { workspaceId: m.workspace.id, permissions: [] };
+        }
+      });
+
+      const workspacePermissionsResults = await Promise.all(workspacePermissionsPromises);
+      const permissionsMap = new Map(
+        workspacePermissionsResults.map((r) => [r.workspaceId, r.permissions])
+      );
+
+      // Helper function to map workspace with subscription and permissions
+      const mapWorkspaceWithSubscriptionAndPermissions = (m: typeof allMemberships[0]) => ({
+        id: m.workspace.id,
+        slug: m.workspace.slug,
+        name: m.workspace.name,
+        updatedAt: m.workspace.updatedAt.toISOString(),
+        subscription: m.workspace.subscription ? {
+          plan: m.workspace.subscription.plan,
+          status: m.workspace.subscription.status,
+          renewsAt: m.workspace.subscription.periodEnd ? m.workspace.subscription.periodEnd.toISOString() : null,
+        } : null,
+        permissions: permissionsMap.get(m.workspace.id) ?? [],
+      });
+
       // Separate owner and member workspaces
       const ownerWorkspaces = allMemberships
         .filter((m) => m.role === 'OWNER')
-        .map((m) => ({
-          id: m.workspace.id,
-          slug: m.workspace.slug,
-          name: m.workspace.name,
-          updatedAt: m.workspace.updatedAt.toISOString(),
-        }));
+        .map(mapWorkspaceWithSubscriptionAndPermissions);
 
       const memberWorkspaces = allMemberships
         .filter((m) => m.role !== 'OWNER')
-        .map((m) => ({
-          id: m.workspace.id,
-          slug: m.workspace.slug,
-          name: m.workspace.name,
-          updatedAt: m.workspace.updatedAt.toISOString(),
-        }));
+        .map(mapWorkspaceWithSubscriptionAndPermissions);
 
       return reply.status(200).send({
         success: true,
@@ -807,7 +886,17 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
             id: user.id,
             email: user.email,
             name: user.name,
+            username: user.username,
             googleId: user.googleId ?? null,
+            completedOnboarding: user.completedOnboarding,
+            locale: user.locale,
+            timezone: user.timezone,
+            phone: user.phone,
+            avatarMediaId: user.avatarMediaId,
+            avatarUrl,
+            status: user.status,
+            createdAt: user.createdAt.toISOString(),
+            updatedAt: user.updatedAt.toISOString(),
           },
           ownerWorkspaces,
           memberWorkspaces,

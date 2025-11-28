@@ -48,23 +48,29 @@ export function WorkspaceProvider({
   const setWorkspace = (ws: Workspace | null) => setWorkspaceOverride(ws);
 
   // Set workspace ID getter for HTTP client
-  // Only set if workspace ID is a valid UUID (not a slug)
+  // Only set if workspace ID is resolved (not a slug)
   useEffect(() => {
     if (!workspaceReady || !workspace?.id) {
       setWorkspaceIdGetter(() => null);
       return;
     }
 
-    // Check if workspace.id is a UUID (not a slug)
-    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspace.id);
+    // Check if workspace.id is NOT a slug
+    // Slug format: lowercase alphanumeric and hyphens, 3-64 chars
+    // Valid workspace IDs: CUID (c + 25 base36 chars) or custom IDs like "ws_beyler"
+    // Invalid (slug): short lowercase strings like "beyler", "demo-workspace"
+    const isSlug = /^[a-z0-9-]{3,64}$/.test(workspace.id) && 
+                   !workspace.id.startsWith('c') && 
+                   !workspace.id.startsWith('ws_') &&
+                   workspace.id.length < 20; // CUIDs are 26 chars, custom IDs might be longer
     
-    if (!isUUID) {
+    if (isSlug) {
       // Workspace ID is still a slug, don't set getter yet
       setWorkspaceIdGetter(() => null);
       return;
     }
 
+    // Workspace ID is resolved (CUID or custom ID like ws_beyler)
     setWorkspaceIdGetter(() => workspace.id ?? null);
     return () => {
       setWorkspaceIdGetter(() => null);

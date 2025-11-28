@@ -1,11 +1,7 @@
 "use client"
 
 import * as React from "react"
-<<<<<<< HEAD
 import * as SwitchPrimitive from "@radix-ui/react-switch"
-=======
-import { Switch as SwitchPrimitive } from "@radix-ui/react-switch"
->>>>>>> origin/saj
 
 import { cn } from "@/shared/utils"
 

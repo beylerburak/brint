@@ -74,7 +74,6 @@ export async function updateUserProfile(
   return response.data.data;
 }
 
-<<<<<<< HEAD
 export async function disconnectGoogleConnection(): Promise<UserProfile> {
   const response = await httpClient.delete<{ success: boolean; data: UserProfile }>(
     "/users/me/google-connection"
@@ -91,8 +90,6 @@ export async function disconnectGoogleConnection(): Promise<UserProfile> {
   return response.data.data;
 }
 
-=======
->>>>>>> origin/saj
 export interface CheckUsernameAvailabilityResponse {
   success: boolean;
   data: {
@@ -118,7 +115,4 @@ export async function checkUsernameAvailability(username: string): Promise<boole
 
   return response.data.data.available;
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/saj

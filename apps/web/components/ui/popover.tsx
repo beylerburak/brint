@@ -1,11 +1,7 @@
 "use client"
 
 import * as React from "react"
-<<<<<<< HEAD
 import * as PopoverPrimitive from "@radix-ui/react-popover"
-=======
-import { Popover as PopoverPrimitive } from "@radix-ui/react-popover"
->>>>>>> origin/saj
 
 import { cn } from "@/shared/utils"
 

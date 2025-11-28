@@ -48,8 +48,19 @@ export function WorkspaceProvider({
   const setWorkspace = (ws: Workspace | null) => setWorkspaceOverride(ws);
 
   // Set workspace ID getter for HTTP client
+  // Only set if workspace ID is a valid UUID (not a slug)
   useEffect(() => {
     if (!workspaceReady || !workspace?.id) {
+      setWorkspaceIdGetter(() => null);
+      return;
+    }
+
+    // Check if workspace.id is a UUID (not a slug)
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspace.id);
+    
+    if (!isUUID) {
+      // Workspace ID is still a slug, don't set getter yet
       setWorkspaceIdGetter(() => null);
       return;
     }

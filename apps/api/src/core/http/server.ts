@@ -27,7 +27,7 @@ import { registerMediaRoutes } from '../../modules/media/media.routes.js';
  */
 export async function createServer(): Promise<FastifyInstance> {
   const app = Fastify({ 
-    logger: logger as any 
+    logger,
   });
 
   // Register global error handler
@@ -79,7 +79,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerDebugRoutes(app);
   await registerAuthRoutes(app);
-  await app.register(registerStudioRoutes, { prefix: '/studio' });
+  await registerStudioRoutes(app);
   await registerUserRoutes(app);
   await registerSubscriptionRoutes(app);
   await registerWorkspaceMemberRoutes(app);

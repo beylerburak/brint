@@ -12,7 +12,7 @@ import { logger } from '../../lib/logger.js';
 import { magicLinkService } from './magic-link.service.js';
 import { sendMagicLinkEmail } from '../../core/email/email.service.js';
 import { permissionService } from '../../core/auth/permission.service.js';
-import { BadRequestError, UnauthorizedError } from '../../lib/http-errors.js';
+import { BadRequestError, UnauthorizedError, ForbiddenError, HttpError, NotFoundError } from '../../lib/http-errors.js';
 
 /**
  * Registers authentication routes
@@ -138,13 +138,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
     // 1. Validate query parameters
     if (!code || !state) {
-      return reply.status(400).send({
-        success: false,
-        error: {
-          code: 'OAUTH_BAD_REQUEST',
-          message: 'Missing required parameters: code and state are required',
-        },
-      });
+      throw new BadRequestError('OAUTH_BAD_REQUEST', 'Missing required parameters: code and state are required');
     }
 
     // 2. Validate state from Redis
@@ -152,13 +146,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const storedState = await redis.get(stateKey);
 
     if (!storedState) {
-      return reply.status(401).send({
-        success: false,
-        error: {
-          code: 'OAUTH_STATE_INVALID',
-          message: 'Invalid or expired state parameter',
-        },
-      });
+      throw new UnauthorizedError('OAUTH_STATE_INVALID', undefined, 'Invalid or expired state parameter');
     }
 
     // Delete state after validation (one-time use)
@@ -190,26 +178,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           },
           'Google OAuth token exchange failed'
         );
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'OAUTH_TOKEN_EXCHANGE_FAILED',
-            message: 'Failed to exchange authorization code for tokens',
-          },
-        });
+        throw new UnauthorizedError('OAUTH_TOKEN_EXCHANGE_FAILED', undefined, 'Failed to exchange authorization code for tokens');
       }
 
       const tokenData = await tokenResponse.json() as { id_token?: string; access_token?: string; refresh_token?: string };
 
       // 4. Decode id_token (basic profile)
       if (!tokenData.id_token) {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'OAUTH_NO_ID_TOKEN',
-            message: 'No id_token received from Google',
-          },
-        });
+        throw new BadRequestError('OAUTH_NO_ID_TOKEN', 'No id_token received from Google');
       }
 
       // Decode without verification for now (will add verification later)
@@ -244,13 +220,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       };
 
       if (!profile.email || !profile.sub) {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'OAUTH_PROFILE_INCOMPLETE',
-            message: 'Missing required fields from Google profile (email/sub)',
-          },
-        });
+        throw new BadRequestError('OAUTH_PROFILE_INCOMPLETE', 'Missing required fields from Google profile (email/sub)');
       }
 
       logger.info(
@@ -305,13 +275,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         'Error in Google OAuth callback'
       );
 
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: 'OAUTH_CALLBACK_ERROR',
-          message: 'An unexpected error occurred during OAuth callback',
-        },
-      });
+      throw new HttpError(500, 'OAUTH_CALLBACK_ERROR', 'An unexpected error occurred during OAuth callback', safeError);
     }
   });
 
@@ -359,13 +323,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
         'Refresh attempt without token'
       );
-      return reply.status(401).send({
-        success: false,
-        error: {
-          code: 'AUTH_REFRESH_MISSING_TOKEN',
-          message: 'Refresh token not found in cookies',
-        },
-      });
+      throw new UnauthorizedError('AUTH_REFRESH_MISSING_TOKEN', undefined, 'Refresh token not found in cookies');
     }
 
     try {
@@ -396,13 +354,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           'Refresh attempt with non-existent session'
         );
         clearAuthCookies(reply);
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'AUTH_REFRESH_SESSION_NOT_FOUND',
-            message: 'Session not found',
-          },
-        });
+        throw new UnauthorizedError('AUTH_REFRESH_SESSION_NOT_FOUND', undefined, 'Session not found');
       }
 
       // 4. Check if session is expired
@@ -422,13 +374,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           logger.error({ error: err, oldTid }, 'Failed to revoke expired session during refresh');
         });
         clearAuthCookies(reply);
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'AUTH_REFRESH_SESSION_EXPIRED',
-            message: 'Session expired',
-          },
-        });
+        throw new UnauthorizedError('AUTH_REFRESH_SESSION_EXPIRED', undefined, 'Session expired');
       }
 
       // 5. Token rotation: Create new session
@@ -490,13 +436,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           'Refresh attempt with invalid token'
         );
         clearAuthCookies(reply);
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'AUTH_REFRESH_INVALID_TOKEN',
-            message: 'Invalid or expired refresh token',
-          },
-        });
+        throw new UnauthorizedError('AUTH_REFRESH_INVALID_TOKEN', undefined, 'Invalid or expired refresh token');
       }
 
       // Unexpected error
@@ -507,13 +447,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         'Unexpected error during token refresh'
       );
       clearAuthCookies(reply);
-      return reply.status(401).send({
-        success: false,
-        error: {
-          code: 'AUTH_REFRESH_FAILED',
-          message: 'Token refresh failed',
-        },
-      });
+      throw new UnauthorizedError('AUTH_REFRESH_FAILED', undefined, 'Token refresh failed');
     }
   });
 
@@ -632,30 +566,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const { email, redirectTo } = request.body;
 
     if (!email || typeof email !== 'string' || email.trim().length === 0) {
-      return reply.status(400).send({
-        success: false,
-        error: {
-          code: 'AUTH_MAGIC_LINK_INVALID_EMAIL',
-          message: 'Email is required',
-        },
-      });
+      throw new BadRequestError('AUTH_MAGIC_LINK_INVALID_EMAIL', 'Email is required');
     }
 
     try {
-      // Create magic link
       const result = await magicLinkService.createMagicLink({
         email,
         redirectTo: redirectTo ?? null,
       });
 
-      // Generate magic link URL (frontend domain)
-      // Note: Frontend handles locale routing, so we use the base URL
       const magicLinkUrl = `${appUrlConfig.baseUrl}/auth/magic-link/verify?token=${result.token}`;
-
-      // Send email via SMTP (or log if SMTP not configured)
       await sendMagicLinkEmail(result.payload.email, magicLinkUrl);
 
-      // Return generic success (don't leak user existence)
       return reply.status(200).send({
         success: true,
         message: 'If an account exists for this email, a magic link has been sent.',
@@ -668,12 +590,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
         'Error creating magic link'
       );
-
-      // Return generic error to avoid leaking information
-      return reply.status(200).send({
-        success: true,
-        message: 'If an account exists for this email, a magic link has been sent.',
-      });
+      throw new HttpError(500, 'AUTH_MAGIC_LINK_FAILED', 'Failed to create magic link');
     }
   });
 
@@ -835,13 +752,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     // Check if user is authenticated
     if (!request.auth || !request.auth.userId) {
-      return reply.status(401).send({
-        success: false,
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authentication required',
-        },
-      });
+      throw new UnauthorizedError('UNAUTHORIZED');
     }
 
     const userId = request.auth.userId;
@@ -853,13 +764,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       });
 
       if (!user) {
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'USER_NOT_FOUND',
-            message: 'User not found',
-          },
-        });
+        throw new UnauthorizedError('USER_NOT_FOUND', undefined, 'User not found');
       }
 
       // Get all active workspace memberships
@@ -916,13 +821,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
         'Error getting user information'
       );
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      });
+      throw new HttpError(500, 'INTERNAL_ERROR', 'An unexpected error occurred');
     }
   });
 
@@ -1028,13 +927,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const { token } = request.query;
 
     if (!token) {
-      return reply.status(400).send({
-        success: false,
-        error: {
-          code: 'AUTH_MAGIC_LINK_TOKEN_REQUIRED',
-          message: 'Token is required',
-        },
-      });
+      throw new BadRequestError('AUTH_MAGIC_LINK_TOKEN_REQUIRED', 'Token is required');
     }
 
     try {
@@ -1092,13 +985,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           },
           'Magic link verification failed'
         );
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'AUTH_MAGIC_LINK_INVALID_OR_EXPIRED',
-            message: 'Magic link invalid or expired',
-          },
-        });
+        throw new UnauthorizedError('AUTH_MAGIC_LINK_INVALID_OR_EXPIRED', undefined, 'Magic link invalid or expired');
       }
 
       // Unexpected error
@@ -1109,13 +996,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
         'Unexpected error during magic link verification'
       );
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred during magic link verification',
-        },
-      });
+      throw new HttpError(500, 'INTERNAL_ERROR', 'An unexpected error occurred during magic link verification');
     }
   });
 }

@@ -1,15 +1,46 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
 import { userRepository } from "./user.repository.js";
 import { prisma } from "../../lib/prisma.js";
 import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
 import { storageConfig } from "../../config/index.js";
 import { MediaDeleteService } from "../media/application/media-delete.service.js";
+import { UnauthorizedError, NotFoundError, HttpError, BadRequestError } from "../../lib/http-errors.js";
+import { requireAuth } from "../../core/auth/require-auth.js";
 
 const storage = new S3StorageService();
 const mediaDeleteService = new MediaDeleteService(storage);
 
+type UpdateUserBody = {
+  name?: string | null;
+  username?: string | null;
+  locale?: string;
+  timezone?: string;
+  phone?: string | null;
+  avatarMediaId?: string | null;
+  completedOnboarding?: boolean;
+};
+
+const UpdateUserSchema = z.object({
+  name: z.string().trim().max(200).nullable().optional(),
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_.-]+$/)
+    .nullable()
+    .optional(),
+  locale: z.string().trim().min(2).max(10).optional(),
+  timezone: z.string().trim().min(2).max(50).optional(),
+  phone: z.string().trim().min(5).max(30).nullable().optional(),
+  avatarMediaId: z.string().uuid().nullable().optional(),
+  completedOnboarding: z.boolean().optional(),
+});
+
 export async function registerUserRoutes(app: FastifyInstance) {
   app.get("/users/me", {
+    preHandler: [requireAuth()],
     schema: {
       tags: ["Users"],
       summary: "Get current user profile",
@@ -46,20 +77,11 @@ export async function registerUserRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.auth?.userId) {
-      return reply.status(401).send({
-        success: false,
-        error: { code: "UNAUTHORIZED", message: "Authentication required" },
-      });
-    }
+  }, async (request: FastifyRequest<{ Body: UpdateUserBody }>, reply: FastifyReply) => {
 
     const user = await userRepository.findUserById(request.auth.userId);
     if (!user) {
-      return reply.status(404).send({
-        success: false,
-        error: { code: "USER_NOT_FOUND", message: "User not found" },
-      });
+      throw new NotFoundError("USER_NOT_FOUND", "User not found");
     }
 
     // Get googleId from database
@@ -90,6 +112,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
   });
 
   app.patch("/users/me", {
+    preHandler: [requireAuth()],
     schema: {
       tags: ["Users"],
       summary: "Update current user profile",
@@ -139,22 +162,18 @@ export async function registerUserRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.auth?.userId) {
-      return reply.status(401).send({
-        success: false,
-        error: { code: "UNAUTHORIZED", message: "Authentication required" },
-      });
-    }
 
     const currentUser = await userRepository.findUserById(request.auth.userId);
     if (!currentUser) {
-      return reply.status(404).send({
-        success: false,
-        error: { code: "USER_NOT_FOUND", message: "User not found" },
-      });
+      throw new NotFoundError("USER_NOT_FOUND", "User not found");
     }
 
-    const body = request.body as any;
+    const parsed = UpdateUserSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new BadRequestError("INVALID_BODY", "Invalid user payload", parsed.error.flatten());
+    }
+
+    const body = parsed.data;
     const completedOnboarding = body.completedOnboarding;
     const shouldRemoveAvatar = body.avatarMediaId === null;
     const avatarToDelete = shouldRemoveAvatar ? currentUser.avatarMediaId : null;
@@ -177,10 +196,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         request.log.error({ error, avatarToDelete }, "Failed to delete avatar media");
-        return reply.status(500).send({
-          success: false,
-          error: { code: "AVATAR_DELETE_FAILED", message: "Failed to delete avatar media" },
-        });
+        throw new HttpError(500, "AVATAR_DELETE_FAILED", "Failed to delete avatar media");
       }
     }
 
@@ -212,6 +228,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
   });
 
   app.delete("/users/me/google-connection", {
+    preHandler: [requireAuth()],
     schema: {
       tags: ["Users"],
       summary: "Disconnect Google account for current user",
@@ -249,19 +266,10 @@ export async function registerUserRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.auth?.userId) {
-      return reply.status(401).send({
-        success: false,
-        error: { code: "UNAUTHORIZED", message: "Authentication required" },
-      });
-    }
 
     const user = await userRepository.findUserById(request.auth.userId);
     if (!user) {
-      return reply.status(404).send({
-        success: false,
-        error: { code: "USER_NOT_FOUND", message: "User not found" },
-      });
+      throw new NotFoundError("USER_NOT_FOUND", "User not found");
     }
 
     // Clear googleId
@@ -323,21 +331,12 @@ export async function registerUserRoutes(app: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.auth?.userId) {
-      return reply.status(401).send({
-        success: false,
-        error: { code: "UNAUTHORIZED", message: "Authentication required" },
-      });
-    }
 
     const params = request.params as { username: string };
     const username = params.username.trim().toLowerCase();
 
     if (!username) {
-      return reply.status(400).send({
-        success: false,
-        error: { code: "INVALID_USERNAME", message: "Username is required" },
-      });
+      throw new BadRequestError("INVALID_USERNAME", "Username is required");
     }
 
     // Check if username is already taken by another user

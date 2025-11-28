@@ -103,7 +103,9 @@
         "cookieSettings": "Cookie Settings",
         "cookieSettingsDescription": "Manage your cookie preferences.",
         "cookieAccepted": "I accept cookies",
-        "cookieSettingsSaved": "Cookie preferences saved."
+        "cookieSettingsSaved": "Cookie preferences saved.",
+        "languageUpdated": "Language preference updated.",
+        "timezoneUpdated": "Timezone preference updated."
       },
       "notifications": "Notifications",
       "connectionsLabel": "Connections",

@@ -103,7 +103,9 @@
         "cookieSettings": "Çerez Ayarları",
         "cookieSettingsDescription": "Çerez tercihlerinizi yönetin.",
         "cookieAccepted": "Çerezleri kabul ediyorum",
-        "cookieSettingsSaved": "Çerez tercihleri kaydedildi."
+        "cookieSettingsSaved": "Çerez tercihleri kaydedildi.",
+        "languageUpdated": "Dil tercihi güncellendi.",
+        "timezoneUpdated": "Saat dilimi tercihi güncellendi."
       },
       "notifications": "Bildirimler",
       "connectionsLabel": "Bağlantılar",

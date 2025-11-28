@@ -65,6 +65,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (session) {
             setUser(session.user);
             setTokenReady(true);
+            
+            // Prefetch subscriptions for all accessible workspaces
+            const allWorkspaces = [
+              ...(session.ownerWorkspaces ?? []),
+              ...(session.memberWorkspaces ?? []),
+            ];
+            if (allWorkspaces.length > 0) {
+              // Prefetch in background (don't await - let it run async)
+              import("@/features/subscription/utils/prefetch-subscriptions").then(({ prefetchSubscriptionsForWorkspaces }) => {
+                void prefetchSubscriptionsForWorkspaces(allWorkspaces);
+              });
+            }
           } else {
             setTokenReady(false);
           }
@@ -108,6 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear cache on login to force fresh data fetch
     apiCache.invalidate("session:current");
     apiCache.invalidate("user:profile");
+    
+    // Prefetch subscriptions for all accessible workspaces
+    if (result.workspaces && result.workspaces.length > 0) {
+      // Prefetch in background (don't await - let it run async)
+      import("@/features/subscription/utils/prefetch-subscriptions").then(({ prefetchSubscriptionsForWorkspaces }) => {
+        void prefetchSubscriptionsForWorkspaces(result.workspaces);
+      });
+    }
   };
 
   const loginWithSession = async (result: LoginResult) => {

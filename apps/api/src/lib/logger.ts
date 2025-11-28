@@ -1,4 +1,5 @@
 import pino from 'pino';
+import type { FastifyBaseLogger } from 'fastify';
 import { appConfig } from '../config/index.js';
 
 /**
@@ -6,7 +7,7 @@ import { appConfig } from '../config/index.js';
  * Uses pino for structured logging
  * Configured via appConfig.logLevel
  */
-export const logger = pino({
+export const logger: FastifyBaseLogger = pino({
   level: appConfig.logLevel,
   base: {
     service: 'api',
@@ -14,4 +15,3 @@ export const logger = pino({
 });
 
 export type Logger = typeof logger;
-

@@ -338,11 +338,18 @@ function ThemePreferenceSelect() {
   )
 }
 
-function LanguagePreferenceSelect() {
+function LanguagePreferenceSelect({ 
+  currentLocale: initialLocale, 
+  onLocaleChange 
+}: { 
+  currentLocale: string | undefined
+  onLocaleChange: (locale: string) => Promise<void>
+}) {
   const router = useRouter()
   const pathname = usePathname()
-  const currentLocale = useLocale() as Locale
+  const currentLocale = (useLocale() as Locale) || (initialLocale as Locale) || "en"
   const [open, setOpen] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
   const t = useTranslations("common")
 
   const localeLabels: Record<Locale, string> = {
@@ -350,16 +357,24 @@ function LanguagePreferenceSelect() {
     tr: "Türkçe",
   }
 
-  const switchLocale = (newLocale: Locale) => {
-    let pathWithoutLocale = pathname
-    if (currentLocale !== "en" || pathname.startsWith(`/${currentLocale}`)) {
-      pathWithoutLocale = pathname.replace(`/${currentLocale}`, "")
+  const switchLocale = async (newLocale: Locale) => {
+    setIsSaving(true)
+    try {
+      await onLocaleChange(newLocale)
+      let pathWithoutLocale = pathname
+      if (currentLocale !== "en" || pathname.startsWith(`/${currentLocale}`)) {
+        pathWithoutLocale = pathname.replace(`/${currentLocale}`, "")
+      }
+      const newPath = newLocale === "en" 
+        ? pathWithoutLocale || "/"
+        : `/${newLocale}${pathWithoutLocale}`
+      router.push(newPath)
+      setOpen(false)
+    } catch (error) {
+      console.error("Failed to update locale:", error)
+    } finally {
+      setIsSaving(false)
     }
-    const newPath = newLocale === "en" 
-      ? pathWithoutLocale || "/"
-      : `/${newLocale}${pathWithoutLocale}`
-    router.push(newPath)
-    setOpen(false)
   }
 
   return (
@@ -367,8 +382,9 @@ function LanguagePreferenceSelect() {
       <DropdownMenuTrigger asChild>
         <button
           className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
+          disabled={isSaving}
         >
-          {localeLabels[currentLocale]}
+          {isSaving ? (t("saving") || "Saving...") : localeLabels[currentLocale]}
           <ChevronDown className="h-3 w-3" />
         </button>
       </DropdownMenuTrigger>
@@ -387,56 +403,108 @@ function LanguagePreferenceSelect() {
   )
 }
 
-function TimezonePreferenceSelect() {
+function TimezonePreferenceSelect({ 
+  currentTimezone, 
+  onTimezoneChange 
+}: { 
+  currentTimezone: string | undefined
+  onTimezoneChange: (timezone: string) => Promise<void>
+}) {
   const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState("utc")
+  const [value, setValue] = React.useState<string>(currentTimezone || "")
+  const [isSaving, setIsSaving] = React.useState(false)
   const t = useTranslations("common")
 
-  const timezones = [
-    { value: "utc", country: "UTC", offset: "UTC+0" },
-    { value: "est", country: "United States (Eastern)", offset: "UTC-5" },
-    { value: "pst", country: "United States (Pacific)", offset: "UTC-8" },
-  ]
+  React.useEffect(() => {
+    setValue(currentTimezone || "")
+  }, [currentTimezone])
 
-  const selectedTimezone = timezones.find(tz => tz.value === value)
+  // Fetch supported timezones
+  const timezones = React.useMemo(() => {
+    try {
+      return Intl.supportedValuesOf('timeZone')
+    } catch {
+      return ['UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Istanbul', 'Asia/Tokyo']
+    }
+  }, [])
+
+  const formattedTimezones = React.useMemo(() => {
+    return timezones
+      .map(timezone => {
+        try {
+          const formatter = new Intl.DateTimeFormat('en', {
+            timeZone: timezone,
+            timeZoneName: 'shortOffset'
+          })
+          const parts = formatter.formatToParts(new Date())
+          const offset = parts.find(part => part.type === 'timeZoneName')?.value || ''
+          const formattedOffset = offset === 'GMT' ? 'GMT+0' : offset
+          return {
+            value: timezone,
+            label: `(${formattedOffset}) ${timezone.replace(/_/g, ' ')}`,
+            numericOffset: parseInt(formattedOffset.replace('GMT', '').replace('+', '') || '0')
+          }
+        } catch {
+          return {
+            value: timezone,
+            label: timezone.replace(/_/g, ' '),
+            numericOffset: 0
+          }
+        }
+      })
+      .sort((a, b) => a.numericOffset - b.numericOffset) // Sort by numeric offset
+  }, [timezones])
+
+  const defaultTimezone = formattedTimezones.find(tz => tz.value === 'UTC') || formattedTimezones.find(tz => tz.value.toLowerCase().includes('utc')) || { label: '(GMT+0) UTC', value: 'UTC' }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors justify-between min-w-[200px]"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors w-fit"
+          disabled={isSaving}
         >
-          {selectedTimezone ? (
-            <span className="flex flex-col items-start">
-              <span className="font-medium">{selectedTimezone.country}</span>
-              <span className="text-xs text-muted-foreground">{selectedTimezone.offset}</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Select timezone</span>
-          )}
-          <ChevronsUpDown className="h-3 w-3 text-muted-foreground/80 shrink-0" />
+          <span>
+            {isSaving ? (t("saving") || "Saving...") : (
+              value ? (
+                formattedTimezones.find(timezone => timezone.value === value)?.label
+              ) : (
+                defaultTimezone.label
+              )
+            )}
+          </span>
+          <ChevronsUpDown className="h-3 w-3 text-muted-foreground/80 shrink-0 ml-1.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="end">
+      <PopoverContent className="w-[--radix-popper-anchor-width] p-0" align="end">
         <Command>
           <CommandInput placeholder="Search timezone..." />
           <CommandList>
             <CommandEmpty>No timezone found.</CommandEmpty>
             <CommandGroup>
-              {timezones.map((tz) => (
+              {formattedTimezones.map(({ value: itemValue, label }) => (
                 <CommandItem
-                  key={tz.value}
-                  value={tz.country}
-                  onSelect={() => {
-                    setValue(tz.value === value ? "" : tz.value)
-                    setOpen(false)
+                  key={itemValue}
+                  value={`${itemValue} ${label}`}
+                  onSelect={async () => {
+                    if (itemValue === value) {
+                      setOpen(false)
+                      return
+                    }
+                    setIsSaving(true)
+                    try {
+                      await onTimezoneChange(itemValue)
+                      setValue(itemValue)
+                      setOpen(false)
+                    } catch (error) {
+                      console.error("Failed to update timezone:", error)
+                    } finally {
+                      setIsSaving(false)
+                    }
                   }}
                 >
-                  <span className="flex flex-col flex-1">
-                    <span className="font-medium">{tz.country}</span>
-                    <span className="text-muted-foreground text-sm">{tz.offset}</span>
-                  </span>
-                  {value === tz.value && <CheckIcon size={16} className="ml-auto" />}
+                  <span className="truncate">{label}</span>
+                  {value === itemValue && <CheckIcon size={16} className="ml-auto" />}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -1593,93 +1661,97 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                   </Tabs>
                 </div>
               ) : activeItem === "preferences" ? (
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 pt-0 gap-6">
                   {/* Preferences Group */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <h2 className="text-base font-semibold text-foreground">
                       {t("settings.account.preferences") || "Preferences"}
                     </h2>
-                    <div className="rounded-lg border p-4 space-y-4">
-                      {/* Theme */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground block mb-1">
-                            {t("settings.account.preferencesTheme") || "Theme"}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {t("settings.account.preferencesThemeDescription") || "Choose your preferred theme for the application."}
-                          </p>
-                        </div>
-                        <ThemePreferenceSelect />
+                    
+                    {/* Theme */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesTheme") || "Theme"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesThemeDescription") || "Choose your preferred theme for the application."}
+                        </p>
                       </div>
+                      <ThemePreferenceSelect />
                     </div>
                   </div>
 
                   {/* Language & Region Group */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <h2 className="text-base font-semibold text-foreground">
                       {t("settings.account.preferencesGroup.languageRegion") || "Language & Region"}
                     </h2>
-                    <div className="rounded-lg border p-4 space-y-4">
-                      {/* Language */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground block mb-1">
-                            {t("settings.account.preferencesGroup.language") || "Language"}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {t("settings.account.preferencesGroup.languageDescription") || "Choose your preferred language."}
-                          </p>
-                        </div>
-                        <LanguagePreferenceSelect />
+                    
+                    {/* Language */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesGroup.language") || "Language"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesGroup.languageDescription") || "Choose your preferred language."}
+                        </p>
                       </div>
+                      <LanguagePreferenceSelect 
+                        currentLocale={profileUser?.locale}
+                        onLocaleChange={async (locale: string) => {
+                          const updated = await updateUserProfile({ locale })
+                          setProfileUser(updated)
+                          toast({
+                            title: t("settings.account.preferencesGroup.language") || "Language",
+                            description: t("settings.account.preferencesGroup.languageUpdated") || "Language preference updated.",
+                          })
+                        }}
+                      />
+                    </div>
 
-                      {/* Start week on Monday */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground block mb-1">
-                            {t("settings.account.preferencesGroup.startWeekMonday") || "Start week on Monday"}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {t("settings.account.preferencesGroup.startWeekMondayDescription") || "Start the week on Monday instead of Sunday."}
-                          </p>
-                        </div>
-                        <Switch />
+                    {/* Timezone */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesGroup.timezone") || "Timezone"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesGroup.timezoneDescription") || "Select your timezone."}
+                        </p>
                       </div>
-
-                      {/* Timezone */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground block mb-1">
-                            {t("settings.account.preferencesGroup.timezone") || "Timezone"}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {t("settings.account.preferencesGroup.timezoneDescription") || "Select your timezone."}
-                          </p>
-                        </div>
-                        <TimezonePreferenceSelect />
-                      </div>
+                      <TimezonePreferenceSelect 
+                        currentTimezone={profileUser?.timezone}
+                        onTimezoneChange={async (timezone: string) => {
+                          const updated = await updateUserProfile({ timezone })
+                          setProfileUser(updated)
+                          toast({
+                            title: t("settings.account.preferencesGroup.timezone") || "Timezone",
+                            description: t("settings.account.preferencesGroup.timezoneUpdated") || "Timezone preference updated.",
+                          })
+                        }}
+                      />
                     </div>
                   </div>
 
                   {/* Privacy Group */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <h2 className="text-base font-semibold text-foreground">
                       {t("settings.account.preferencesGroup.privacy") || "Privacy"}
                     </h2>
-                    <div className="rounded-lg border p-4 space-y-4">
-                      {/* Cookie Settings */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground block mb-1">
-                            {t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings"}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {t("settings.account.preferencesGroup.cookieSettingsDescription") || "Manage your cookie preferences."}
-                          </p>
-                        </div>
-                        <CookieSettingsPopover />
+                    
+                    {/* Cookie Settings */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesGroup.cookieSettings") || "Cookie Settings"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesGroup.cookieSettingsDescription") || "Manage your cookie preferences."}
+                        </p>
                       </div>
+                      <CookieSettingsPopover />
                     </div>
                   </div>
                 </div>

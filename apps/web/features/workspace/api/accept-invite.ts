@@ -13,7 +13,7 @@ export async function acceptWorkspaceInvite(token: string): Promise<{
   status: string;
 }> {
   const response = await httpClient.post<AcceptInviteResponse>(
-    `/workspace-invites/${token}/accept`
+    `/public/invites/${token}/accept`
   );
 
   if (!response.ok) {

@@ -1,9 +1,31 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
-import { BadRequestError, ForbiddenError, HttpError } from "../../lib/http-errors.js";
+import { BadRequestError, ForbiddenError, HttpError, NotFoundError, ConflictError } from "../../lib/http-errors.js";
+import { requireWorkspaceMatch } from "../../core/auth/require-workspace.js";
+
+type WorkspaceParams = {
+  workspaceId: string;
+};
+
+type UpsertSubscriptionBody = {
+  plan: "FREE" | "PRO" | "ENTERPRISE";
+  status?: "ACTIVE" | "CANCELED" | "PAST_DUE";
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  cancelAt?: string | null;
+};
+
+const UpsertSubscriptionSchema = z.object({
+  plan: z.enum(["FREE", "PRO", "ENTERPRISE"]),
+  status: z.enum(["ACTIVE", "CANCELED", "PAST_DUE"]).optional(),
+  periodStart: z.string().datetime().optional().nullable(),
+  periodEnd: z.string().datetime().optional().nullable(),
+  cancelAt: z.string().datetime().optional().nullable(),
+});
 
 export async function registerSubscriptionRoutes(app: FastifyInstance) {
   // Workspace-scoped subscription (uses X-Workspace-Id)
@@ -39,6 +61,9 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
       throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
     }
 
+    reply.header("Deprecation", "true");
+    reply.header("Link", '</workspaces/:workspaceId/subscription>; rel="successor-version"');
+
     const subscription = await prisma.subscription.findUnique({
       where: { workspaceId },
     });
@@ -59,7 +84,7 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
   });
 
   app.get("/workspaces/:workspaceId/subscription", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
     schema: {
       tags: ["Workspaces"],
       summary: "Get workspace subscription",
@@ -100,8 +125,8 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { workspaceId: paramWorkspaceId } = request.params as { workspaceId: string };
+  }, async (request: FastifyRequest<{ Params: WorkspaceParams }>, reply: FastifyReply) => {
+    const { workspaceId: paramWorkspaceId } = request.params;
     const workspaceId = request.auth?.workspaceId;
 
     if (!workspaceId) {
@@ -119,7 +144,7 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
   });
 
   app.put("/workspaces/:workspaceId/subscription", {
-    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
     schema: {
       tags: ["Workspaces"],
       summary: "Upsert workspace subscription",
@@ -166,8 +191,8 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { workspaceId: paramWorkspaceId } = request.params as { workspaceId: string };
+  }, async (request: FastifyRequest<{ Params: WorkspaceParams; Body: UpsertSubscriptionBody }>, reply: FastifyReply) => {
+    const { workspaceId: paramWorkspaceId } = request.params;
     const workspaceId = request.auth?.workspaceId;
 
     if (!workspaceId) {
@@ -178,32 +203,36 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
       throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId: workspaceId, paramWorkspaceId });
     }
 
-    const body = request.body as any;
+    const parsed = UpsertSubscriptionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new BadRequestError("INVALID_BODY", "Invalid subscription payload", parsed.error.flatten());
+    }
+
     try {
       const subscription = await prisma.subscription.upsert({
         where: { workspaceId },
         update: {
-          plan: body.plan,
-          status: body.status ?? undefined,
-          periodStart: body.periodStart ? new Date(body.periodStart) : undefined,
-          periodEnd: body.periodEnd ? new Date(body.periodEnd) : undefined,
-          cancelAt: body.cancelAt ? new Date(body.cancelAt) : null,
+          plan: parsed.data.plan,
+          status: parsed.data.status ?? undefined,
+          periodStart: parsed.data.periodStart ? new Date(parsed.data.periodStart) : undefined,
+          periodEnd: parsed.data.periodEnd ? new Date(parsed.data.periodEnd) : undefined,
+          cancelAt: parsed.data.cancelAt ? new Date(parsed.data.cancelAt) : null,
         },
         create: {
           workspaceId,
-          plan: body.plan,
-          status: body.status ?? "ACTIVE",
-          periodStart: body.periodStart ? new Date(body.periodStart) : null,
-          periodEnd: body.periodEnd ? new Date(body.periodEnd) : null,
-          cancelAt: body.cancelAt ? new Date(body.cancelAt) : null,
+          plan: parsed.data.plan,
+          status: parsed.data.status ?? "ACTIVE",
+          periodStart: parsed.data.periodStart ? new Date(parsed.data.periodStart) : null,
+          periodEnd: parsed.data.periodEnd ? new Date(parsed.data.periodEnd) : null,
+          cancelAt: parsed.data.cancelAt ? new Date(parsed.data.cancelAt) : null,
         },
       });
       return reply.send({ success: true, data: subscription });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        return reply.status(400).send({ success: false, error: { code: error.code, message: error.message } });
+        throw new BadRequestError(error.code, error.message);
       }
-      return reply.status(500).send({ success: false, error: { code: "INTERNAL", message: "Failed to upsert subscription" } });
+      throw new HttpError(500, "INTERNAL", "Failed to upsert subscription");
     }
   });
 }

@@ -94,17 +94,15 @@ class HttpClient {
       accessToken = getAccessToken();
     }
 
-    // Build headers
-    const headers: Record<string, string> = {
-      ...(options?.headers as Record<string, string> | undefined),
-    };
+    // Build headers - start with options headers, but ensure auth headers are set correctly
+    const headers: Record<string, string> = {};
 
     // Only add Content-Type if we have a body
     if (body !== undefined && body !== null) {
       headers["Content-Type"] = "application/json";
     }
 
-    // Add Authorization header if we have a token
+    // Add Authorization header if we have a token (CRITICAL: must be set)
     if (accessToken && !skipAuth) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
@@ -112,25 +110,55 @@ class HttpClient {
     // Get workspace ID - set header if we have a resolved workspace ID
     // No heuristics - use the resolved workspace.id from context
     const workspaceId = getWorkspaceId();
-    if (workspaceId && !headers["X-Workspace-Id"]) {
+    if (workspaceId && !skipAuth) {
       headers["X-Workspace-Id"] = workspaceId;
     }
 
-    // Log request
-    console.log(`[HTTP] ${method} ${fullUrl}`);
+    // Merge with options headers last (but don't let them override auth headers)
+    if (options?.headers) {
+      Object.assign(headers, options.headers);
+      // Ensure auth headers are not overridden
+      if (accessToken && !skipAuth) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      if (workspaceId && !skipAuth) {
+        headers["X-Workspace-Id"] = workspaceId;
+      }
+    }
 
+    // Log request with auth info (for debugging)
+    const authHeaderValue = headers["Authorization"];
+    const workspaceHeaderValue = headers["X-Workspace-Id"];
+    console.log(`[HTTP] ${method} ${fullUrl}`, {
+      hasToken: !!accessToken,
+      hasWorkspaceId: !!workspaceId,
+      workspaceId: workspaceId || "none",
+      headers: {
+        "Authorization": authHeaderValue ? (authHeaderValue.startsWith("Bearer ") ? "Bearer ***" : authHeaderValue) : "MISSING",
+        "X-Workspace-Id": workspaceHeaderValue || "none",
+      },
+      tokenLength: accessToken?.length || 0,
+    });
+
+    // Final check: ensure Authorization header is set if we have a token
+    if (accessToken && !skipAuth && !headers["Authorization"]) {
+      console.error("[HTTP] CRITICAL: Access token exists but Authorization header is missing!");
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    // Prepare fetch options - exclude headers from options to prevent override
+    const { headers: optionsHeaders, ...fetchOptions } = options || {};
+    
     try {
       const response = await fetch(fullUrl, {
         method,
         headers,
         body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
         credentials: "include", // Include cookies for refresh token
-        ...options,
+        ...fetchOptions,
       });
 
-      // Log response status
-      console.log(`[HTTP] ${method} ${fullUrl} → ${response.status}`);
-
+      // Parse response data first
       let data: T;
       const contentType = response.headers.get("content-type");
       
@@ -148,6 +176,17 @@ class HttpClient {
       const isRecoverableError = 
         (response.status === 401 && errorCode === "AUTH_REQUIRED") ||
         (response.status === 400 && errorCode === "WORKSPACE_ID_REQUIRED");
+
+      // Log response status with error details if failed
+      if (!response.ok) {
+        console.warn(`[HTTP] ${method} ${fullUrl} → ${response.status}`, {
+          errorCode,
+          errorMessage: (data as any)?.error?.message,
+          willRetry: isRecoverableError && !skipRefresh && retryCount < maxRetries,
+        });
+      } else {
+        console.log(`[HTTP] ${method} ${fullUrl} → ${response.status}`);
+      }
       
       if (isRecoverableError && !skipRefresh && retryCount < maxRetries) {
         // Don't retry refresh endpoint itself

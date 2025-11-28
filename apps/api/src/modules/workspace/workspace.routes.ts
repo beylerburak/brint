@@ -1,31 +1,35 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 import { createLimitGuard } from '../../core/subscription/limit-checker.js';
 import { prisma } from '../../lib/prisma.js';
 import { ensureDefaultWorkspaceRoles } from './workspace-role.service.js';
+import { UnauthorizedError, ConflictError } from '../../lib/http-errors.js';
+import { validateBody } from '../../lib/validation.js';
+import { requireAuth } from '../../core/auth/require-auth.js';
 
-interface CreateWorkspaceBody {
-  name: string;
-  slug: string;
-  plan?: 'FREE' | 'PRO' | 'ENTERPRISE';
-}
+const CreateWorkspaceSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(2)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/),
+  plan: z.enum(['FREE', 'PRO', 'ENTERPRISE']).default('FREE').optional(),
+});
 
-function requireAuthContext(request: FastifyRequest, reply: FastifyReply) {
-  if (!request.auth?.userId) {
-    return reply.status(401).send({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-    });
-  }
-}
+type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceSchema>;
 
 export async function registerWorkspaceRoutes(app: FastifyInstance) {
   app.post(
     '/workspaces',
     {
       preHandler: [
-        async (request, reply) => {
-          return requireAuthContext(request, reply);
+        requireAuth(),
+        async (request) => {
+          request.body = validateBody(CreateWorkspaceSchema, request.body);
         },
         createLimitGuard('workspace.maxCount', (req) => ({
           userId: req.auth?.userId,
@@ -51,10 +55,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
       if (!request.auth?.userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-        });
+        throw new UnauthorizedError('UNAUTHORIZED');
       }
 
       const { name, slug, plan = 'FREE' } = request.body;
@@ -100,13 +101,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
         });
       } catch (error: any) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          return reply.status(409).send({
-            success: false,
-            error: {
-              code: 'WORKSPACE_SLUG_EXISTS',
-              message: 'Workspace slug already exists',
-            },
-          });
+          throw new ConflictError('WORKSPACE_SLUG_EXISTS', 'Workspace slug already exists');
         }
 
         throw error;

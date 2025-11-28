@@ -3,6 +3,8 @@ import { PERMISSIONS } from '../../core/auth/permissions.registry.js';
 import { requirePermission } from '../../core/auth/require-permission.js';
 import { checkLimit, UnsupportedLimitError } from '../../core/subscription/limit-service.js';
 import { isLimitKey, LIMIT_KEY_REGISTRY, type LimitKey } from '../../core/subscription/limit-keys.js';
+import { BadRequestError, ForbiddenError, HttpError } from '../../lib/http-errors.js';
+import { requireWorkspaceMatch } from '../../core/auth/require-workspace.js';
 
 interface UsageQuery {
   limitKey?: string;
@@ -17,7 +19,7 @@ export async function registerUsageRoutes(app: FastifyInstance) {
   app.get(
     '/workspaces/:workspaceId/usage',
     {
-      preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW)],
+      preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_VIEW), requireWorkspaceMatch()],
       schema: {
         tags: ['Workspaces'],
         summary: 'Get usage for a subscription limit key',
@@ -67,36 +69,18 @@ export async function registerUsageRoutes(app: FastifyInstance) {
       const { workspaceId } = request.params;
 
       if (!limitKeyRaw || !isLimitKey(limitKeyRaw)) {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'INVALID_LIMIT_KEY',
-            message: 'limitKey is required and must be a known limit',
-          },
-        });
+        throw new BadRequestError('INVALID_LIMIT_KEY', 'limitKey is required and must be a known limit');
       }
 
       const limitKey = limitKeyRaw as LimitKey;
       const definition = LIMIT_KEY_REGISTRY[limitKey];
 
       if (definition.scope === 'brand' && !brandId) {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'BRAND_ID_REQUIRED',
-            message: `brandId is required for ${limitKey}`,
-          },
-        });
+        throw new BadRequestError('BRAND_ID_REQUIRED', `brandId is required for ${limitKey}`);
       }
 
       if (request.auth?.workspaceId && request.auth.workspaceId !== workspaceId) {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'WORKSPACE_MISMATCH',
-            message: 'Workspace in header does not match requested workspace',
-          },
-        });
+        throw new ForbiddenError('WORKSPACE_MISMATCH', { headerWorkspaceId: request.auth.workspaceId, paramWorkspaceId: workspaceId });
       }
 
       try {
@@ -121,13 +105,7 @@ export async function registerUsageRoutes(app: FastifyInstance) {
         });
       } catch (error: unknown) {
         if (error instanceof UnsupportedLimitError) {
-          return reply.status(501).send({
-            success: false,
-            error: {
-              code: 'LIMIT_NOT_IMPLEMENTED',
-              message: error.message,
-            },
-          });
+          throw new HttpError(501, 'LIMIT_NOT_IMPLEMENTED', error.message);
         }
 
         throw error;

@@ -41,9 +41,12 @@ export async function getBrands(workspaceId?: string): Promise<Brand[]> {
     throw new Error("Workspace ID is required to fetch brands");
   }
 
-  const response = await httpClient.get<GetBrandsResponse>("/studio/brands", {
-    headers: { "X-Workspace-Id": resolvedWorkspaceId },
-  });
+  const response = await httpClient.get<GetBrandsResponse>(
+    `/workspaces/${resolvedWorkspaceId}/studio/brands`,
+    {
+      headers: { "X-Workspace-Id": resolvedWorkspaceId },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(response.message || "Failed to get brands");
@@ -61,9 +64,13 @@ export async function createBrand(
     throw new Error("Workspace ID is required to create a brand");
   }
 
-  const response = await httpClient.post<CreateBrandResponse>("/studio/brands", data, {
-    headers: { "X-Workspace-Id": resolvedWorkspaceId },
-  });
+  const response = await httpClient.post<CreateBrandResponse>(
+    `/workspaces/${resolvedWorkspaceId}/studio/brands`,
+    data,
+    {
+      headers: { "X-Workspace-Id": resolvedWorkspaceId },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(response.message || "Failed to create brand");

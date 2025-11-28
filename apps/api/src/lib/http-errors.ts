@@ -28,3 +28,15 @@ export class BadRequestError extends HttpError {
     super(400, code, message ?? 'Bad request', details);
   }
 }
+
+export class NotFoundError extends HttpError {
+  constructor(code: string = 'NOT_FOUND', message?: string, details?: unknown) {
+    super(404, code, message ?? 'Resource not found', details);
+  }
+}
+
+export class ConflictError extends HttpError {
+  constructor(code: string = 'CONFLICT', message?: string, details?: unknown) {
+    super(409, code, message ?? 'Conflict', details);
+  }
+}

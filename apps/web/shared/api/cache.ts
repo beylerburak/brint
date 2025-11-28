@@ -63,6 +63,31 @@ class ApiCache {
   }
 
   /**
+   * Manually set cache entry (for prefetching)
+   */
+  set<T>(key: string, data: T): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Get cached data without fetching (returns undefined if not cached or expired)
+   */
+  get<T>(key: string, ttl: number = this.defaultTTL): T | undefined {
+    const now = Date.now();
+    const cached = this.cache.get(key) as CacheEntry<T> | undefined;
+
+    // Return cached data if still valid
+    if (cached && (now - cached.timestamp) < ttl) {
+      return cached.data;
+    }
+
+    return undefined;
+  }
+
+  /**
    * Clear all cache
    */
   clear(): void {

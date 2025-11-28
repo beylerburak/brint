@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/features/workspace/components/sidebar/app-sidebar";
-import { WorkspaceHeader } from "@/features/workspace/components/workspace-header";
+import { SpaceSidebar } from "@/features/workspace/components/sidebar/space-sidebar";
+import { SpaceHeader } from "@/features/workspace/components/space-header";
 import { ProfileCompletionDialog } from "@/features/workspace/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/workspace/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
@@ -91,9 +91,9 @@ export function WorkspaceLayoutClient({
         <ProfileCompletionDialog user={userProfile} onComplete={handleProfileComplete} />
       )}
     <SidebarProvider>
-      <AppSidebar />
+      <SpaceSidebar />
       <SidebarInset>
-        <WorkspaceHeader workspace={workspace} />
+        <SpaceHeader workspace={workspace} />
         <div className="flex flex-1 flex-col">
           {children}
         </div>

@@ -10,6 +10,8 @@ import { useWorkspace } from "@/features/workspace/context/workspace-context";
 import { useBrand } from "@/features/brand/context/brand-context";
 import { usePermissions } from "@/permissions";
 import { useSubscription } from "@/features/subscription";
+import { apiCache } from "@/shared/api/cache";
+import type { SubscriptionSnapshot } from "@/shared/api/subscription";
 import { NavUser } from "@/features/workspace/components/sidebar/nav-user";
 import { SpaceSwitcher } from "@/features/workspace/components/sidebar/space-switcher";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
@@ -30,7 +32,7 @@ import { Settings, LifeBuoy } from "lucide-react";
 import { cn } from "@/shared/utils";
 import { SettingsDialog } from "@/features/settings";
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function SpaceSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const locale = useLocale();
   const pathname = usePathname();
   const { workspace } = useWorkspace();
@@ -132,21 +134,76 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ];
 
+  // Get subscription plans for all workspaces from cache
+  // Use useMemo to recalculate when availableWorkspaces, current subscription, or workspace changes
+  const [prefetchTrigger, setPrefetchTrigger] = React.useState(0);
+  
+  // Listen for prefetch completion and subscription update events
+  React.useEffect(() => {
+    const handlePrefetch = () => {
+      setPrefetchTrigger((prev) => prev + 1);
+    };
+    
+    const handleSubscriptionUpdate = () => {
+      setPrefetchTrigger((prev) => prev + 1);
+    };
+    
+    window.addEventListener("subscriptions-prefetched", handlePrefetch);
+    window.addEventListener("subscription-updated", handleSubscriptionUpdate);
+    return () => {
+      window.removeEventListener("subscriptions-prefetched", handlePrefetch);
+      window.removeEventListener("subscription-updated", handleSubscriptionUpdate);
+    };
+  }, []);
+  
+  const workspacePlans = React.useMemo(() => {
+    const plans = new Map<string, string>();
+    
+    availableWorkspaces.forEach((ws) => {
+      const cached = apiCache.get<SubscriptionSnapshot | null>(
+        `subscription:${ws.id}`,
+        60000 // 60 seconds TTL
+      );
+      
+      if (cached?.plan) {
+        plans.set(ws.id, cached.plan);
+      } else {
+        // Default to FREE if not cached
+        plans.set(ws.id, "FREE");
+      }
+    });
+    
+    return plans;
+  }, [availableWorkspaces, subscriptionPlan, workspace?.id, prefetchTrigger]); // Recalculate when workspaces, current subscription, workspace changes, or prefetch completes
+
+  // Format plan for display
+  const formatPlan = (plan: string | undefined): string => {
+    if (!plan) return "Free";
+    const upperPlan = plan.toUpperCase();
+    if (upperPlan === "FREE") return "Free";
+    if (upperPlan === "PRO") return "Pro";
+    if (upperPlan === "ENTERPRISE") return "Enterprise";
+    return plan;
+  };
+
   const teams =
     availableWorkspaces.length > 0
-      ? availableWorkspaces.map((ws) => ({
-          name: ws.name ? ws.name : `@${ws.slug}`,
-          slug: ws.slug,
-          logo: sidebarNavigation[0]?.icon,
-          plan: subscriptionPlan ?? "Free",
-        }))
+      ? availableWorkspaces.map((ws) => {
+          const plan = workspacePlans.get(ws.id) ?? subscriptionPlan ?? "FREE";
+          return {
+            name: ws.name ? ws.name : `@${ws.slug}`,
+            slug: ws.slug,
+            logo: sidebarNavigation[0]?.icon,
+            plan: formatPlan(plan),
+          };
+        })
       : workspace
         ? [
             {
               name: `@${workspace.slug}`,
               slug: workspace.slug,
               logo: sidebarNavigation[0]?.icon,
-              plan: subscriptionPlan ?? "Free",
+              plan: formatPlan(subscriptionPlan),
             },
           ]
         : [];
@@ -220,3 +277,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   );
 }
+

@@ -6,7 +6,7 @@ import { AuthProvider } from "@/features/auth/context/auth-context";
 import { WorkspaceProvider } from "@/features/workspace/context/workspace-context";
 import { PermissionProvider } from "@/permissions";
 import { ProtectedLayout } from "@/components/protected-layout";
-import { WorkspaceGuard } from "@/features/workspace/components/workspace-guard";
+import { SpaceGuard } from "@/features/workspace/components/space-guard";
 
 export default async function LocaleLayout({
   children,
@@ -32,9 +32,9 @@ export default async function LocaleLayout({
         <WorkspaceProvider params={{ locale }}>
           <PermissionProvider>
             <ProtectedLayout>
-              <WorkspaceGuard>
+              <SpaceGuard>
                 {children}
-              </WorkspaceGuard>
+              </SpaceGuard>
             </ProtectedLayout>
           </PermissionProvider>
         </WorkspaceProvider>

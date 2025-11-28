@@ -41,7 +41,7 @@ apps/web/
 │   │   └── context/            # auth-context.tsx
 │   ├── workspace/              # Workspace feature
 │   │   ├── api/                # subscription-api.ts, user-api.ts
-│   │   ├── components/         # sidebar, workspace-guard, workspace-header
+│   │   ├── components/         # sidebar, space-guard, space-header
 │   │   ├── context/            # workspace-context.tsx
 │   │   ├── navigation/        # navigation.ts (sidebar config)
 │   │   └── pages/             # dashboard-page, settings-page, studio-page, brand-dashboard-page
@@ -113,7 +113,7 @@ Sıra değişmez:
 </AuthProvider>
 ```
 - Root layout: ThemeProvider + Toaster.
-- Locale layout: NextIntlClientProvider + ProtectedLayout + WorkspaceGuard.
+- Locale layout: NextIntlClientProvider + ProtectedLayout + SpaceGuard.
 - Workspace layout: SubscriptionProvider + sidebar + header (workspace shell).
 - Studio layout: BrandProvider sarıyor (brand context).
 
@@ -127,7 +127,7 @@ Sıra değişmez:
 
 ### Workspace Feature (`features/workspace/`)
 - **API**: `api/` - subscription-api.ts, user-api.ts (workspace-specific API'ler)
-- **Components**: `components/` - Sidebar (app-sidebar, nav-main, nav-projects, nav-user, space-switcher), WorkspaceGuard, WorkspaceHeader
+- **Components**: `components/` - Sidebar (space-sidebar, nav-main, nav-projects, nav-user, space-switcher), SpaceGuard, SpaceHeader
 - **Context**: `context/workspace-context.tsx` - WorkspaceProvider, useWorkspace hook
 - **Navigation**: `navigation/navigation.ts` - Sidebar navigation configuration
 - **Pages**: `pages/` - DashboardPage, SettingsPage, StudioPage, BrandDashboardPage
@@ -181,7 +181,7 @@ Shared katmanı, tüm feature'lar tarafından kullanılan altyapı ve utility'le
 ## UI / DS
 - `components/ui/*`: ShadCN kit.
 - `components/theme-provider.tsx`, `components/theme-toggle.tsx`: tema kontrolü.
-- `components/protected-layout.tsx`: auth shell; WorkspaceGuard yönlendirme yapar.
+- `components/protected-layout.tsx`: auth shell; SpaceGuard yönlendirme yapar.
 
 ## Aliaslar & Import Pattern'leri
 
@@ -210,7 +210,7 @@ import { LoginForm, SignupForm } from "@/features/auth/components/login-form";
 // Workspace feature
 import { useWorkspace, WorkspaceProvider } from "@/features/workspace/context/workspace-context";
 import { getWorkspaceSubscription } from "@/features/workspace/api/subscription-api";
-import { AppSidebar } from "@/features/workspace/components/sidebar/app-sidebar";
+import { SpaceSidebar } from "@/features/workspace/components/sidebar/space-sidebar";
 import { sidebarNavigation } from "@/features/workspace/navigation/navigation";
 import { DashboardPage } from "@/features/workspace/pages/dashboard-page";
 

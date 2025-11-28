@@ -9,17 +9,17 @@ import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { clearAccessToken } from "@/shared/auth/token-storage";
 import { apiCache } from "@/shared/api/cache";
 
-interface WorkspaceGuardProps {
+interface SpaceGuardProps {
   children: React.ReactNode;
 }
 
 /**
- * WorkspaceGuard - Handles workspace redirect logic
+ * SpaceGuard - Handles workspace redirect logic
  * 
  * - If user has no workspace in URL and is not on onboarding → redirect to onboarding
  * - If user has workspace but is on onboarding → redirect to workspace dashboard
  */
-export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
+export function SpaceGuard({ children }: SpaceGuardProps) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { workspace } = useWorkspace();
   const router = useRouter();
@@ -43,7 +43,7 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
         const session = await getCurrentSession();
         if (!session) {
           // Session invalid - clear auth state and redirect to login
-          console.warn("WorkspaceGuard: Session invalid, logging out user");
+          console.warn("SpaceGuard: Session invalid, logging out user");
           clearAccessToken();
           localStorage.removeItem("auth_user");
           apiCache.invalidate("session:current");
@@ -61,7 +61,7 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
           errorMessage.includes("UNAUTHORIZED") ||
           errorMessage.includes("Request failed with status 401")
         ) {
-          console.warn("WorkspaceGuard: Session invalid (401), logging out user:", errorMessage);
+          console.warn("SpaceGuard: Session invalid (401), logging out user:", errorMessage);
           clearAccessToken();
           localStorage.removeItem("auth_user");
           apiCache.invalidate("session:current");
@@ -71,7 +71,7 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
           return;
         }
         // Other errors - log but don't redirect (might be network issues)
-        console.error("WorkspaceGuard: Error verifying session:", error);
+        console.error("SpaceGuard: Error verifying session:", error);
       }
     })();
 
@@ -124,3 +124,4 @@ export function WorkspaceGuard({ children }: WorkspaceGuardProps) {
 
   return <>{children}</>;
 }
+

@@ -30,11 +30,11 @@ function getPageTitle(pathname: string, workspace: string): string {
     .join(" ");
 }
 
-interface WorkspaceHeaderProps {
+interface SpaceHeaderProps {
   workspace: string;
 }
 
-export function WorkspaceHeader({ workspace }: WorkspaceHeaderProps) {
+export function SpaceHeader({ workspace }: SpaceHeaderProps) {
   const pathname = usePathname();
   const pageTitle = getPageTitle(pathname, workspace);
   const { subscription, plan } = useSubscription();
@@ -76,3 +76,4 @@ export function WorkspaceHeader({ workspace }: WorkspaceHeaderProps) {
     </header>
   );
 }
+

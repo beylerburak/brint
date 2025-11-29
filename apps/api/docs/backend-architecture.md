@@ -26,7 +26,7 @@ The backend is built on **Node.js + Fastify** and follows a **domain-driven modu
 - **Database**: PostgreSQL (via Prisma ORM)
 - **Cache**: Redis
 - **Logging**: Pino
-- **Validation**: Zod
+- **Validation**: Zod (see [Validation Standard Guide](../../../docs/guides-for-ai/validation-standard.md))
 - **Testing**: Vitest (spec files)
 
 ### Directory Structure

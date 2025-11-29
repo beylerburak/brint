@@ -259,6 +259,7 @@ function createColumns(
 
 interface WorkspaceMembersTableProps {
   refreshTrigger?: number;
+  onCountChange?: (count: number) => void;
 }
 
 type TableRow = WorkspaceMember | {
@@ -279,7 +280,7 @@ type TableRow = WorkspaceMember | {
   inviteEmail: string;
 };
 
-export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableProps = {}) {
+export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: WorkspaceMembersTableProps = {}) {
   const { workspace } = useWorkspace();
   const t = useTranslations("common");
   const [members, setMembers] = React.useState<WorkspaceMember[]>([]);
@@ -305,12 +306,20 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
           getWorkspaceMembers(workspace.id),
           getWorkspaceInvites(workspace.id),
         ]);
-        logger.debug("[MembersTable] Loaded members:", membersData);
-        logger.debug("[MembersTable] Loaded invites:", invitesData);
-        logger.debug("[MembersTable] Pending invites:", invitesData.filter(i => i.status === "PENDING"));
+        logger.debug("[MembersTable] Loaded members:", membersData, "type:", typeof membersData, "isArray:", Array.isArray(membersData));
+        logger.debug("[MembersTable] Loaded invites:", invitesData, "type:", typeof invitesData, "isArray:", Array.isArray(invitesData));
+        
+        // Ensure both are arrays
+        const safeMembersData = Array.isArray(membersData) ? membersData : [];
+        const safeInvitesData = Array.isArray(invitesData) ? invitesData : [];
+        
+        logger.debug("[MembersTable] Safe members count:", safeMembersData.length);
+        logger.debug("[MembersTable] Safe invites count:", safeInvitesData.length);
+        logger.debug("[MembersTable] Pending invites:", safeInvitesData.filter(i => i.status === "PENDING"));
+        
         if (!cancelled) {
-          setMembers(membersData);
-          setInvites(invitesData);
+          setMembers(safeMembersData);
+          setInvites(safeInvitesData);
         }
       } catch (err) {
         logger.error("[MembersTable] Error loading data:", err);
@@ -368,8 +377,8 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
         getWorkspaceMembers(workspace.id),
         getWorkspaceInvites(workspace.id),
       ]);
-      setMembers(membersData);
-      setInvites(invitesData);
+      setMembers(Array.isArray(membersData) ? membersData : []);
+      setInvites(Array.isArray(invitesData) ? invitesData : []);
     },
     [workspace?.id]
   );
@@ -400,10 +409,17 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
 
   // Combine members and pending invites
   const tableData = React.useMemo<TableRow[]>(() => {
-    const rows: TableRow[] = [...members];
+    logger.debug("[MembersTable] Computing tableData - members:", members, "invites:", invites);
+    
+    // Ensure members is an array
+    const safeMembers = Array.isArray(members) ? members : [];
+    const rows: TableRow[] = [...safeMembers];
+    
+    // Ensure invites is an array before filtering
+    const safeInvites = Array.isArray(invites) ? invites : [];
     
     // Add pending invites as table rows
-    const pendingInvites = invites.filter((invite) => invite.status === "PENDING");
+    const pendingInvites = safeInvites.filter((invite) => invite.status === "PENDING");
     logger.debug("[MembersTable] Processing pending invites:", pendingInvites);
     
     pendingInvites.forEach((invite) => {
@@ -426,9 +442,16 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
       });
     });
     
-    logger.debug("[MembersTable] Final tableData:", rows);
+    logger.debug("[MembersTable] Final tableData:", rows, "length:", rows.length);
     return rows;
   }, [members, invites]);
+
+  // Notify parent of count change
+  React.useEffect(() => {
+    if (onCountChange) {
+      onCountChange(tableData.length);
+    }
+  }, [tableData.length, onCountChange]);
 
   const columns = React.useMemo(() => createColumns(t), [t]);
 

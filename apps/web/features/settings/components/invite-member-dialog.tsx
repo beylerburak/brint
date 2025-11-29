@@ -21,6 +21,7 @@ import {
 import {
   createWorkspaceInvite,
   getWorkspaceInvites,
+  resendWorkspaceInvite,
   type WorkspaceInvite,
 } from "@/features/space/api/invites-api";
 import { useWorkspace } from "@/features/space/context/workspace-context";
@@ -64,6 +65,8 @@ export function InviteMemberDialog({
   const [members, setMembers] = React.useState<WorkspaceMember[]>([]);
   const [invites, setInvites] = React.useState<WorkspaceInvite[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [pendingInviteForEmail, setPendingInviteForEmail] = React.useState<WorkspaceInvite | null>(null);
+  const [isResending, setIsResending] = React.useState(false);
 
   React.useEffect(() => {
     if (!open || !workspace?.id) return;
@@ -78,8 +81,8 @@ export function InviteMemberDialog({
           getWorkspaceInvites(workspace.id),
         ]);
         if (!cancelled) {
-          setMembers(membersData);
-          setInvites(invitesData);
+          setMembers(Array.isArray(membersData) ? membersData : []);
+          setInvites(Array.isArray(invitesData) ? invitesData : []);
         }
       } catch (error) {
         logger.error("Failed to load data:", error);
@@ -97,12 +100,36 @@ export function InviteMemberDialog({
     };
   }, [open, workspace?.id]);
 
+  // Check for pending invite when email changes
+  React.useEffect(() => {
+    if (!email || !invites.length) {
+      setPendingInviteForEmail(null);
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const pendingInvite = invites.find(
+      (invite) => invite.email.toLowerCase() === normalizedEmail && invite.status === "PENDING"
+    );
+    setPendingInviteForEmail(pendingInvite || null);
+  }, [email, invites]);
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !workspace?.id) return;
 
+    // Prevent creating invite if pending invite exists
+    if (pendingInviteForEmail) {
+      toast.error(t("settings.workspace.people.pendingInviteExists") || "A pending invite already exists for this email");
+      return;
+    }
+
     try {
-      const invite = await createWorkspaceInvite(workspace.id, { email });
+      // Default to workspace-member role for new invites
+      const invite = await createWorkspaceInvite(workspace.id, { 
+        email,
+        roleKey: 'workspace-member'
+      });
       
       // Show success toast
       toast.success(t("settings.workspace.people.inviteSent", { email }));
@@ -116,8 +143,8 @@ export function InviteMemberDialog({
         getWorkspaceInvites(workspace.id),
       ]);
       
-      setMembers(membersData);
-      setInvites(invitesData);
+      setMembers(Array.isArray(membersData) ? membersData : []);
+      setInvites(Array.isArray(invitesData) ? invitesData : []);
       
       // Notify parent to refresh members table
       if (onInviteSent) {
@@ -125,11 +152,49 @@ export function InviteMemberDialog({
       }
     } catch (error) {
       logger.error("[InviteDialog] Error creating invite:", error);
+      const errorMessage = error instanceof Error ? error.message : t("settings.workspace.people.inviteError");
+      
+      // Check if error is about pending invite
+      if (errorMessage.includes("pending invite") || errorMessage.includes("PENDING_INVITE_EXISTS")) {
+        // Reload invites to get the pending invite
+        try {
+          const invitesData = await getWorkspaceInvites(workspace.id);
+          setInvites(Array.isArray(invitesData) ? invitesData : []);
+        } catch (reloadError) {
+          logger.error("Failed to reload invites:", reloadError);
+        }
+      }
+      
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleResendInvite = async () => {
+    if (!pendingInviteForEmail || !workspace?.id || isResending) return;
+
+    try {
+      setIsResending(true);
+      await resendWorkspaceInvite(workspace.id, pendingInviteForEmail.id);
+      
+      toast.success(t("settings.workspace.people.inviteResent") || "Invite resent successfully");
+      
+      // Reload invites to get updated data
+      const invitesData = await getWorkspaceInvites(workspace.id);
+      setInvites(Array.isArray(invitesData) ? invitesData : []);
+      
+      // Notify parent to refresh members table
+      if (onInviteSent) {
+        onInviteSent();
+      }
+    } catch (error) {
+      logger.error("[InviteDialog] Error resending invite:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : t("settings.workspace.people.inviteError")
+          : t("settings.workspace.people.inviteResendError") || "Failed to resend invite"
       );
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -157,10 +222,29 @@ export function InviteMemberDialog({
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <Button type="submit" className="h-10" disabled={!email}>
-              {t("settings.workspace.people.inviteButton")}
-            </Button>
+            {pendingInviteForEmail ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={handleResendInvite}
+                disabled={isResending}
+              >
+                {isResending
+                  ? (t("settings.workspace.people.resendingInvite") || "Resending...")
+                  : (t("settings.workspace.people.resendInvite") || "Resend invite")}
+              </Button>
+            ) : (
+              <Button type="submit" className="h-10" disabled={!email}>
+                {t("settings.workspace.people.inviteButton")}
+              </Button>
+            )}
           </div>
+          {pendingInviteForEmail && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("settings.workspace.people.pendingInviteMessage") || "A pending invite exists for this email. Click 'Resend invite' to send it again."}
+            </p>
+          )}
         </form>
         <h4 className="mt-4 text-sm font-medium text-foreground">
           {t("settings.workspace.people.inviteDialog.existingAccessTitle")}

@@ -21,4 +21,4 @@ export function buildStringSchema(rule: FieldRule, baseKey?: string) {
   return schema;
 }
 
-export const emailSchema = z.string().email('validation.email.invalid');
+export const emailSchema = z.string().email('validation.email.invalid').max(255, 'validation.email.max');

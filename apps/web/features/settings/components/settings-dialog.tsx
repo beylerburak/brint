@@ -55,8 +55,11 @@ import {
 import {
   Tabs,
   TabsContent,
+  TabsContents,
   TabsList,
   TabsTrigger,
+  TabsHighlight,
+  TabsHighlightItem,
 } from "@/components/animate-ui/primitives/radix/tabs"
 import { useTranslations, useLocale } from "next-intl"
 import { usePathname, useRouter } from "next/navigation"
@@ -107,6 +110,7 @@ import {
 } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -636,6 +640,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const [activeItem, setActiveItem] = React.useState<string | null>(null)
   const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false)
   const [membersTableRefresh, setMembersTableRefresh] = React.useState(0)
+  const [membersCount, setMembersCount] = React.useState<number>(0)
   const [isMobile, setIsMobile] = React.useState(false)
   const [disconnectGoogleDialogOpen, setDisconnectGoogleDialogOpen] = React.useState(false)
   const t = useTranslations("common")
@@ -1760,18 +1765,44 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                      </Button>
                    </div>
                   <Tabs defaultValue="members" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="members">{t("settings.workspace.people.tabs.members")}</TabsTrigger>
-                      <TabsTrigger value="contact">{t("settings.workspace.people.tabs.contact")}</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="members" className="mt-1">
-                      <WorkspaceMembersTable refreshTrigger={membersTableRefresh} />
-                    </TabsContent>
-                    <TabsContent value="contact" className="mt-1">
-                      <div className="flex items-center justify-center py-8">
-                        <span className="text-muted-foreground">{t("settings.workspace.people.contactContentComingSoon")}</span>
-                      </div>
-                    </TabsContent>
+                    <TabsHighlight className="bg-background absolute z-0 inset-0 rounded-md">
+                      <TabsList className="h-10 inline-flex p-1 bg-accent w-full rounded-lg">
+                        <TabsHighlightItem value="members" className="flex-1">
+                          <TabsTrigger
+                            value="members"
+                            className="h-full px-4 py-2 leading-0 w-full text-sm inline-flex items-center justify-center gap-2"
+                          >
+                            <span>{t("settings.workspace.people.tabs.members")}</span>
+                            {membersCount > 0 && (
+                              <Badge variant="secondary">
+                                {membersCount}
+                              </Badge>
+                            )}
+                          </TabsTrigger>
+                        </TabsHighlightItem>
+                        <TabsHighlightItem value="contact" className="flex-1">
+                          <TabsTrigger
+                            value="contact"
+                            className="h-full px-4 py-2 leading-0 w-full text-sm"
+                          >
+                            {t("settings.workspace.people.tabs.contact")}
+                          </TabsTrigger>
+                        </TabsHighlightItem>
+                      </TabsList>
+                    </TabsHighlight>
+                    <TabsContents className="mt-3">
+                      <TabsContent value="members">
+                        <WorkspaceMembersTable 
+                          refreshTrigger={membersTableRefresh} 
+                          onCountChange={setMembersCount}
+                        />
+                      </TabsContent>
+                      <TabsContent value="contact">
+                        <div className="flex items-center justify-center py-8">
+                          <span className="text-muted-foreground">{t("settings.workspace.people.contactContentComingSoon")}</span>
+                        </div>
+                      </TabsContent>
+                    </TabsContents>
                   </Tabs>
                 </div>
               ) : activeItem === "preferences" ? (

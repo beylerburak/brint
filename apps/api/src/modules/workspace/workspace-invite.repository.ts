@@ -39,6 +39,16 @@ export class WorkspaceInviteRepository {
       data: { status },
     });
   }
+
+  async findPendingByEmailAndWorkspace(email: string, workspaceId: string) {
+    return prisma.workspaceInvite.findFirst({
+      where: {
+        email,
+        workspaceId,
+        status: "PENDING",
+      },
+    });
+  }
 }
 
 export const workspaceInviteRepository = new WorkspaceInviteRepository();

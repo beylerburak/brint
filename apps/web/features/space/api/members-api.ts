@@ -19,7 +19,10 @@ export interface WorkspaceMember {
 
 export interface GetWorkspaceMembersResponse {
   success: boolean;
-  data: WorkspaceMember[];
+  data: {
+    items: WorkspaceMember[];
+    nextCursor: string | null;
+  };
 }
 
 /**
@@ -39,7 +42,19 @@ export async function getWorkspaceMembers(
     throw new Error(response.message || "Failed to get workspace members");
   }
 
-  return response.data.data;
+  // Backend returns paginated response: { items: [], nextCursor: null }
+  // Extract items array from paginated response
+  const data = response.data?.data;
+  if (data && Array.isArray(data.items)) {
+    return data.items;
+  }
+  
+  // Fallback: if data is directly an array (legacy format)
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
+  return [];
 }
 
 export interface UpdateWorkspaceMemberRequest {

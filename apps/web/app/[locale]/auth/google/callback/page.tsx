@@ -46,7 +46,7 @@ export default function GoogleCallbackPage() {
       }
 
       const redirectBack = `${window.location.origin}${localePrefix}/auth/google/callback?complete=1`;
-      const apiUrl = `${appConfig.apiBaseUrl}/auth/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}&redirect_url=${encodeURIComponent(redirectBack)}`;
+      const apiUrl = `${appConfig.apiBaseUrl}/v1/auth/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}&redirect_url=${encodeURIComponent(redirectBack)}`;
       window.location.replace(apiUrl);
       return;
     }

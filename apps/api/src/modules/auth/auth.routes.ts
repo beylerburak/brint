@@ -13,6 +13,8 @@ import { magicLinkService } from './magic-link.service.js';
 import { enqueueMagicLinkEmail } from '../../core/queue/email.queue.js';
 import { permissionService } from '../../core/auth/permission.service.js';
 import { BadRequestError, UnauthorizedError, ForbiddenError, HttpError, NotFoundError } from '../../lib/http-errors.js';
+import { validateBody } from '../../lib/validation.js';
+import { magicLinkRequestSchema } from '@brint/core-validation';
 import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
 import { logActivity } from '../activity/activity.service.js';
 
@@ -677,12 +679,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-  }, async (request: FastifyRequest<{ Body: { email: string; redirectTo?: string } }>, reply: FastifyReply) => {
-    const { email, redirectTo } = request.body;
-
-    if (!email || typeof email !== 'string' || email.trim().length === 0) {
-      throw new BadRequestError('AUTH_MAGIC_LINK_INVALID_EMAIL', 'Email is required');
-    }
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    // Validate request body using Zod
+    const { email, redirectTo } = validateBody(magicLinkRequestSchema, request);
 
     try {
       const result = await magicLinkService.createMagicLink({

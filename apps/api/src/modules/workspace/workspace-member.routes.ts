@@ -12,6 +12,7 @@ import {
   createCursorPaginationResult,
   getPrismaTakeValue,
 } from "../../lib/pagination.js";
+import { validateQuery } from "../../lib/validation.js";
 
 const storage = new S3StorageService();
 
@@ -88,18 +89,12 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
     }
 
-    // Parse and validate pagination query parameters
-    const parsed = cursorPaginationQuerySchema.safeParse(request.query);
+    // Validate and parse pagination query parameters using Zod
+    const { limit, cursor } = validateQuery(cursorPaginationQuerySchema, request.query);
 
-    if (!parsed.success) {
-      throw new BadRequestError("INVALID_QUERY", "Invalid pagination query parameters", {
-        issues: parsed.error.issues,
-      });
-    }
-
-    const { limit, cursor } = normalizeCursorPaginationInput({
-      limit: parsed.data.limit,
-      cursor: parsed.data.cursor ?? null,
+    const paginationInput = normalizeCursorPaginationInput({
+      limit,
+      cursor: cursor ?? null,
     });
 
     // Build where clause with cursor pagination
@@ -107,10 +102,10 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       workspaceId,
     };
 
-    if (cursor) {
+    if (paginationInput.cursor) {
       // Cursor-based pagination: get members created before the cursor member
       const cursorMember = await prisma.workspaceMember.findUnique({
-        where: { id: cursor },
+        where: { id: paginationInput.cursor },
         select: { joinedAt: true, id: true },
       });
 
@@ -154,7 +149,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
         { joinedAt: "desc" },
         { id: "desc" }, // Secondary sort for deterministic ordering
       ],
-      take: getPrismaTakeValue(limit), // Fetch one extra to check if there's a next page
+      take: getPrismaTakeValue(paginationInput.limit), // Fetch one extra to check if there's a next page
     });
 
     // Collect all unique avatar media IDs
@@ -180,7 +175,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
     }
 
     // Create pagination result (removes extra item if present)
-    const paginationResult = createCursorPaginationResult(members, limit, (member) => member.id);
+    const paginationResult = createCursorPaginationResult(members, paginationInput.limit, (member) => member.id);
 
     // Map members to include avatarUrl if available
     const membersWithAvatar = await Promise.all(

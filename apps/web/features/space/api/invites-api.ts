@@ -3,6 +3,7 @@ import { getWorkspaceId } from "@/shared/http/workspace-header";
 
 export interface CreateWorkspaceInviteRequest {
   email: string;
+  roleKey: string;
   expiresAt?: string | null;
 }
 
@@ -26,7 +27,10 @@ export interface CreateWorkspaceInviteResponse {
 
 export interface GetWorkspaceInvitesResponse {
   success: boolean;
-  data: WorkspaceInvite[];
+  data: {
+    items: WorkspaceInvite[];
+    nextCursor: string | null;
+  };
 }
 
 /**
@@ -46,7 +50,19 @@ export async function getWorkspaceInvites(
     throw new Error(response.message || "Failed to get workspace invites");
   }
 
-  return response.data.data;
+  // Backend returns paginated response: { items: [], nextCursor: null }
+  // Extract items array from paginated response
+  const data = response.data?.data;
+  if (data && Array.isArray(data.items)) {
+    return data.items;
+  }
+  
+  // Fallback: if data is directly an array (legacy format)
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
+  return [];
 }
 
 /**
@@ -79,6 +95,45 @@ export async function createWorkspaceInvite(
 
   // Backend returns { success: true, data: WorkspaceInvite }
   if (!response.data.data) {
+    throw new Error("Invalid response from server: missing invite data");
+  }
+
+  return response.data.data;
+}
+
+export interface ResendWorkspaceInviteResponse {
+  success: boolean;
+  data: {
+    id: string;
+    email: string;
+    token: string;
+    status: string;
+  };
+}
+
+/**
+ * Resend a workspace invite (regenerate token and send email again)
+ */
+export async function resendWorkspaceInvite(
+  workspaceId: string,
+  inviteId: string
+): Promise<ResendWorkspaceInviteResponse["data"]> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
+  const response = await httpClient.post<ResendWorkspaceInviteResponse>(
+    `/workspaces/${resolvedWorkspaceId}/invites/${inviteId}/resend`
+  );
+
+  if (!response.ok) {
+    const errorMessage = 
+      (response.details as any)?.error?.message || 
+      response.message || 
+      "Failed to resend workspace invite";
+    throw new Error(errorMessage);
+  }
+
+  if (!response.data?.data) {
     throw new Error("Invalid response from server: missing invite data");
   }
 

@@ -11,7 +11,7 @@ import { logger } from "../../lib/logger.js";
 import { setAuthCookies } from "../../core/auth/auth.cookies.js";
 import { tokenService } from "../../core/auth/token.service.js";
 import { sessionService } from "../../core/auth/session.service.js";
-import { workspaceInviteCreateSchema, cursorPaginationQuerySchema } from "@brint/core-validation";
+import { createWorkspaceInviteSchema, cursorPaginationQuerySchema } from "@brint/core-validation";
 import { validateBody } from "../../lib/validation.js";
 import { logActivity } from "../activity/activity.service.js";
 import {
@@ -215,9 +215,9 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         type: "object",
         properties: {
           email: { type: "string" },
-          expiresAt: { type: ["string", "null"], format: "date-time" },
+          roleKey: { type: "string" },
         },
-        required: ["email"],
+        required: ["email", "roleKey"],
       },
       response: {
         200: {
@@ -248,12 +248,30 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       });
     }
 
-    const body = validateBody(workspaceInviteCreateSchema, request);
+    // Validate request body using Zod
+    const { email, roleKey } = validateBody(createWorkspaceInviteSchema, request);
+    
+    // Check if there's already a pending invite for this email in this workspace
+    const existingPendingInvite = await workspaceInviteService.getPendingByEmailAndWorkspace(email, workspaceId);
+    if (existingPendingInvite) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: "PENDING_INVITE_EXISTS",
+          message: "A pending invite already exists for this email address",
+          data: {
+            inviteId: existingPendingInvite.id,
+            email: existingPendingInvite.email,
+          },
+        },
+      });
+    }
+
     const token = randomUUID();
-    const expiresAt = body.expiresAt ? new Date(body.expiresAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days default
 
     const invite = await workspaceInviteService.create({
-      email: body.email,
+      email,
       workspaceId,
       invitedBy: request.auth?.userId ?? "system",
       token,
@@ -388,6 +406,164 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
     const updated = await workspaceInviteService.updateStatus(invite.id, "EXPIRED");
     return reply.send({ success: true, data: { id: updated.id, status: updated.status } });
+  });
+
+  // Resend invite (regenerate token and send email again)
+  app.post("/workspaces/:workspaceId/invites/:inviteId/resend", {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 hour',
+      },
+    },
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
+    schema: {
+      tags: ["Workspaces"],
+      summary: "Resend a workspace invite",
+      params: {
+        type: "object",
+        properties: {
+          workspaceId: { type: "string" },
+          inviteId: { type: "string" },
+        },
+        required: ["workspaceId", "inviteId"],
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                email: { type: "string" },
+                token: { type: "string" },
+                status: { type: "string" },
+              },
+              required: ["id", "email", "token", "status"],
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, inviteId } = request.params as { workspaceId: string; inviteId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+
+    if (!headerWorkspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
+    }
+
+    const invite = await workspaceInviteService.getById(inviteId);
+    if (!invite) {
+      return reply.status(404).send({ success: false, error: { code: "INVITE_NOT_FOUND", message: "Invite not found" } });
+    }
+
+    if (invite.workspaceId !== workspaceId) {
+      throw new ForbiddenError("INVITE_WORKSPACE_MISMATCH", { inviteWorkspaceId: invite.workspaceId, paramWorkspaceId: workspaceId });
+    }
+
+    if (invite.status !== "PENDING") {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "INVITE_NOT_RESENDABLE", message: "Only pending invites can be resent" },
+      });
+    }
+
+    // Per-invite cooldown: Check if invite was updated less than 5 minutes ago
+    const RESEND_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+    const timeSinceLastUpdate = Date.now() - invite.updatedAt.getTime();
+    if (timeSinceLastUpdate < RESEND_COOLDOWN_MS) {
+      const remainingSeconds = Math.ceil((RESEND_COOLDOWN_MS - timeSinceLastUpdate) / 1000);
+      const remainingMinutes = Math.ceil(remainingSeconds / 60);
+      return reply.status(429).send({
+        success: false,
+        error: {
+          code: "RESEND_COOLDOWN",
+          message: `Please wait ${remainingMinutes} minute(s) before resending this invite`,
+          data: {
+            remainingSeconds,
+            cooldownMinutes: 5,
+          },
+        },
+      });
+    }
+
+    // Generate new token and update expiresAt
+    const newToken = randomUUID();
+    const newExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days from now
+
+    const updated = await prisma.workspaceInvite.update({
+      where: { id: invite.id },
+      data: {
+        token: newToken,
+        expiresAt: newExpiresAt,
+      },
+    });
+
+    // Get workspace name and inviter name for email
+    const [workspace, inviter] = await Promise.all([
+      prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true },
+      }),
+      request.auth?.userId
+        ? prisma.user.findUnique({
+            where: { id: request.auth.userId },
+            select: { name: true, email: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    // Enqueue invite email job
+    const inviteUrl = `${appUrlConfig.baseUrl}/invites?token=${newToken}`;
+    void enqueueWorkspaceInviteEmail({
+      to: updated.email,
+      workspaceName: workspace?.name ?? "Workspace",
+      inviteLink: inviteUrl,
+      invitedByName: inviter?.name ?? inviter?.email ?? null,
+      locale: null,
+      workspaceId: workspaceId,
+      inviterUserId: request.auth?.userId ?? null,
+      inviteId: updated.id,
+    }).catch((err) => {
+      logger.error(
+        { err, inviteId: updated.id, email: updated.email },
+        "Failed to enqueue workspace invite email (resend)"
+      );
+    });
+
+    // Log activity event
+    void logActivity({
+      type: "workspace.member_invite_resent",
+      workspaceId: workspaceId,
+      userId: request.auth?.userId ?? null,
+      actorType: "user",
+      source: "api",
+      scopeType: "workspace",
+      scopeId: workspaceId,
+      metadata: {
+        inviteId: updated.id,
+        invitedEmail: updated.email,
+      },
+      request,
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        id: updated.id,
+        email: updated.email,
+        token: updated.token,
+        status: updated.status,
+      },
+    });
   });
 
   // Get invite details by token (public endpoint)

@@ -16,6 +16,10 @@ export class WorkspaceInviteService {
   async updateStatus(id: string, status: "PENDING" | "ACCEPTED" | "EXPIRED") {
     return workspaceInviteRepository.updateStatus(id, status);
   }
+
+  async getPendingByEmailAndWorkspace(email: string, workspaceId: string) {
+    return workspaceInviteRepository.findPendingByEmailAndWorkspace(email, workspaceId);
+  }
 }
 
 export const workspaceInviteService = new WorkspaceInviteService();

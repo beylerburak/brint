@@ -21,9 +21,23 @@ export async function serverFetch<T>(
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("access_token")?.value;
 
-  const url = input.startsWith("http")
-    ? input
-    : `${appConfig.apiBaseUrl}${input.startsWith("/") ? input : `/${input}`}`;
+  let url: string;
+  if (input.startsWith("http")) {
+    url = input;
+  } else {
+    // Remove leading slash if present to avoid double slashes
+    const cleanPath = input.startsWith("/") ? input.slice(1) : input;
+    
+    // Non-versioned routes (health, debug, realtime) don't get /v1 prefix
+    const nonVersionedRoutes = ["health", "debug", "realtime"];
+    const isNonVersioned = nonVersionedRoutes.some((route) => 
+      cleanPath.startsWith(`${route}/`) || cleanPath === route
+    );
+    
+    // Add /v1 prefix for all API routes except non-versioned ones
+    const versionedPath = isNonVersioned ? cleanPath : `v1/${cleanPath}`;
+    url = `${appConfig.apiBaseUrl}/${versionedPath}`;
+  }
 
   const res = await fetch(url, {
     ...init,

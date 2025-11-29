@@ -76,14 +76,7 @@ docker-compose.override.yml
 
 # Misc
 .vercel
-.netlify
-.cursorrules
-.taskrules
-docs
-tasks
-.cursor
-.cursorrules
-.taskrules
 .vscode
 
-.guides-for-ai
+guide-for-ai/
+docs/

@@ -12,6 +12,7 @@ import { setAccessToken, clearAccessToken, getAccessToken } from "@/shared/auth/
 import { onUnauthenticated } from "@/shared/http";
 import { apiCache } from "@/shared/api/cache";
 import type { LoginResult } from "@/features/auth/api/auth-api";
+import { logger } from "@/shared/utils/logger";
 
 export type AuthUser = {
   id: string;
@@ -29,7 +30,7 @@ interface AuthContextValue {
   login: (result: LoginResult) => Promise<void>;
   loginWithSession: (result: LoginResult) => Promise<void>;
   logout: () => Promise<void>;
-  verifyMagicLinkToken: (token: string) => Promise<LoginResult>;
+  verifyMagicLinkToken: (token: string) => Promise<LoginResult & { verifyData?: MagicLinkVerifyResult }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setTokenReady(false);
           }
         } catch (error) {
-          console.error("Error restoring session:", error);
+          logger.error("Error restoring session:", error);
           clearAccessToken();
           localStorage.removeItem(AUTH_STORAGE_KEY);
           setTokenReady(false);
@@ -130,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await logoutApi();
     } catch (error) {
       // Log error but continue with local logout
-      console.error("Logout API call failed:", error);
+      logger.error("Logout API call failed:", error);
     } finally {
       setUser(null);
       clearAccessToken();

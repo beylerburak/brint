@@ -15,6 +15,7 @@ import {
 } from '@/components/animate-ui/components/radix/dropdown-menu';
 import { useWorkspace } from '@/features/space/context/workspace-context';
 import { getCurrentSession } from '@/features/auth/api/auth-api';
+import { logger } from '@/shared/utils/logger';
 
 function getSpaceInitial(name: string): string {
   return name.charAt(0).toUpperCase();
@@ -88,7 +89,7 @@ export function SpaceSwitcherDropdownContent() {
           }
         }
       } catch (error) {
-        console.warn('Failed to load spaces', error);
+        logger.warn('Failed to load spaces', error);
         if (!cancelled) {
           setSpaces([]);
         }

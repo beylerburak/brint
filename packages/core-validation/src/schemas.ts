@@ -20,6 +20,14 @@ export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export const workspaceCreateSchema = z.object({
   name: displayNameSchema,
   slug: workspaceSlugSchema,
+  plan: z.enum(['FREE', 'PRO', 'ENTERPRISE']).optional().default('FREE'),
 });
 
 export type WorkspaceCreateInput = z.infer<typeof workspaceCreateSchema>;
+
+export const workspaceInviteCreateSchema = z.object({
+  email: emailSchema,
+  expiresAt: z.string().datetime().optional().nullable(),
+});
+
+export type WorkspaceInviteCreateInput = z.infer<typeof workspaceInviteCreateSchema>;

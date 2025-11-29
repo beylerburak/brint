@@ -1,6 +1,7 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { logger } from './logger.js';
 import { HttpError } from './http-errors.js';
+import { appConfig } from '../config/app-config.js';
 
 /**
  * Standard error response format for all API errors
@@ -65,7 +66,9 @@ export function globalErrorHandler(
       message: error.message || 'An unexpected error occurred',
       details:
         (error as HttpError).details ??
-        (process.env.NODE_ENV === 'development' ? error.stack : undefined),
+        (appConfig.isDev && appConfig.exposeStackTraces && error.stack
+          ? error.stack
+          : undefined),
     },
   };
 

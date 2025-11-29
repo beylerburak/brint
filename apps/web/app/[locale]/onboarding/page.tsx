@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
+import { logger } from "@/shared/utils/logger";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function OnboardingPage() {
         // No workspaces - user can stay on onboarding
         setChecking(false);
       } catch (error) {
-        console.error("Error checking workspaces:", error);
+        logger.error("Error checking workspaces:", error);
         setChecking(false);
       }
     };

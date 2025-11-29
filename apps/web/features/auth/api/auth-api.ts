@@ -1,6 +1,7 @@
 import { httpClient } from "@/shared/http";
 import { apiCache } from "@/shared/api/cache";
 import type { AuthUser } from "@/features/auth/context/auth-context";
+import { logger } from "@/shared/utils/logger";
 
 export interface LoginPayload {
   email: string;
@@ -67,7 +68,7 @@ export async function requestMagicLink(
   });
 
   if (!response.ok) {
-    throw new Error(response.message || "Failed to request magic link");
+    throw new Error("Failed to request magic link");
   }
 
   return response.data;
@@ -84,8 +85,8 @@ export async function getGoogleOAuthUrl(): Promise<string> {
     skipAuth: true,
   });
 
-  if (!response.ok || !response.data.redirectUrl) {
-    throw new Error(response.message || "Failed to get Google OAuth URL");
+  if (!response.ok || !response.data?.redirectUrl) {
+    throw new Error("Failed to get Google OAuth URL");
   }
 
   return response.data.redirectUrl;
@@ -103,8 +104,8 @@ export async function completeGoogleOAuth(code: string, state: string): Promise<
     skipAuth: true,
   });
 
-  if (!response.ok || !response.data.user) {
-    throw new Error(response.message || "Failed to complete Google login");
+  if (!response.ok || !response.data?.user) {
+    throw new Error("Failed to complete Google login");
   }
 
   return response.data;
@@ -169,7 +170,7 @@ export async function refreshToken(): Promise<RefreshTokenResult> {
   });
 
   if (!response.ok) {
-    throw new Error(response.message || "Failed to refresh token");
+    throw new Error("Failed to refresh token");
   }
 
   return {
@@ -316,7 +317,7 @@ export async function getCurrentSession(): Promise<{
                 localStorage.setItem(permissionsCacheKey, JSON.stringify(workspace.permissions));
               } catch (error) {
                 // Ignore localStorage errors (quota exceeded, etc.)
-                console.warn('Failed to cache permissions in localStorage:', error);
+                logger.warn('Failed to cache permissions in localStorage:', error);
               }
             }
           }
@@ -348,7 +349,7 @@ export async function getCurrentSession(): Promise<{
         if (error instanceof Error && error.message.includes("401")) {
           throw error;
         }
-        console.error("Error getting current session:", error);
+        logger.error("Error getting current session:", error);
         return null;
       }
     },

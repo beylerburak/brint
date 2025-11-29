@@ -5,6 +5,7 @@ import { fetchPermissionsSnapshot } from "@/shared/api/permissions";
 import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { PermissionKey } from "../permission-keys";
+import { logger } from "@/shared/utils/logger";
 
 interface PermissionContextValue {
   permissions: PermissionKey[];
@@ -136,7 +137,7 @@ export function PermissionProvider({
         return refresh(retryCount + 1);
       }
       
-      console.warn("Failed to fetch permissions snapshot", error);
+      logger.warn("Failed to fetch permissions snapshot", error);
       setPermissions([]);
     } finally {
       setLoading(false);

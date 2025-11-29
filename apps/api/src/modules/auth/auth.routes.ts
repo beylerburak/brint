@@ -282,6 +282,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /auth/refresh - Refresh access token
   app.post('/auth/refresh', {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute',
+      },
+    },
     schema: {
       tags: ['Auth'],
       summary: 'Refresh access token',
@@ -525,6 +531,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /auth/magic-link - Request magic link email
   app.post('/auth/magic-link', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 hour',
+      },
+    },
     schema: {
       tags: ['Auth'],
       summary: 'Request magic link email',

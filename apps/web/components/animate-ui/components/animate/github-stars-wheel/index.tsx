@@ -11,6 +11,7 @@ import {
   type ScrollingNumberContainerProps as ScrollingNumberContainerPrimitiveProps,
 } from '@/components/animate-ui/primitives/texts/scrolling-number';
 import { cn } from '@/shared/utils';
+import { logger } from '@/shared/utils/logger';
 import {
   Particles,
   ParticlesEffect,
@@ -27,6 +28,8 @@ type GitHubStarsWheelProps = {
   delay?: number;
   value?: number;
   step?: number;
+  itemsSize?: number;
+  sideItemsCount?: number;
 } & Omit<
   ScrollingNumberContainerPrimitiveProps,
   'direction' | 'number' | 'step'
@@ -71,7 +74,7 @@ function GitHubStarsWheel({
             setStars(data.stargazers_count);
           }
         })
-        .catch(console.error)
+        .catch((error) => logger.error("Failed to fetch GitHub stars:", error))
         .finally(() => setIsLoading(false));
     }, delay);
 

@@ -8,6 +8,7 @@ import { getAccessToken, clearAccessToken } from "@/shared/auth/token-storage";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { routeResolver } from "@/shared/routing/route-resolver";
 import { apiCache } from "@/shared/api/cache";
+import { logger } from "@/shared/utils/logger";
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -89,7 +90,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
             router.replace(redirectPath);
           }
         } catch (error) {
-          console.error("ProtectedLayout redirect error:", error);
+          logger.error("ProtectedLayout redirect error:", error);
           router.replace(`${localePrefix}/login`);
         }
       })();
@@ -105,7 +106,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
           const session = await getCurrentSession();
           if (!session) {
             // Session invalid - clear auth state and redirect to login
-            console.warn("Session invalid, logging out user");
+            logger.warn("Session invalid, logging out user");
             clearAccessToken();
             localStorage.removeItem("auth_user");
             apiCache.invalidate("session:current");
@@ -115,7 +116,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
           }
         } catch (error) {
           // Unexpected error (network issues, etc.) - log but don't redirect
-          console.error("ProtectedLayout session verification error:", error);
+          logger.error("ProtectedLayout session verification error:", error);
         }
       })();
       return;

@@ -8,6 +8,7 @@ import { SUBSCRIPTION_PERMISSION } from "@/features/permissions/permission-keys"
 import { getWorkspaceSubscription, type SubscriptionResult } from "@/features/space/api/subscription-api";
 import { apiCache } from "@/shared/api/cache";
 import type { SubscriptionPlan } from "../config/plans";
+import { logger } from "@/shared/utils/logger";
 
 interface SubscriptionContextValue {
   subscription: SubscriptionResult | null;
@@ -32,7 +33,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // CRITICAL: workspaceReady must be true - this ensures workspace ID getter is set
     // No heuristics - workspace.id must be resolved (not a slug)
     if (!tokenReady || !workspaceReady || !workspace?.id) {
-      console.debug("[Subscription] Skipping load - not ready:", {
+      logger.debug("[Subscription] Skipping load - not ready:", {
         tokenReady,
         workspaceReady,
         workspaceId: workspace?.id,
@@ -47,7 +48,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const { getWorkspaceId } = await import("@/shared/http/workspace-header");
     const currentWorkspaceId = getWorkspaceId();
     if (!currentWorkspaceId || currentWorkspaceId !== workspace.id) {
-      console.debug("[Subscription] Skipping load - workspace ID mismatch:", {
+      logger.debug("[Subscription] Skipping load - workspace ID mismatch:", {
         getterWorkspaceId: currentWorkspaceId,
         contextWorkspaceId: workspace.id,
       });
@@ -60,7 +61,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // If workspace changed, invalidate old workspace cache and force fresh fetch
     const workspaceChanged = previousWorkspaceId && previousWorkspaceId !== workspace.id;
     if (workspaceChanged) {
-      console.log("[Subscription] Workspace changed, invalidating caches:", {
+      logger.debug("[Subscription] Workspace changed, invalidating caches:", {
         from: previousWorkspaceId,
         to: workspace.id,
       });
@@ -68,7 +69,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       apiCache.invalidate(`subscription:${workspace.id}`); // Force fresh fetch for new workspace
     }
     
-    console.debug("[Subscription] Loading subscription for workspace:", workspace.id);
+    logger.debug("[Subscription] Loading subscription for workspace:", workspace.id);
 
     // Skip subscription fetch if user doesn't have permission
     // This endpoint requires the subscription permission (workspace:settings.manage)
@@ -82,7 +83,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       // If workspace changed, bypass cache and fetch fresh data
       let sub: SubscriptionResult | null;
       if (workspaceChanged) {
-        console.log("[Subscription] Fetching fresh subscription (workspace changed)");
+        logger.debug("[Subscription] Fetching fresh subscription (workspace changed)");
         // Direct fetch without cache
         sub = await getWorkspaceSubscription();
         // Cache the fresh result manually for future use
@@ -130,13 +131,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       
       // For 403, silently fail (user doesn't have permission)
       if (errorStatus === 403 || errorCode === "PERMISSION_DENIED") {
-        console.warn(`Subscription fetch denied - user lacks ${SUBSCRIPTION_PERMISSION} permission`);
+        logger.warn(`Subscription fetch denied - user lacks ${SUBSCRIPTION_PERMISSION} permission`);
         setSubscription(null);
       } else if (errorCode === "WORKSPACE_MISMATCH") {
-        console.warn("Subscription fetch failed: Workspace ID mismatch between path and header");
+        logger.warn("Subscription fetch failed: Workspace ID mismatch between path and header");
         setSubscription(null);
       } else {
-        console.warn("Failed to load subscription:", {
+        logger.warn("Failed to load subscription:", {
           status: errorStatus,
           code: errorCode,
           message: error?.message,

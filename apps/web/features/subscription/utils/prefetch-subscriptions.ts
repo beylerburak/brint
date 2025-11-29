@@ -5,6 +5,7 @@
 
 import { fetchWorkspaceSubscription } from "@/shared/api/subscription";
 import { apiCache } from "@/shared/api/cache";
+import { logger } from "@/shared/utils/logger";
 
 export interface Workspace {
   id: string;
@@ -23,7 +24,7 @@ export async function prefetchSubscriptionsForWorkspaces(
     return;
   }
 
-  console.log(`[Subscription] Prefetching subscriptions for ${workspaces.length} workspace(s)`);
+  logger.debug(`[Subscription] Prefetching subscriptions for ${workspaces.length} workspace(s)`);
 
   // Fetch all subscriptions in parallel
   // Use fetchWorkspaceSubscription directly with workspace ID to bypass workspace context dependency
@@ -45,7 +46,7 @@ export async function prefetchSubscriptionsForWorkspaces(
       
       // Only log non-permission errors
       if (errorStatus !== 403 && errorCode !== "PERMISSION_DENIED") {
-        console.debug(`[Subscription] Failed to prefetch for workspace ${workspace.id}:`, error);
+        logger.debug(`[Subscription] Failed to prefetch for workspace ${workspace.id}:`, error);
       }
       return { workspaceId: workspace.id, success: false };
     }
@@ -56,7 +57,7 @@ export async function prefetchSubscriptionsForWorkspaces(
     (r) => r.status === "fulfilled" && r.value.success
   ).length;
   
-  console.log(`[Subscription] Prefetch complete: ${successful}/${workspaces.length} successful`);
+  logger.debug(`[Subscription] Prefetch complete: ${successful}/${workspaces.length} successful`);
   
   // Emit custom event to notify components that subscriptions have been prefetched
   if (typeof window !== "undefined") {

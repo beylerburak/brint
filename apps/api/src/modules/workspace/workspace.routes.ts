@@ -3,12 +3,8 @@ import { Prisma } from '@prisma/client';
 import { createLimitGuard } from '../../core/subscription/limit-checker.js';
 import { prisma } from '../../lib/prisma.js';
 import { ensureDefaultWorkspaceRoles } from './workspace-role.service.js';
-
-interface CreateWorkspaceBody {
-  name: string;
-  slug: string;
-  plan?: 'FREE' | 'PRO' | 'ENTERPRISE';
-}
+import { workspaceCreateSchema } from '@brint/core-validation';
+import { validateBody } from '../../lib/validation.js';
 
 function requireAuthContext(request: FastifyRequest, reply: FastifyReply) {
   if (!request.auth?.userId) {
@@ -27,10 +23,14 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
         async (request, reply) => {
           return requireAuthContext(request, reply);
         },
-        createLimitGuard('workspace.maxCount', (req) => ({
-          userId: req.auth?.userId,
-          planOverride: (req.body as CreateWorkspaceBody | undefined)?.plan,
-        })),
+        createLimitGuard('workspace.maxCount', (req) => {
+          // Parse body early for plan override (before validation)
+          const body = req.body as { plan?: 'FREE' | 'PRO' | 'ENTERPRISE' } | undefined;
+          return {
+            userId: req.auth?.userId,
+            planOverride: body?.plan,
+          };
+        }),
       ],
       schema: {
         tags: ['Workspaces'],
@@ -47,7 +47,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
       },
     },
     async (
-      request: FastifyRequest<{ Body: CreateWorkspaceBody }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       if (!request.auth?.userId) {
@@ -57,7 +57,8 @@ export async function registerWorkspaceRoutes(app: FastifyInstance) {
         });
       }
 
-      const { name, slug, plan = 'FREE' } = request.body;
+      const body = validateBody(workspaceCreateSchema, request);
+      const { name, slug, plan } = body;
 
       try {
         const result = await prisma.$transaction(async (tx) => {

@@ -1,7 +1,8 @@
 import { appConfig } from "@/shared/config";
+import { logger } from "@/shared/utils/logger";
 
 export default function ConfigDebugPage() {
-  console.log("CONFIG:", appConfig);
+  logger.debug("CONFIG:", appConfig);
 
   return (
     <div>

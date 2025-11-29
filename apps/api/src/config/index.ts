@@ -27,14 +27,6 @@ export const cacheConfig = {
 };
 
 /**
- * Security configuration
- * Will be populated in future TS steps
- */
-export const securityConfig = {
-  accessTokenSecret: null as string | null,
-};
-
-/**
  * Upload configuration
  * Will be populated in future TS steps
  */

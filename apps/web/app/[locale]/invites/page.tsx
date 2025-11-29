@@ -257,6 +257,17 @@ export default function InvitesPage() {
 
 
 
+  if (status === "accepting") {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="text-muted-foreground">{t("accepting")}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (status === "accept-invite") {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -277,16 +288,8 @@ export default function InvitesPage() {
             onClick={handleAcceptInvite}
             size="lg"
             className="w-full"
-            disabled={status === "accepting"}
           >
-            {status === "accepting" ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                {t("accepting")}
-              </>
-            ) : (
-              t("continueToWorkspace", { workspaceName: inviteDetails.workspaceName })
-            )}
+            {t("continueToWorkspace", { workspaceName: inviteDetails.workspaceName })}
           </Button>
 
           {error && (
@@ -295,17 +298,6 @@ export default function InvitesPage() {
       </div>
     </div>
   );
-  }
-
-  if (status === "accepting") {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="text-muted-foreground">{t("accepting")}</p>
-        </div>
-      </div>
-    );
   }
 
   if (status === "success") {

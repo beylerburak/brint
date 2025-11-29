@@ -11,6 +11,8 @@ import { logger } from "../../lib/logger.js";
 import { setAuthCookies } from "../../core/auth/auth.cookies.js";
 import { tokenService } from "../../core/auth/token.service.js";
 import { sessionService } from "../../core/auth/session.service.js";
+import { workspaceInviteCreateSchema } from "@brint/core-validation";
+import { validateBody } from "../../lib/validation.js";
 
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   // List invites for a workspace
@@ -106,6 +108,12 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
 
   // Create invite
   app.post("/workspaces/:workspaceId/invites", {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 hour',
+      },
+    },
     preHandler: [requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)],
     schema: {
       tags: ["Workspaces"],
@@ -154,7 +162,7 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       });
     }
 
-    const body = request.body as any;
+    const body = validateBody(workspaceInviteCreateSchema, request);
     const token = randomUUID();
     const expiresAt = body.expiresAt ? new Date(body.expiresAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 

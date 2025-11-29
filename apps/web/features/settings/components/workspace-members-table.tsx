@@ -36,6 +36,7 @@ import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { logger } from "@/shared/utils/logger";
 
 function getInitials(name: string | null | undefined, email: string): string {
   if (name) {
@@ -304,15 +305,15 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
           getWorkspaceMembers(workspace.id),
           getWorkspaceInvites(workspace.id),
         ]);
-        console.log("[MembersTable] Loaded members:", membersData);
-        console.log("[MembersTable] Loaded invites:", invitesData);
-        console.log("[MembersTable] Pending invites:", invitesData.filter(i => i.status === "PENDING"));
+        logger.debug("[MembersTable] Loaded members:", membersData);
+        logger.debug("[MembersTable] Loaded invites:", invitesData);
+        logger.debug("[MembersTable] Pending invites:", invitesData.filter(i => i.status === "PENDING"));
         if (!cancelled) {
           setMembers(membersData);
           setInvites(invitesData);
         }
       } catch (err) {
-        console.error("[MembersTable] Error loading data:", err);
+        logger.error("[MembersTable] Error loading data:", err);
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load data");
         }
@@ -403,7 +404,7 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
     
     // Add pending invites as table rows
     const pendingInvites = invites.filter((invite) => invite.status === "PENDING");
-    console.log("[MembersTable] Processing pending invites:", pendingInvites);
+    logger.debug("[MembersTable] Processing pending invites:", pendingInvites);
     
     pendingInvites.forEach((invite) => {
       rows.push({
@@ -425,7 +426,7 @@ export function WorkspaceMembersTable({ refreshTrigger }: WorkspaceMembersTableP
       });
     });
     
-    console.log("[MembersTable] Final tableData:", rows);
+    logger.debug("[MembersTable] Final tableData:", rows);
     return rows;
   }, [members, invites]);
 

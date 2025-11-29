@@ -8,6 +8,7 @@ import { useWorkspace } from "@/features/space/context/workspace-context";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { clearAccessToken } from "@/shared/auth/token-storage";
 import { apiCache } from "@/shared/api/cache";
+import { logger } from "@/shared/utils/logger";
 
 interface SpaceGuardProps {
   children: React.ReactNode;
@@ -43,7 +44,7 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
         const session = await getCurrentSession();
         if (!session) {
           // Session invalid - clear auth state and redirect to login
-          console.warn("SpaceGuard: Session invalid, logging out user");
+          logger.warn("SpaceGuard: Session invalid, logging out user");
           clearAccessToken();
           localStorage.removeItem("auth_user");
           apiCache.invalidate("session:current");
@@ -54,7 +55,7 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
         }
       } catch (error) {
         // Unexpected error (network issues, etc.) - log but don't redirect
-        console.error("SpaceGuard: Error verifying session:", error);
+        logger.error("SpaceGuard: Error verifying session:", error);
       }
     })();
 

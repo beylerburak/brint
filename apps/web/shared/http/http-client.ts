@@ -3,6 +3,7 @@ import type { HttpMethod, HttpResponse } from "./types";
 import { getAccessToken, setAccessToken, clearAccessToken } from "../auth/token-storage";
 import { refreshToken } from "@/features/auth/api/auth-api";
 import { getWorkspaceId } from "./workspace-header";
+import { logger } from "../utils/logger";
 
 interface RequestOptions extends RequestInit {
   method?: HttpMethod;
@@ -26,7 +27,7 @@ function emitUnauthenticated(): void {
     try {
       listener();
     } catch (error) {
-      console.error("Error in auth event listener:", error);
+      logger.error("Error in auth event listener:", error);
     }
   });
 }
@@ -126,23 +127,9 @@ class HttpClient {
       }
     }
 
-    // Log request with auth info (for debugging)
-    const authHeaderValue = headers["Authorization"];
-    const workspaceHeaderValue = headers["X-Workspace-Id"];
-    console.log(`[HTTP] ${method} ${fullUrl}`, {
-      hasToken: !!accessToken,
-      hasWorkspaceId: !!workspaceId,
-      workspaceId: workspaceId || "none",
-      headers: {
-        "Authorization": authHeaderValue ? (authHeaderValue.startsWith("Bearer ") ? "Bearer ***" : authHeaderValue) : "MISSING",
-        "X-Workspace-Id": workspaceHeaderValue || "none",
-      },
-      tokenLength: accessToken?.length || 0,
-    });
-
     // Final check: ensure Authorization header is set if we have a token
     if (accessToken && !skipAuth && !headers["Authorization"]) {
-      console.error("[HTTP] CRITICAL: Access token exists but Authorization header is missing!");
+      logger.error("[HTTP] CRITICAL: Access token exists but Authorization header is missing!");
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
 
@@ -179,13 +166,11 @@ class HttpClient {
 
       // Log response status with error details if failed
       if (!response.ok) {
-        console.warn(`[HTTP] ${method} ${fullUrl} → ${response.status}`, {
+        logger.warn(`[HTTP] ${method} ${fullUrl} → ${response.status}`, {
           errorCode,
           errorMessage: (data as any)?.error?.message,
           willRetry: isRecoverableError && !skipRefresh && retryCount < maxRetries,
         });
-      } else {
-        console.log(`[HTTP] ${method} ${fullUrl} → ${response.status}`);
       }
       
       if (isRecoverableError && !skipRefresh && retryCount < maxRetries) {
@@ -267,7 +252,7 @@ class HttpClient {
       };
     } catch (error) {
       // Log error
-      console.warn(`[HTTP] ${method} ${fullUrl} → Error:`, error);
+      logger.error(`[HTTP] ${method} ${fullUrl} → Error:`, error);
 
       const errorMessage =
         error instanceof Error ? error.message : "Fetch failed";

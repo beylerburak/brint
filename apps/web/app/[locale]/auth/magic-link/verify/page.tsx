@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { useToast } from "@/components/ui/use-toast";
 import { routeResolver } from "@/shared/routing/route-resolver";
+import { logger } from "@/shared/utils/logger";
 
 export default function MagicLinkVerifyPage() {
   const searchParams = useSearchParams();
@@ -48,8 +49,8 @@ export default function MagicLinkVerifyPage() {
         
         if (cancelled) return;
         const verifyData = result.verifyData;
-        console.log("[Magic Link Verify] Result:", result);
-        console.log("[Magic Link Verify] VerifyData:", verifyData);
+        logger.debug("[Magic Link Verify] Result:", result);
+        logger.debug("[Magic Link Verify] VerifyData:", verifyData);
 
         const redirectTo = verifyData?.redirectTo ?? result.verifyData?.redirectTo ?? null;
 
@@ -71,7 +72,7 @@ export default function MagicLinkVerifyPage() {
           fallbackWorkspaceSlug: verifyData?.workspace?.slug ?? result.workspaces?.[0]?.slug,
         });
 
-        console.log("[Magic Link Verify] Final redirect path:", redirectPath);
+        logger.debug("[Magic Link Verify] Final redirect path:", redirectPath);
         window.location.href = redirectPath;
       } catch (error) {
         if (cancelled) return;

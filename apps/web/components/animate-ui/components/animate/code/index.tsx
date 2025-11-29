@@ -63,7 +63,7 @@ function CodeHeader({
       {copyButton && (
         <CopyButton
           content={code}
-          size="xs"
+          size="icon-sm"
           variant="ghost"
           className="ml-auto w-auto h-auto p-2 -mr-2"
         />

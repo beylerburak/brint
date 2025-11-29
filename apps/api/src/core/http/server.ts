@@ -1,5 +1,6 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { logger } from '../../lib/logger.js';
 import { globalErrorHandler, notFoundHandler } from '../../lib/error-handler.js';
 import swaggerPlugin from '../../plugins/swagger.js';
@@ -16,8 +17,9 @@ import { registerWorkspaceMemberRoutes } from '../../modules/workspace/workspace
 import { registerWorkspaceRoleRoutes } from '../../modules/workspace/workspace-role.routes.js';
 import { registerUsageRoutes } from '../../modules/workspace/usage.routes.js';
 import { registerWorkspaceRoutes } from '../../modules/workspace/workspace.routes.js';
-import { appConfig } from '../../config/index.js';
+import { appConfig } from '../../config/app-config.js';
 import { registerMediaRoutes } from '../../modules/media/media.routes.js';
+import { redis } from '../../lib/redis.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -36,35 +38,82 @@ export async function createServer(): Promise<FastifyInstance> {
   // Register 404 handler
   app.setNotFoundHandler(notFoundHandler);
 
+  // Build allowed origins whitelist
+  const allowedOrigins = [
+    appConfig.appUrl,
+    appConfig.frontendUrl,
+    ...(appConfig.additionalAllowedOrigins
+      ? appConfig.additionalAllowedOrigins.split(',').map((origin) => origin.trim())
+      : []),
+  ].filter(Boolean);
+
   // Register CORS plugin (must be before other plugins)
   await app.register(cors, {
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'X-Requested-With'],
+
     origin: (origin, cb) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Allow requests with no origin (curl, mobile app vs.)
       if (!origin) {
         return cb(null, true);
       }
 
-      // In development, allow localhost on any port
-      if (appConfig.env === 'development') {
-        const hostname = new URL(origin).hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          return cb(null, true);
-        }
-      }
-
-      // In production, you would check against a whitelist
-      // For now, allow all origins in development
-      if (appConfig.env === 'development') {
+      // Whitelist'te varsa
+      if (allowedOrigins.includes(origin)) {
         return cb(null, true);
       }
 
-      // Reject in production if not whitelisted
-      cb(new Error('Not allowed by CORS'), false);
+      // Dev ortamında localhost'a izin ver
+      if (appConfig.isDev) {
+        try {
+          const hostname = new URL(origin).hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return cb(null, true);
+          }
+        } catch {
+          // URL parse edilemezse dev'de bile reject edelim
+          return cb(new Error('INVALID_ORIGIN'), false);
+        }
+      }
+
+      // Prod'da whitelist dışı her şeyi reddet
+      return cb(new Error('CORS_NOT_ALLOWED'), false);
     },
-    credentials: true, // Allow cookies to be sent
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
   });
+
+  // Register global rate limiting (skip in test environment)
+  if (!appConfig.isTest) {
+    await app.register(rateLimit, {
+      max: 100,
+      timeWindow: '1 minute',
+      keyGenerator: (req) => req.ip,
+      redis,
+      skipOnError: true,
+      onExceeding: (req, key) => {
+        logger.warn(
+          {
+            ip: req.ip,
+            method: req.method,
+            url: req.url,
+            key,
+          },
+          'Rate limit approaching'
+        );
+      },
+      onExceeded: (req, key) => {
+        logger.warn(
+          {
+            ip: req.ip,
+            method: req.method,
+            url: req.url,
+            key,
+          },
+          'Rate limit exceeded'
+        );
+      },
+    });
+  }
 
   // Register Swagger plugin BEFORE defining routes
   await app.register(swaggerPlugin);

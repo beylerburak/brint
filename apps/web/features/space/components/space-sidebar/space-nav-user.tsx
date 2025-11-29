@@ -38,6 +38,7 @@ import { useWorkspace } from '@/features/space/context/workspace-context';
 import { getCurrentSession } from '@/features/auth/api/auth-api';
 import { Badge } from '@/components/ui/badge';
 import { SpaceSwitcherDropdownContent } from './space-switcher';
+import { logger } from '@/shared/utils/logger';
 
 function getInitials(name: string | null | undefined, email: string): string {
   if (name) {
@@ -111,7 +112,7 @@ export function SpaceNavUser() {
           }
         }
       } catch (error) {
-        console.warn('Failed to load workspace plan', error);
+        logger.warn('Failed to load workspace plan', error);
         if (!cancelled) {
           setWorkspacePlan('FREE');
         }

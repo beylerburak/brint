@@ -8,6 +8,7 @@ import { SpaceHeader } from "@/features/space/components/space-header";
 import { ProfileCompletionDialog } from "@/features/space/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/space/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
+import { logger } from "@/shared/utils/logger";
 
 export function WorkspaceLayoutClient({
   children,
@@ -58,7 +59,7 @@ export function WorkspaceLayoutClient({
           return;
         }
         
-        console.error("Failed to get user profile:", err);
+        logger.error("Failed to get user profile:", err);
         if (!cancelled) {
           setHasCheckedProfile(true);
         }
@@ -75,7 +76,7 @@ export function WorkspaceLayoutClient({
   const handleProfileComplete = () => {
     setShowProfileDialog(false);
     // Refresh user profile
-    getUserProfile().then(setUserProfile).catch(console.error);
+    getUserProfile().then(setUserProfile).catch((error) => logger.error("Failed to get user profile:", error));
   };
 
   // Show nothing while auth is loading

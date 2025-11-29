@@ -11,7 +11,18 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { BlocksProps } from "@/lib/blocks";
+// BlocksProps type definition
+export type BlocksProps = {
+  name: string;
+  blocksId: string;
+  codeSource?: string;
+  code?: string | ReactNode;
+  meta?: {
+    type?: "file" | "directory";
+    iframeHeight?: string;
+  };
+  fileTree?: Array<{ name: string; path: string }>;
+};
 
 import { CodeBlockEditor } from "../code-block-editor";
 import { SingleFileCodeView } from "../single-file-code-view";
@@ -148,7 +159,7 @@ export const Block = ({
                 type="single"
                 value={state.size}
                 className="gap-0.5"
-                onValueChange={(value) => {
+                onValueChange={(value: string) => {
                   handleSizeChange(value);
                 }}
               >

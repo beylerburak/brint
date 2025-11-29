@@ -71,6 +71,7 @@ import { apiCache } from "@/shared/api/cache"
 import { getAccessToken } from "@/shared/auth/token-storage"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { logger } from "@/shared/utils/logger"
 import { z } from "zod"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -426,7 +427,7 @@ function LanguagePreferenceSelect({
         router.push(newPath)
       }, 0)
     } catch (error) {
-      console.error("Failed to update locale:", error)
+      logger.error("Failed to update locale:", error)
     } finally {
       setIsSaving(false)
     }
@@ -552,7 +553,7 @@ function TimezonePreferenceSelect({
                       setValue(itemValue)
                       setOpen(false)
                     } catch (error) {
-                      console.error("Failed to update timezone:", error)
+                      logger.error("Failed to update timezone:", error)
                     } finally {
                       setIsSaving(false)
                     }
@@ -730,7 +731,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
           setMediaConfig(config)
         })
         .catch((error) => {
-          console.error("Failed to load media config:", error)
+          logger.error("Failed to load media config:", error)
           // Continue with default values if config fails to load
         })
     }
@@ -859,7 +860,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             setIsCheckingUsername(false)
             return
           }
-          console.error("Error checking username availability:", error)
+          logger.error("Error checking username availability:", error)
           setUsernameAvailability(null)
           setIsCheckingUsername(false)
         }
@@ -1074,7 +1075,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
         description: t("settings.account.avatarUploaded") || "Avatar uploaded successfully.",
       })
     } catch (err) {
-      console.error("Failed to upload avatar:", err)
+      logger.error("Failed to upload avatar:", err)
       toast({
         title: t("error") || "Error",
         description: err instanceof Error ? err.message : t("settings.account.avatarUploadError") || "Failed to upload avatar",
@@ -1131,7 +1132,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
           handleCropUpload(croppedDataUrl, croppedFile)
         })
         .catch((error) => {
-          console.error("Failed to process cropped image:", error)
+          logger.error("Failed to process cropped image:", error)
           toast({
             title: t("error") || "Error",
             description: t("settings.account.avatarCropError") || "Failed to process cropped image",

@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { updateUserProfile, checkUsernameAvailability, type UserProfile } from "../api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { useToast } from "@/components/ui/use-toast";
+import { logger } from "@/shared/utils/logger";
 
 const profileCompletionSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -102,7 +103,7 @@ export function ProfileCompletionDialog({ user, onComplete }: ProfileCompletionD
         const available = await checkUsernameAvailability(watchedUsername);
         setUsernameAvailability(available);
       } catch (err) {
-        console.error("Failed to check username availability:", err);
+        logger.error("Failed to check username availability:", err);
         setUsernameAvailability(null);
       } finally {
         setIsCheckingUsername(false);

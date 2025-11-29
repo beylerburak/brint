@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth/context/auth-context";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { getAccessToken } from "@/shared/auth/token-storage";
 import { routeResolver } from "@/shared/routing/route-resolver";
+import { logger } from "@/shared/utils/logger";
 
 export default function HomePage() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function HomePage() {
         });
         router.replace(redirectPath);
       } catch (error) {
-        console.error("Error getting session:", error);
+        logger.error("Error getting session:", error);
         router.replace(`${localePrefix}/login`);
       } finally {
         setChecking(false);

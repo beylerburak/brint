@@ -25,6 +25,7 @@ import {
 } from "@/features/space/api/invites-api";
 import { useWorkspace } from "@/features/space/context/workspace-context";
 import { toast } from "sonner";
+import { logger } from "@/shared/utils/logger";
 
 interface InviteMemberDialogProps {
   open: boolean;
@@ -81,7 +82,7 @@ export function InviteMemberDialog({
           setInvites(invitesData);
         }
       } catch (error) {
-        console.error("Failed to load data:", error);
+        logger.error("Failed to load data:", error);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -123,7 +124,7 @@ export function InviteMemberDialog({
         onInviteSent();
       }
     } catch (error) {
-      console.error("[InviteDialog] Error creating invite:", error);
+      logger.error("[InviteDialog] Error creating invite:", error);
       toast.error(
         error instanceof Error
           ? error.message

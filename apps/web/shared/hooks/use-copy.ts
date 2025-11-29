@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { logger } from "@/shared/utils/logger"
 
 export function useCopyToClipboard({
   timeout = 2000,
@@ -28,7 +29,7 @@ export function useCopyToClipboard({
       setTimeout(() => {
         setIsCopied(false)
       }, timeout)
-    }, console.error)
+    }, (error) => logger.error("Failed to copy to clipboard:", error))
   }
 
   return { isCopied, copyToClipboard }

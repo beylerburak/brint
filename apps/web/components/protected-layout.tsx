@@ -77,7 +77,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
       void (async () => {
         try {
           const session = await getCurrentSession();
-          const redirectPath = routeResolver({
+          const redirectPath = await routeResolver({
             locale,
             hasToken: hasToken,
             ownerWorkspaces: session?.ownerWorkspaces,
@@ -85,6 +85,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
             invites: session?.invites,
             currentPath: pathname,
             fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
+            useActivityBasedSelection: true, // Use activity-based workspace selection
           });
           if (redirectPath !== pathname) {
             router.replace(redirectPath);

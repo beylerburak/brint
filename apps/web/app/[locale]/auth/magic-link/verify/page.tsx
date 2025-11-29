@@ -62,7 +62,7 @@ export default function MagicLinkVerifyPage() {
           return;
         }
 
-        const redirectPath = routeResolver({
+        const redirectPath = await routeResolver({
           locale,
           hasToken: true,
           ownerWorkspaces: verifyData?.ownerWorkspaces ?? result.workspaces,
@@ -70,6 +70,7 @@ export default function MagicLinkVerifyPage() {
           invites: verifyData?.invites ?? [],
           currentPath: searchParams.toString() ? `/auth/magic-link/verify?${searchParams.toString()}` : "/auth/magic-link/verify",
           fallbackWorkspaceSlug: verifyData?.workspace?.slug ?? result.workspaces?.[0]?.slug,
+          useActivityBasedSelection: true, // Use activity-based workspace selection
         });
 
         logger.debug("[Magic Link Verify] Final redirect path:", redirectPath);

@@ -80,7 +80,7 @@ export default function GoogleCallbackPage() {
           accessToken: tokenResult.accessToken,
         });
 
-        const redirectPath = routeResolver({
+        const redirectPath = await routeResolver({
           locale,
           hasToken: true,
           ownerWorkspaces: session.ownerWorkspaces,
@@ -91,6 +91,7 @@ export default function GoogleCallbackPage() {
             session.ownerWorkspaces[0]?.slug ??
             session.memberWorkspaces[0]?.slug ??
             null,
+          useActivityBasedSelection: true, // Use activity-based workspace selection
         });
 
         setStatus("success");

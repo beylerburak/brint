@@ -1,4 +1,4 @@
-type WorkspaceLike = { slug: string; updatedAt?: string | null };
+type WorkspaceLike = { slug: string; id?: string; updatedAt?: string | null };
 type InviteLike = { updatedAt?: string | null };
 
 export interface RouteResolverInput {
@@ -9,13 +9,18 @@ export interface RouteResolverInput {
   invites?: InviteLike[];
   currentPath?: string; // e.g. "/en/login"
   fallbackWorkspaceSlug?: string | null;
+  useActivityBasedSelection?: boolean; // If true, use activity-based workspace selection
 }
 
 /**
  * Resolves the correct post-auth route based on workspace/invite state.
  * Implements the shared redirect rules for onboarding/invites/workspace home.
+ * 
+ * If useActivityBasedSelection is true, will try to select workspace based on
+ * user's most recent activity. Falls back to most recently updated workspace if
+ * activity data is unavailable.
  */
-export function routeResolver(input: RouteResolverInput): string {
+export async function routeResolver(input: RouteResolverInput): Promise<string> {
   const {
     locale,
     hasToken,
@@ -24,6 +29,7 @@ export function routeResolver(input: RouteResolverInput): string {
     invites = [],
     currentPath,
     fallbackWorkspaceSlug,
+    useActivityBasedSelection = false,
   } = input;
 
   const localePrefix = locale === "en" ? "" : `/${locale}`;
@@ -44,7 +50,11 @@ export function routeResolver(input: RouteResolverInput): string {
 
   // If user is on login while authenticated, send to workspace selection logic
   if (isAuthPage) {
-    const target = selectWorkspace(allWorkspaces, fallbackWorkspaceSlug);
+    const target = await selectWorkspace(
+      allWorkspaces,
+      fallbackWorkspaceSlug,
+      useActivityBasedSelection
+    );
     if (target) return `${localePrefix}/${target}/dashboard`;
   }
 
@@ -56,8 +66,12 @@ export function routeResolver(input: RouteResolverInput): string {
     return `${localePrefix}/onboarding`;
   }
 
-  // Workspaces exist -> pick most recently updated (owner/member agnostic)
-  const workspaceSlug = selectWorkspace(allWorkspaces, fallbackWorkspaceSlug);
+  // Workspaces exist -> pick workspace (activity-based or most recently updated)
+  const workspaceSlug = await selectWorkspace(
+    allWorkspaces,
+    fallbackWorkspaceSlug,
+    useActivityBasedSelection
+  );
   if (!workspaceSlug) {
     return `${localePrefix}/onboarding`;
   }
@@ -74,11 +88,48 @@ function normalizePath(pathname: string | undefined, locale: string): string | u
   return pathname;
 }
 
-function selectWorkspace(workspaces: WorkspaceLike[], fallbackSlug?: string | null): string {
-  if (workspaces.length > 0) {
-    return workspaces[0].slug;
+async function selectWorkspace(
+  workspaces: WorkspaceLike[],
+  fallbackSlug?: string | null,
+  useActivityBasedSelection = false
+): Promise<string> {
+  if (workspaces.length === 0) {
+    return fallbackSlug ?? "";
   }
-  return fallbackSlug ?? "";
+
+  // If activity-based selection is enabled, try to find workspace with most recent activity
+  if (useActivityBasedSelection) {
+    try {
+      // Import dynamically to avoid circular dependencies
+      const { getUserMostRecentActivityWorkspaceId } = await import("../api/activity");
+
+      // Get workspace IDs (filter out workspaces without IDs)
+      const workspaceIds = workspaces
+        .map((ws) => ws.id)
+        .filter((id): id is string => !!id);
+
+      if (workspaceIds.length > 0) {
+        const mostRecentActivityWorkspaceId =
+          await getUserMostRecentActivityWorkspaceId(workspaceIds);
+
+        if (mostRecentActivityWorkspaceId) {
+          // Find workspace with matching ID
+          const workspace = workspaces.find(
+            (ws) => ws.id === mostRecentActivityWorkspaceId
+          );
+          if (workspace) {
+            return workspace.slug;
+          }
+        }
+      }
+    } catch (error) {
+      // If activity fetch fails, fall back to default behavior (most recently updated)
+      // Silently continue to default selection
+    }
+  }
+
+  // Default: return most recently updated workspace (first in sorted array)
+  return workspaces[0].slug;
 }
 
 /**

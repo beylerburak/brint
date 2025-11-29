@@ -23,7 +23,7 @@ export default function HomePage() {
       try {
         // Get user workspaces
         const session = await getCurrentSession();
-        const redirectPath = routeResolver({
+        const redirectPath = await routeResolver({
           locale,
           hasToken,
           ownerWorkspaces: session?.ownerWorkspaces,
@@ -31,6 +31,7 @@ export default function HomePage() {
           invites: session?.invites,
           currentPath: "/",
           fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
+          useActivityBasedSelection: true, // Use activity-based workspace selection
         });
         router.replace(redirectPath);
       } catch (error) {

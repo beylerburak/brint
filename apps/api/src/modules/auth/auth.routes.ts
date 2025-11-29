@@ -253,8 +253,47 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
       );
 
-      // Get the most recently updated workspace (for activity logging)
+      // Get the most recently updated workspace (for fallback)
       const primaryWorkspace = allMemberships.length > 0 ? allMemberships[0].workspace : null;
+
+      // Find workspace with most recent activity (for activity logging)
+      let activityBasedWorkspace = null;
+      if (allMemberships.length > 0) {
+        const workspaceIds = allMemberships.map((m) => m.workspaceId);
+        
+        // Get most recent activity event for each workspace
+        const activityQueries = workspaceIds.map(async (workspaceId) => {
+          const recentEvent = await prisma.activityEvent.findFirst({
+            where: { workspaceId },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+          });
+          return {
+            workspaceId,
+            lastActivityAt: recentEvent?.createdAt ?? null,
+          };
+        });
+
+        const activityResults = await Promise.all(activityQueries);
+        const validResults = activityResults.filter((r) => r.lastActivityAt !== null);
+        
+        if (validResults.length > 0) {
+          // Sort by last activity time (most recent first)
+          validResults.sort((a, b) => {
+            const aTime = a.lastActivityAt?.getTime() ?? 0;
+            const bTime = b.lastActivityAt?.getTime() ?? 0;
+            return bTime - aTime;
+          });
+          
+          // Find workspace with most recent activity
+          activityBasedWorkspace = allMemberships.find(
+            (m) => m.workspaceId === validResults[0].workspaceId
+          )?.workspace ?? null;
+        }
+      }
+
+      // Use activity-based workspace if available, otherwise fall back to most recently updated
+      const loginWorkspace = activityBasedWorkspace ?? primaryWorkspace;
 
       // 6. Set cookies
       setAuthCookies(reply, {
@@ -265,7 +304,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // Log activity event (fire-and-forget, doesn't block response)
       void logActivity({
         type: "auth.google_oauth_login_success",
-        workspaceId: primaryWorkspace?.id ?? null,
+        workspaceId: loginWorkspace?.id ?? null,
         userId: result.user.id,
         actorType: "user",
         source: "api",
@@ -276,6 +315,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           googleId: profile.sub,
           ip: request.ip,
           hasWorkspaces: allMemberships.length > 0,
+          workspaceSelectionMethod: activityBasedWorkspace ? "activity_based" : "most_recently_updated",
         },
         request,
       });

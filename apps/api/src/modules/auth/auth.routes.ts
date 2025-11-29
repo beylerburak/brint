@@ -1,9 +1,9 @@
 import { randomBytes, randomUUID } from 'crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import * as jwt from 'jsonwebtoken';
 import { redis } from '../../lib/redis.js';
 import { oauthConfig, authConfig, appUrlConfig, storageConfig } from '../../config/index.js';
 import { loginOrRegisterWithGoogle, type GoogleProfile } from './google-oauth.service.js';
+import { verifyGoogleIdToken } from './google-oauth.verify.js';
 import { setAuthCookies, clearAuthCookies } from '../../core/auth/auth.cookies.js';
 import { tokenService } from '../../core/auth/token.service.js';
 import { sessionService } from '../../core/auth/session.service.js';
@@ -185,13 +185,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
       const tokenData = await tokenResponse.json() as { id_token?: string; access_token?: string; refresh_token?: string };
 
-      // 4. Decode id_token (basic profile)
+      // 4. Verify id_token using Google's JWKS (secure verification)
       if (!tokenData.id_token) {
         throw new BadRequestError('OAUTH_NO_ID_TOKEN', 'No id_token received from Google');
       }
 
-      // Decode without verification for now (will add verification later)
-      const decoded = jwt.decode(tokenData.id_token) as GoogleProfile | null;
+      // Verify token signature, issuer, and audience
+      const verifiedProfile = await verifyGoogleIdToken(tokenData.id_token);
 
       // 4b. Optionally fetch userinfo (to get phone_number and freshest fields)
       let userinfo: Partial<GoogleProfile> | null = null;
@@ -213,12 +213,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
+      // Merge verified profile with userinfo (userinfo takes precedence for optional fields)
       const profile: GoogleProfile = {
-        sub: userinfo?.sub ?? decoded?.sub ?? '',
-        email: userinfo?.email ?? decoded?.email ?? '',
-        email_verified: userinfo?.email_verified ?? decoded?.email_verified,
-        name: userinfo?.name ?? decoded?.name,
-        phone_number: userinfo?.phone_number ?? decoded?.phone_number,
+        sub: verifiedProfile.sub,
+        email: verifiedProfile.email,
+        email_verified: userinfo?.email_verified ?? verifiedProfile.email_verified,
+        name: userinfo?.name ?? verifiedProfile.name,
+        phone_number: userinfo?.phone_number ?? verifiedProfile.phone_number,
       };
 
       if (!profile.email || !profile.sub) {

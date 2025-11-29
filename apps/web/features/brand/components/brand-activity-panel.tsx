@@ -12,6 +12,12 @@ import { Clock, User, Bot, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +32,15 @@ interface BrandActivityPanelProps {
   brandId: string;
 }
 
+interface ActorInfo {
+  id: string;
+  name: string | null;
+  email: string;
+  username: string | null;
+  avatarMediaId: string | null;
+  avatarUrl: string | null;
+}
+
 interface ActivityEvent {
   id: string;
   type: string;
@@ -33,7 +48,9 @@ interface ActivityEvent {
   actorType: string;
   title?: string;
   summary?: string;
+  details?: string;
   metadata?: Record<string, unknown>;
+  actor?: ActorInfo | null;
 }
 
 export function BrandActivityPanel({ brandId }: BrandActivityPanelProps) {
@@ -161,22 +178,80 @@ interface ActivityItemProps {
 }
 
 function ActivityItem({ event }: ActivityItemProps) {
-  // Use API-provided title/summary if available, fallback to computed display
+  // Use API-provided title/summary/details if available, fallback to computed display
   const computedDisplay = getEventDisplay(event);
   const title = event.title || computedDisplay.title;
   const description = event.summary || computedDisplay.description;
+  const details = event.details || computedDisplay.details;
   const ActorIcon = getActorIcon(event.actorType);
   const relativeTime = formatRelativeTime(event.timestamp);
   const fullDate = formatFullDate(event.timestamp);
+  const actor = event.actor;
+
+  // Get actor initials for avatar fallback
+  const getActorInitials = () => {
+    if (actor?.name) {
+      const parts = actor.name.split(" ");
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      }
+      return actor.name.substring(0, 2).toUpperCase();
+    }
+    if (actor?.email) {
+      return actor.email.substring(0, 2).toUpperCase();
+    }
+    return "?";
+  };
 
   return (
     <div className="flex gap-3 rounded-lg border p-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-        <ActorIcon className="h-4 w-4 text-muted-foreground" />
-      </div>
+      {/* Actor Avatar with Hover Card */}
+      {actor && event.actorType === "user" ? (
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <Avatar className="h-8 w-8 cursor-pointer">
+              {actor.avatarUrl && (
+                <AvatarImage src={actor.avatarUrl} alt={actor.name || actor.email} />
+              )}
+              <AvatarFallback className="bg-muted text-xs">
+                {getActorInitials()}
+              </AvatarFallback>
+            </Avatar>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-64" align="start">
+            <div className="flex gap-3">
+              <Avatar className="h-12 w-12">
+                {actor.avatarUrl && (
+                  <AvatarImage src={actor.avatarUrl} alt={actor.name || actor.email} />
+                )}
+                <AvatarFallback className="bg-muted">
+                  {getActorInitials()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="space-y-1">
+                {actor.name && (
+                  <p className="text-sm font-medium">{actor.name}</p>
+                )}
+                {actor.username && (
+                  <p className="text-xs text-muted-foreground">@{actor.username}</p>
+                )}
+                <p className="text-xs text-muted-foreground">{actor.email}</p>
+              </div>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+          <ActorIcon className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
+      
       <div className="flex-1 space-y-1">
         <p className="text-sm font-medium">{title}</p>
-        {description && (
+        {details && (
+          <p className="text-xs text-foreground/80">{details}</p>
+        )}
+        {description && !details && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
         <TooltipProvider>
@@ -213,10 +288,12 @@ function getActorIcon(actorType: string) {
   }
 }
 
-function getEventDisplay(event: ActivityEvent): { title: string; description?: string } {
-  const eventTypeMap: Record<string, { title: string; description?: string }> = {
+function getEventDisplay(event: ActivityEvent): { title: string; description?: string; details?: string } {
+  const changesSummary = getChangesSummary(event.metadata);
+  
+  const eventTypeMap: Record<string, { title: string; description?: string; details?: string }> = {
     "brand.created": { title: "Brand created" },
-    "brand.updated": { title: "Brand updated", description: getChangesSummary(event.metadata) },
+    "brand.updated": { title: "Brand updated", details: changesSummary },
     "brand.deleted": { title: "Brand archived" },
     "brand.profile_completed": { title: "Profile completed" },
     "brand.social_account_connected": { title: "Social account connected" },
@@ -235,16 +312,44 @@ function getEventDisplay(event: ActivityEvent): { title: string; description?: s
   };
 }
 
+/**
+ * Map technical field names to human-readable labels
+ */
+const FIELD_LABELS: Record<string, string> = {
+  name: "name",
+  slug: "slug",
+  description: "description",
+  industry: "industry",
+  language: "language",
+  timezone: "timezone",
+  toneOfVoice: "tone of voice",
+  primaryColor: "primary color",
+  secondaryColor: "secondary color",
+  websiteUrl: "website URL",
+  logoMediaId: "logo",
+  isArchived: "archive status",
+  profileCompleted: "profile status",
+  publishingDefaultsConfigured: "publishing defaults",
+  hashtagPresetsCount: "hashtag presets",
+};
+
+/**
+ * Get human-readable label for a field name
+ */
+function getFieldLabel(field: string): string {
+  return FIELD_LABELS[field] || field.replace(/([A-Z])/g, " $1").toLowerCase().trim();
+}
+
 function getChangesSummary(metadata?: Record<string, unknown>): string | undefined {
   if (!metadata?.changes) return undefined;
 
   const changes = metadata.changes as Record<string, { before?: unknown; after?: unknown }>;
-  const changedFields = Object.keys(changes);
+  const changedFields = Object.keys(changes).map(getFieldLabel);
 
   if (changedFields.length === 0) return undefined;
   if (changedFields.length === 1) return `Changed ${changedFields[0]}`;
   if (changedFields.length === 2) return `Changed ${changedFields.join(" and ")}`;
-  return `Changed ${changedFields.length} fields`;
+  return `Changed ${changedFields.slice(0, -1).join(", ")} and ${changedFields[changedFields.length - 1]}`;
 }
 
 function formatRelativeTime(dateString: string): string {

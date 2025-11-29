@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
 import { SpaceSidebar } from "@/features/space/components/space-sidebar";
-import { SpaceHeader } from "@/features/space/components/space-header";
+import { SpaceHeaderAlt } from "@/features/space/components/space-header-alt";
 import { ProfileCompletionDialog } from "@/features/space/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/space/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
@@ -93,7 +93,7 @@ export function WorkspaceLayoutClient({
       <SidebarProvider>
         <SpaceSidebar />
         <SidebarInset>
-          <SpaceHeader workspace={workspace} />
+          <SpaceHeaderAlt workspace={workspace} />
           <div className="flex flex-1 flex-col">
             {children}
           </div>

@@ -163,6 +163,7 @@ export interface UpdateBrandData {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   websiteUrl?: string | null;
+  logoMediaId?: string | null;
   profileCompleted?: boolean;
   hasAtLeastOneSocialAccount?: boolean;
   publishingDefaultsConfigured?: boolean;

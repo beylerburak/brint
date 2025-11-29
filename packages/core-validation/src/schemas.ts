@@ -122,6 +122,7 @@ export const createBrandSchema = z.object({
   secondaryColor: z.string().max(20, 'validation.brand.secondaryColor.max')
     .regex(/^#[0-9A-Fa-f]{6}$/, 'validation.brand.secondaryColor.pattern').optional().nullable(),
   websiteUrl: z.string().url('validation.brand.websiteUrl.invalid').max(2000, 'validation.brand.websiteUrl.max').optional().nullable(),
+  logoMediaId: z.string().max(50, 'validation.brand.logoMediaId.max').optional().nullable(),
 });
 
 export type CreateBrandInput = z.infer<typeof createBrandSchema>;

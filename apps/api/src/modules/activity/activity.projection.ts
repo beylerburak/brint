@@ -1,10 +1,51 @@
 import type { ActivityEvent, User, Workspace } from "@prisma/client";
-import type { AiActivityItem, ActivityActorType, ActivitySource, ActivityScopeType } from "./activity.types.js";
+import type { AiActivityItem, ActivityActorType, ActivitySource, ActivityScopeType, ActorInfo } from "./activity.types.js";
 
 export type ActivityEventWithRelations = ActivityEvent & {
-  user?: User | null;
+  user?: (Pick<User, 'id' | 'email' | 'name' | 'username' | 'avatarMediaId'>) | null;
   workspace?: Workspace | null;
 };
+
+/**
+ * Map technical field names to human-readable labels
+ */
+const FIELD_LABELS: Record<string, string> = {
+  name: "name",
+  slug: "slug",
+  description: "description",
+  industry: "industry",
+  language: "language",
+  timezone: "timezone",
+  toneOfVoice: "tone of voice",
+  primaryColor: "primary color",
+  secondaryColor: "secondary color",
+  websiteUrl: "website URL",
+  logoMediaId: "logo",
+  isArchived: "archive status",
+  profileCompleted: "profile status",
+  publishingDefaultsConfigured: "publishing defaults",
+  hashtagPresetsCount: "hashtag presets",
+  title: "title",
+  body: "body",
+  status: "status",
+};
+
+/**
+ * Get human-readable label for a field name
+ */
+function formatFieldName(field: string): string {
+  return FIELD_LABELS[field] || field.replace(/([A-Z])/g, " $1").toLowerCase().trim();
+}
+
+/**
+ * Format changed fields into a readable message
+ */
+function formatChangedFieldsMessage(fields: string[]): string {
+  if (fields.length === 0) return "";
+  if (fields.length === 1) return `Changed ${fields[0]}`;
+  if (fields.length === 2) return `Changed ${fields.join(" and ")}`;
+  return `Changed ${fields.slice(0, -1).join(", ")} and ${fields[fields.length - 1]}`;
+}
 
 /**
  * Projects a raw ActivityEvent (with relations) into an AI-friendly format
@@ -18,6 +59,19 @@ export type ActivityEventWithRelations = ActivityEvent & {
 export function projectActivityEventForAI(
   event: ActivityEventWithRelations
 ): AiActivityItem {
+  // Build actor info if user is available
+  let actor: ActorInfo | null = null;
+  if (event.user) {
+    actor = {
+      id: event.user.id,
+      name: event.user.name,
+      email: event.user.email,
+      username: event.user.username,
+      avatarMediaId: event.user.avatarMediaId,
+      // avatarUrl will be populated by the routes layer if needed
+    };
+  }
+
   const base: AiActivityItem = {
     id: event.id,
     timestamp: event.createdAt.toISOString(),
@@ -32,6 +86,7 @@ export function projectActivityEventForAI(
     summary: "",
     details: undefined,
     metadata: (event.metadata as Record<string, unknown>) ?? {},
+    actor,
   };
 
   // Event type bazlı mapping
@@ -128,11 +183,11 @@ export function projectActivityEventForAI(
     case "brand.updated": {
       const brandName = (event.metadata as any)?.name ?? "unknown";
       const changes = (event.metadata as any)?.changes ?? {};
-      const changedFields = Object.keys(changes).join(", ");
+      const changedFields = Object.keys(changes).map(formatFieldName);
       base.title = "Brand updated";
       base.summary = `Brand "${brandName}" was updated.`;
-      if (changedFields) {
-        base.details = `Changed fields: ${changedFields}`;
+      if (changedFields.length > 0) {
+        base.details = formatChangedFieldsMessage(changedFields);
       }
       break;
     }
@@ -222,11 +277,11 @@ export function projectActivityEventForAI(
     case "content.updated": {
       const title = (event.metadata as any)?.title ?? "unknown";
       const changes = (event.metadata as any)?.changes ?? {};
-      const changedFields = Object.keys(changes).join(", ");
+      const changedFields = Object.keys(changes).map(formatFieldName);
       base.title = "Content updated";
       base.summary = `Content "${title}" was updated.`;
-      if (changedFields) {
-        base.details = `Changed fields: ${changedFields}`;
+      if (changedFields.length > 0) {
+        base.details = formatChangedFieldsMessage(changedFields);
       }
       break;
     }

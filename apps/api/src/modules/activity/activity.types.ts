@@ -61,6 +61,16 @@ export type ActivityEventRaw = {
   metadata: Record<string, unknown> | null;
 };
 
+// Actor info for UI display
+export type ActorInfo = {
+  id: string;
+  name: string | null;
+  email: string;
+  username: string | null;
+  avatarMediaId: string | null;
+  avatarUrl?: string | null;
+};
+
 // AI/snapshot için "projection" tipi
 export type AiActivityItem = {
   id: string;
@@ -77,5 +87,7 @@ export type AiActivityItem = {
   summary: string; // tek cümlelik açıklama
   details?: string; // isteğe bağlı daha detaylı açıklama
   metadata: Record<string, unknown>; // normalize edilmiş metadata
+  // Actor info for UI display
+  actor?: ActorInfo | null;
 };
 

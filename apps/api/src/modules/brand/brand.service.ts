@@ -96,6 +96,7 @@ const TRACKED_FIELDS = [
   "primaryColor",
   "secondaryColor",
   "websiteUrl",
+  "logoMediaId",
 ] as const;
 
 /**

@@ -4,6 +4,10 @@ import { getWorkspaceActivity } from "./activity.service.js";
 import { projectActivityEventForAI } from "./activity.projection.js";
 import { BadRequestError, ForbiddenError, UnauthorizedError } from "../../lib/http-errors.js";
 import { prisma } from "../../lib/prisma.js";
+import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
+import { storageConfig } from "../../config/index.js";
+
+const storage = new S3StorageService();
 
 const querySchema = z.object({
   limit: z
@@ -88,6 +92,17 @@ export async function registerActivityRoutes(app: FastifyInstance): Promise<void
                         summary: { type: "string" },
                         details: { type: ["string", "null"] },
                         metadata: { type: "object" },
+                        actor: {
+                          type: ["object", "null"],
+                          properties: {
+                            id: { type: "string" },
+                            name: { type: ["string", "null"] },
+                            email: { type: "string" },
+                            username: { type: ["string", "null"] },
+                            avatarMediaId: { type: ["string", "null"] },
+                            avatarUrl: { type: ["string", "null"] },
+                          },
+                        },
                       },
                       required: ["id", "timestamp", "type", "actorType", "source", "title", "summary", "metadata"],
                     },
@@ -160,6 +175,38 @@ export async function registerActivityRoutes(app: FastifyInstance): Promise<void
 
         // Project events to AI-friendly format
         const projected = items.map(projectActivityEventForAI);
+
+        // Populate avatarUrl for actors with avatarMediaId
+        const avatarMediaIds = projected
+          .filter((p) => p.actor?.avatarMediaId)
+          .map((p) => p.actor!.avatarMediaId!);
+        
+        const uniqueAvatarMediaIds = [...new Set(avatarMediaIds)];
+        
+        if (uniqueAvatarMediaIds.length > 0) {
+          const mediaRecords = await prisma.media.findMany({
+            where: { id: { in: uniqueAvatarMediaIds } },
+            select: { id: true, objectKey: true },
+          });
+          
+          const avatarUrlMap = new Map<string, string>();
+          
+          await Promise.all(
+            mediaRecords.map(async (media) => {
+              const url = await storage.getPresignedDownloadUrl(media.objectKey, {
+                expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+              });
+              avatarUrlMap.set(media.id, url);
+            })
+          );
+          
+          // Populate avatarUrl in projected items
+          for (const item of projected) {
+            if (item.actor?.avatarMediaId && avatarUrlMap.has(item.actor.avatarMediaId)) {
+              item.actor.avatarUrl = avatarUrlMap.get(item.actor.avatarMediaId);
+            }
+          }
+        }
 
         return reply.send({
           success: true,

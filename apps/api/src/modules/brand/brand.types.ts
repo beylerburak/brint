@@ -82,6 +82,7 @@ export interface UpdateBrandInput {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   websiteUrl?: string | null;
+  logoMediaId?: string | null;
 }
 
 /**

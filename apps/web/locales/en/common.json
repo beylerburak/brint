@@ -67,6 +67,28 @@
   "profileUpdatedDescription": "Your profile has been updated successfully.",
   "profileUpdateError": "Failed to update profile",
   "error": "Error",
+  "accessDenied": "Access Denied",
+  "tryAgain": "Try again",
+  "loading": "Loading...",
+  "loadMore": "Load more",
+  "brands": {
+    "title": "Brands",
+    "description": "View and manage brands in this workspace",
+    "newBrand": "New Brand",
+    "noPermission": "You don't have permission to view brands.",
+    "empty": {
+      "title": "No brands yet",
+      "description": "Create your first brand to start publishing content."
+    },
+    "createFirst": "Create your first brand",
+    "table": {
+      "name": "Brand",
+      "industry": "Industry",
+      "readiness": "Readiness",
+      "status": "Status",
+      "created": "Created"
+    }
+  },
   "settings": {
     "title": "Settings",
     "group": {

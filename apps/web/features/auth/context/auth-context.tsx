@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, { createContext, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -24,15 +24,29 @@ export const AuthContext = createContext<AuthContextValue | undefined>(undefined
 
 const AUTH_STORAGE_KEY = "auth_user";
 
+// Global flag to prevent redirect loops during logout
+let isLoggingOut = false;
+
+export function isLoggingOutState(): boolean {
+  return isLoggingOut;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [tokenReady, setTokenReady] = useState(false);
   const router = useRouter();
+  const hasHandledUnauthenticated = useRef(false);
 
   // Initialize from localStorage and check session on mount
   useEffect(() => {
     const initializeAuth = async () => {
+      // If we're in the middle of logging out, don't try to restore session
+      if (isLoggingOut) {
+        setLoading(false);
+        return;
+      }
+
       // Load user from localStorage
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
@@ -55,12 +69,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setTokenReady(true);
             // Subscription info is now included in /auth/me response, no need to prefetch
           } else {
+            // Session invalid but not due to 401 (would have triggered onUnauthenticated)
+            // Clear local state but don't redirect - let ProtectedLayout handle it
+            clearAccessToken();
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            setUser(null);
             setTokenReady(false);
           }
         } catch (error) {
           logger.error("Error restoring session:", error);
           clearAccessToken();
           localStorage.removeItem(AUTH_STORAGE_KEY);
+          setUser(null);
           setTokenReady(false);
         }
       } else {
@@ -74,16 +94,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for unauthenticated events (from HTTP client)
     const unsubscribe = onUnauthenticated(() => {
-      // Clear auth state and redirect to login
-      setUser(null);
+      // Prevent multiple simultaneous logout redirects
+      if (hasHandledUnauthenticated.current || isLoggingOut) {
+        return;
+      }
+      hasHandledUnauthenticated.current = true;
+      isLoggingOut = true;
+
+      // Clear auth state synchronously BEFORE redirect
       clearAccessToken();
-      setTokenReady(false);
       localStorage.removeItem(AUTH_STORAGE_KEY);
-      // Clear API cache on unauthenticated
       apiCache.invalidate("session:current");
       apiCache.invalidate("user:profile");
-      const locale = window.location.pathname.split("/")[1] || "en";
-      router.push(locale === "en" ? "/login" : `/${locale}/login`);
+      
+      // Clear Sentry user context
+      Sentry.setUser(null);
+
+      // Update React state
+      setUser(null);
+      setTokenReady(false);
+      setLoading(false);
+
+      // Use setTimeout to ensure state updates are processed before redirect
+      // This prevents the loop where old state causes redirect back
+      setTimeout(() => {
+        const locale = window.location.pathname.split("/")[1] || "en";
+        const validLocales = ["en", "tr"];
+        const localePrefix = validLocales.includes(locale) ? (locale === "en" ? "" : `/${locale}`) : "";
+        
+        // Use replace instead of push to prevent back button issues
+        router.replace(localePrefix ? `${localePrefix}/login` : "/login");
+        
+        // Reset flags after a delay to allow for page transition
+        setTimeout(() => {
+          isLoggingOut = false;
+          hasHandledUnauthenticated.current = false;
+        }, 1000);
+      }, 50);
     });
 
     return unsubscribe;

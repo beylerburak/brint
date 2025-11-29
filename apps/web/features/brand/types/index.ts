@@ -31,6 +31,10 @@ export interface BrandSummary {
   isArchived: boolean;
   isActive: boolean;
   
+  // Logo
+  logoMediaId?: string | null;
+  logoUrl?: string | null;
+  
   // Timestamps
   createdAt: string;
   updatedAt: string;
@@ -44,7 +48,6 @@ export interface BrandDetail extends BrandSummary {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   websiteUrl?: string | null;
-  logoMediaId?: string | null;
   createdBy?: string | null;
   updatedBy?: string | null;
 }
@@ -79,6 +82,7 @@ export interface UpdateBrandRequest {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   websiteUrl?: string | null;
+  logoMediaId?: string | null;
 }
 
 // ============================================================================

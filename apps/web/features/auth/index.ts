@@ -1,5 +1,5 @@
 // Context & Provider
-export { AuthProvider, AuthContext, useAuth } from "./context/auth-context";
+export { AuthProvider, AuthContext, useAuth, isLoggingOutState } from "./context/auth-context";
 
 // Types
 export type {

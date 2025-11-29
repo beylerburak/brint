@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useAuth } from "@/features/auth/context/auth-context";
+import { useAuth, isLoggingOutState } from "@/features/auth/context/auth-context";
 import { getAccessToken, clearAccessToken } from "@/shared/auth/token-storage";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { routeResolver } from "@/shared/routing/route-resolver";
@@ -27,6 +27,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const searchParams = useSearchParams();
   const locale = useLocale();
   const hasRedirectedFromPublic = useRef(false);
+  const isRedirecting = useRef(false);
 
   // Check if current route is public
   const publicRoutes = ["/login", "/signup", "/sign-up", "/invites"];
@@ -60,6 +61,17 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
       return;
     }
 
+    // Don't do anything if we're in the middle of logging out
+    // This prevents redirect loops when token expires
+    if (isLoggingOutState()) {
+      return;
+    }
+
+    // Prevent multiple concurrent redirects
+    if (isRedirecting.current) {
+      return;
+    }
+
     // Don't redirect if already authenticated
     if (isAuthenticated && isPublic) {
       // If on invites page with token, don't redirect - let user accept invite
@@ -72,19 +84,35 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
         return;
       }
       hasRedirectedFromPublic.current = true;
+      isRedirecting.current = true;
 
       // Authenticated users should not access login/signup - resolve destination
       void (async () => {
         try {
+          // Double-check we're not logging out before making API call
+          if (isLoggingOutState()) {
+            isRedirecting.current = false;
+            return;
+          }
+
           const session = await getCurrentSession();
+          
+          // If session is null after API call, user is no longer authenticated
+          // Don't redirect - the onUnauthenticated handler will take care of it
+          if (!session) {
+            isRedirecting.current = false;
+            hasRedirectedFromPublic.current = false;
+            return;
+          }
+
           const redirectPath = await routeResolver({
             locale,
             hasToken: hasToken,
-            ownerWorkspaces: session?.ownerWorkspaces,
-            memberWorkspaces: session?.memberWorkspaces,
-            invites: session?.invites,
+            ownerWorkspaces: session.ownerWorkspaces,
+            memberWorkspaces: session.memberWorkspaces,
+            invites: session.invites,
             currentPath: pathname,
-            fallbackWorkspaceSlug: session?.ownerWorkspaces?.[0]?.slug ?? session?.memberWorkspaces?.[0]?.slug,
+            fallbackWorkspaceSlug: session.ownerWorkspaces?.[0]?.slug ?? session.memberWorkspaces?.[0]?.slug,
             useActivityBasedSelection: true, // Use activity-based workspace selection
           });
           if (redirectPath !== pathname) {
@@ -92,7 +120,13 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
           }
         } catch (error) {
           logger.error("ProtectedLayout redirect error:", error);
-          router.replace(`${localePrefix}/login`);
+          // Don't redirect to login on error - let onUnauthenticated handle auth errors
+          // Only redirect on truly unexpected errors if we have no token
+          if (!getAccessToken()) {
+            router.replace(`${localePrefix}/login`);
+          }
+        } finally {
+          isRedirecting.current = false;
         }
       })();
       return;
@@ -100,24 +134,36 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
     // For protected routes, verify session with backend
     if (isAuthenticated && !isPublic) {
+      isRedirecting.current = true;
       void (async () => {
         try {
+          // Double-check we're not logging out before making API call
+          if (isLoggingOutState()) {
+            isRedirecting.current = false;
+            return;
+          }
+
           // Verify session is still valid by calling /auth/me
           // Returns null if session is invalid (401 or other error)
           const session = await getCurrentSession();
           if (!session) {
-            // Session invalid - clear auth state and redirect to login
-            logger.warn("Session invalid, logging out user");
-            clearAccessToken();
-            localStorage.removeItem("auth_user");
-            apiCache.invalidate("session:current");
-            apiCache.invalidate("user:profile");
-            router.replace(`${localePrefix}/login`);
+            // Session invalid - the onUnauthenticated handler should have been triggered
+            // If not, manually clear state (this is a fallback)
+            if (!isLoggingOutState()) {
+              logger.warn("Session invalid, clearing auth state");
+              clearAccessToken();
+              localStorage.removeItem("auth_user");
+              apiCache.invalidate("session:current");
+              apiCache.invalidate("user:profile");
+              router.replace(`${localePrefix}/login`);
+            }
             return;
           }
         } catch (error) {
           // Unexpected error (network issues, etc.) - log but don't redirect
           logger.error("ProtectedLayout session verification error:", error);
+        } finally {
+          isRedirecting.current = false;
         }
       })();
       return;

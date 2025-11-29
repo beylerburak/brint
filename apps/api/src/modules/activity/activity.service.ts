@@ -199,6 +199,8 @@ export async function getWorkspaceActivity(
           id: true,
           email: true,
           name: true,
+          username: true,
+          avatarMediaId: true,
         },
       },
       workspace: {

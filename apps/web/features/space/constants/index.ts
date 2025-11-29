@@ -1,6 +1,7 @@
 import {
   Home,
   Palette,
+  Briefcase,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -26,6 +27,12 @@ export const SPACE_NAV_ITEMS: SpaceNavItem[] = [
     route: 'dashboard',
     icon: Home,
     isActive: true,
+  },
+  {
+    title: 'Brands',
+    route: 'brands',
+    icon: Briefcase,
+    permission: 'studio:brand.view',
   },
   {
     title: 'Brand Studio',

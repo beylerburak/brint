@@ -11,4 +11,5 @@ export * from "./brand-activity-panel";
 export * from "./brand-social-accounts-panel";
 export * from "./brand-social-account-connect-dialog";
 export * from "./social-platform-icon";
+export * from "./workspace-brands-list";
 

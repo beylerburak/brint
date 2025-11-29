@@ -24,6 +24,11 @@ import {
   normalizeCursorPaginationInput,
 } from "../../lib/pagination.js";
 import * as brandService from "./brand.service.js";
+import { prisma } from "../../lib/prisma.js";
+import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
+import { storageConfig } from "../../config/index.js";
+
+const storage = new S3StorageService();
 
 /**
  * Validates workspace header matches route param
@@ -47,6 +52,25 @@ function requireWorkspaceMatch(
   }
 
   return headerWorkspaceId;
+}
+
+/**
+ * Helper to generate logo URL for a brand
+ */
+async function getBrandLogoUrl(logoMediaId: string | null): Promise<string | null> {
+  if (!logoMediaId) return null;
+  
+  const media = await prisma.media.findUnique({ where: { id: logoMediaId } });
+  if (!media) return null;
+  
+  // Use CDN URL if available, otherwise use presigned URL
+  if (storageConfig.cdnBaseUrl) {
+    return `${storageConfig.cdnBaseUrl}/${media.objectKey}`;
+  }
+  
+  return storage.getPresignedDownloadUrl(media.objectKey, {
+    expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+  });
 }
 
 export async function registerBrandRoutes(app: FastifyInstance) {
@@ -96,6 +120,8 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                       hasAtLeastOneSocialAccount: { type: "boolean" },
                       publishingDefaultsConfigured: { type: "boolean" },
                       isArchived: { type: "boolean" },
+                      logoMediaId: { type: ["string", "null"] },
+                      logoUrl: { type: ["string", "null"] },
                       createdAt: { type: "string" },
                       updatedAt: { type: "string" },
                     },
@@ -125,10 +151,11 @@ export async function registerBrandRoutes(app: FastifyInstance) {
       includeArchived: query.includeArchived,
     });
 
-    return reply.send({
-      success: true,
-      data: {
-        items: result.items.map((brand) => ({
+    // Generate logo URLs for brands that have logos
+    const brandsWithLogos = await Promise.all(
+      result.items.map(async (brand) => {
+        const logoUrl = await getBrandLogoUrl(brand.logoMediaId);
+        return {
           id: brand.id,
           workspaceId: brand.workspaceId,
           name: brand.name,
@@ -140,9 +167,18 @@ export async function registerBrandRoutes(app: FastifyInstance) {
           hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
           publishingDefaultsConfigured: brand.publishingDefaultsConfigured,
           isArchived: brand.isArchived,
+          logoMediaId: brand.logoMediaId,
+          logoUrl,
           createdAt: brand.createdAt.toISOString(),
           updatedAt: brand.updatedAt.toISOString(),
-        })),
+        };
+      })
+    );
+
+    return reply.send({
+      success: true,
+      data: {
+        items: brandsWithLogos,
         nextCursor: result.nextCursor,
       },
     });
@@ -260,6 +296,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                 secondaryColor: { type: ["string", "null"] },
                 websiteUrl: { type: ["string", "null"] },
                 logoMediaId: { type: ["string", "null"] },
+                logoUrl: { type: ["string", "null"] },
                 readinessScore: { type: "number" },
                 profileCompleted: { type: "boolean" },
                 hasAtLeastOneSocialAccount: { type: "boolean" },
@@ -282,6 +319,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string };
 
     const brand = await brandService.getBrandBySlug(slug, workspaceId);
+    const logoUrl = await getBrandLogoUrl(brand.logoMediaId);
 
     return reply.send({
       success: true,
@@ -299,6 +337,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         secondaryColor: brand.secondaryColor,
         websiteUrl: brand.websiteUrl,
         logoMediaId: brand.logoMediaId,
+        logoUrl,
         readinessScore: brand.readinessScore,
         profileCompleted: brand.profileCompleted,
         hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
@@ -351,6 +390,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                 secondaryColor: { type: ["string", "null"] },
                 websiteUrl: { type: ["string", "null"] },
                 logoMediaId: { type: ["string", "null"] },
+                logoUrl: { type: ["string", "null"] },
                 readinessScore: { type: "number" },
                 profileCompleted: { type: "boolean" },
                 hasAtLeastOneSocialAccount: { type: "boolean" },
@@ -373,6 +413,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
     const { brandId } = validateParams(brandParamsSchema, request.params);
 
     const brand = await brandService.getBrand(brandId, workspaceId);
+    const logoUrl = await getBrandLogoUrl(brand.logoMediaId);
 
     return reply.send({
       success: true,
@@ -390,6 +431,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         secondaryColor: brand.secondaryColor,
         websiteUrl: brand.websiteUrl,
         logoMediaId: brand.logoMediaId,
+        logoUrl,
         readinessScore: brand.readinessScore,
         profileCompleted: brand.profileCompleted,
         hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
@@ -434,6 +476,7 @@ export async function registerBrandRoutes(app: FastifyInstance) {
           primaryColor: { type: ["string", "null"], maxLength: 20 },
           secondaryColor: { type: ["string", "null"], maxLength: 20 },
           websiteUrl: { type: ["string", "null"], maxLength: 2000 },
+          logoMediaId: { type: ["string", "null"], maxLength: 50 },
         },
       },
       response: {

@@ -13,11 +13,11 @@ describe('Auth endpoints', () => {
     await app.close();
   });
 
-  describe('POST /auth/magic-link', () => {
+  describe('POST /v1/auth/magic-link', () => {
     it('should return 200 with success message for valid email', async () => {
       const response = await app.inject({
         method: 'POST',
-        url: '/auth/magic-link',
+        url: '/v1/auth/magic-link',
         payload: { email: 'test@example.com' },
       });
 
@@ -31,7 +31,7 @@ describe('Auth endpoints', () => {
     it('should return 400 for invalid email', async () => {
       const response = await app.inject({
         method: 'POST',
-        url: '/auth/magic-link',
+        url: '/v1/auth/magic-link',
         payload: { email: '' },
       });
 
@@ -46,7 +46,7 @@ describe('Auth endpoints', () => {
     it('should return 400 for missing email', async () => {
       const response = await app.inject({
         method: 'POST',
-        url: '/auth/magic-link',
+        url: '/v1/auth/magic-link',
         payload: {},
       });
 
@@ -59,7 +59,7 @@ describe('Auth endpoints', () => {
     it('should accept optional redirectTo parameter', async () => {
       const response = await app.inject({
         method: 'POST',
-        url: '/auth/magic-link',
+        url: '/v1/auth/magic-link',
         payload: { 
           email: 'test@example.com',
           redirectTo: '/dashboard'
@@ -72,11 +72,11 @@ describe('Auth endpoints', () => {
     });
   });
 
-  describe('GET /auth/google', () => {
+  describe('GET /v1/auth/google', () => {
     it('should return 200 with redirectUrl', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/auth/google',
+        url: '/v1/auth/google',
       });
 
       expect(response.statusCode).toBe(200);

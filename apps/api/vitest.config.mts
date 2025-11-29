@@ -22,6 +22,8 @@ export default defineConfig({
       'src/modules/auth/google-oauth.service.spec.ts',
       'src/modules/auth/magic-link.service.spec.ts',
       'src/modules/user/user.repository.spec.ts',
+      'src/modules/workspace/workspace-invite.routes.spec.ts',
+      'src/modules/workspace/workspace-member.routes.spec.ts',
     ],
     setupFiles: ['./src/test/setup.ts'],
     coverage: {

@@ -31,3 +31,31 @@ export const workspaceInviteCreateSchema = z.object({
 });
 
 export type WorkspaceInviteCreateInput = z.infer<typeof workspaceInviteCreateSchema>;
+
+/**
+ * Cursor-based pagination query schema
+ * Used for validating pagination query parameters in API routes
+ * 
+ * @example
+ * ```typescript
+ * const parsed = cursorPaginationQuerySchema.safeParse(request.query);
+ * if (!parsed.success) {
+ *   throw new BadRequestError('INVALID_QUERY', 'Invalid pagination parameters');
+ * }
+ * const { limit, cursor } = parsed.data;
+ * ```
+ */
+export const cursorPaginationQuerySchema = z.object({
+  limit: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) return undefined;
+      const num = typeof value === 'string' ? parseInt(value, 10) : value;
+      return isNaN(num) ? undefined : num;
+    })
+    .pipe(z.number().int().min(1).max(100).optional()),
+  cursor: z.string().optional(),
+});
+
+export type CursorPaginationQueryInput = z.infer<typeof cursorPaginationQuerySchema>;

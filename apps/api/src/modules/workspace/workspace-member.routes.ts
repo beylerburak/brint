@@ -6,6 +6,12 @@ import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
 import { permissionService } from "../../core/auth/permission.service.js";
 import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
 import { storageConfig } from "../../config/index.js";
+import { cursorPaginationQuerySchema } from "@brint/core-validation";
+import {
+  normalizeCursorPaginationInput,
+  createCursorPaginationResult,
+  getPrismaTakeValue,
+} from "../../lib/pagination.js";
 
 const storage = new S3StorageService();
 
@@ -22,34 +28,48 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
         },
         required: ["workspaceId"],
       },
+      querystring: {
+        type: "object",
+        properties: {
+          limit: { type: "number", minimum: 1, maximum: 100 },
+          cursor: { type: "string" },
+        },
+      },
       response: {
         200: {
           type: "object",
           properties: {
             success: { type: "boolean" },
             data: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  userId: { type: "string" },
-                  workspaceId: { type: "string" },
-                  role: { type: "string" },
-                  status: { type: "string" },
-                  joinedAt: { type: "string" },
-                  user: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: {
                     type: "object",
                     properties: {
                       id: { type: "string" },
-                      email: { type: "string" },
-                      name: { type: "string", nullable: true },
-                      username: { type: "string", nullable: true },
-                      avatarUrl: { type: "string", nullable: true },
+                      userId: { type: "string" },
+                      workspaceId: { type: "string" },
+                      role: { type: "string" },
+                      status: { type: "string" },
+                      joinedAt: { type: "string" },
+                      user: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string" },
+                          email: { type: "string" },
+                          name: { type: "string", nullable: true },
+                          username: { type: "string", nullable: true },
+                          avatarUrl: { type: "string", nullable: true },
+                        },
+                      },
                     },
                   },
                 },
+                nextCursor: { type: ["string", "null"] },
               },
+              required: ["items", "nextCursor"],
             },
           },
           required: ["success", "data"],
@@ -68,10 +88,57 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
     }
 
+    // Parse and validate pagination query parameters
+    const parsed = cursorPaginationQuerySchema.safeParse(request.query);
+
+    if (!parsed.success) {
+      throw new BadRequestError("INVALID_QUERY", "Invalid pagination query parameters", {
+        issues: parsed.error.issues,
+      });
+    }
+
+    const { limit, cursor } = normalizeCursorPaginationInput({
+      limit: parsed.data.limit,
+      cursor: parsed.data.cursor ?? null,
+    });
+
+    // Build where clause with cursor pagination
+    const where: any = {
+      workspaceId,
+    };
+
+    if (cursor) {
+      // Cursor-based pagination: get members created before the cursor member
+      const cursorMember = await prisma.workspaceMember.findUnique({
+        where: { id: cursor },
+        select: { joinedAt: true, id: true },
+      });
+
+      if (!cursorMember) {
+        // Cursor not found, return empty
+        return reply.send({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        });
+      }
+
+      // For cursor pagination with joinedAt, we need to handle ties
+      // Use id as secondary sort key for deterministic ordering
+      where.OR = [
+        { joinedAt: { lt: cursorMember.joinedAt } },
+        {
+          joinedAt: cursorMember.joinedAt,
+          id: { lt: cursorMember.id },
+        },
+      ];
+    }
+
+    // Fetch members with pagination
     const members = await prisma.workspaceMember.findMany({
-      where: {
-        workspaceId,
-      },
+      where,
       include: {
         user: {
           select: {
@@ -83,9 +150,11 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
           },
         },
       },
-      orderBy: {
-        joinedAt: "desc",
-      },
+      orderBy: [
+        { joinedAt: "desc" },
+        { id: "desc" }, // Secondary sort for deterministic ordering
+      ],
+      take: getPrismaTakeValue(limit), // Fetch one extra to check if there's a next page
     });
 
     // Collect all unique avatar media IDs
@@ -110,9 +179,12 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       });
     }
 
+    // Create pagination result (removes extra item if present)
+    const paginationResult = createCursorPaginationResult(members, limit, (member) => member.id);
+
     // Map members to include avatarUrl if available
     const membersWithAvatar = await Promise.all(
-      members.map(async (member) => {
+      paginationResult.items.map(async (member) => {
         let avatarUrl: string | null = null;
         if (member.user.avatarMediaId) {
           const media = mediaMap.get(member.user.avatarMediaId);
@@ -134,7 +206,7 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
           workspaceId: member.workspaceId,
           role: member.role,
           status: member.status,
-          joinedAt: member.joinedAt.toISOString(),
+          joinedAt: member.joinedAt?.toISOString() ?? new Date().toISOString(),
           user: {
             id: member.user.id,
             email: member.user.email,
@@ -146,7 +218,13 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
       })
     );
 
-    return reply.send({ success: true, data: membersWithAvatar });
+    return reply.send({
+      success: true,
+      data: {
+        items: membersWithAvatar,
+        nextCursor: paginationResult.nextCursor,
+      },
+    });
   });
 
   app.patch("/workspaces/:workspaceId/members/:userId", {

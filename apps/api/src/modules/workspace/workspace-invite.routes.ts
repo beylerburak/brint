@@ -11,9 +11,14 @@ import { logger } from "../../lib/logger.js";
 import { setAuthCookies } from "../../core/auth/auth.cookies.js";
 import { tokenService } from "../../core/auth/token.service.js";
 import { sessionService } from "../../core/auth/session.service.js";
-import { workspaceInviteCreateSchema } from "@brint/core-validation";
+import { workspaceInviteCreateSchema, cursorPaginationQuerySchema } from "@brint/core-validation";
 import { validateBody } from "../../lib/validation.js";
 import { logActivity } from "../activity/activity.service.js";
+import {
+  normalizeCursorPaginationInput,
+  createCursorPaginationResult,
+  getPrismaTakeValue,
+} from "../../lib/pagination.js";
 
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   // List invites for a workspace
@@ -29,38 +34,52 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         },
         required: ["workspaceId"],
       },
+      querystring: {
+        type: "object",
+        properties: {
+          limit: { type: "number", minimum: 1, maximum: 100 },
+          cursor: { type: "string" },
+        },
+      },
       response: {
         200: {
           type: "object",
           properties: {
             success: { type: "boolean" },
             data: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  email: { type: "string" },
-                  workspaceId: { type: "string" },
-                  invitedBy: { type: ["string", "null"] },
-                  token: { type: "string" },
-                  status: { type: "string", enum: ["PENDING", "ACCEPTED", "EXPIRED"] },
-                  expiresAt: { type: "string", format: "date-time" },
-                  invitedAt: { type: ["string", "null"], format: "date-time" },
-                  createdAt: { type: "string", format: "date-time" },
-                  updatedAt: { type: "string", format: "date-time" },
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      email: { type: "string" },
+                      workspaceId: { type: "string" },
+                      invitedBy: { type: ["string", "null"] },
+                      token: { type: "string" },
+                      status: { type: "string", enum: ["PENDING", "ACCEPTED", "EXPIRED"] },
+                      expiresAt: { type: "string", format: "date-time" },
+                      invitedAt: { type: ["string", "null"], format: "date-time" },
+                      createdAt: { type: "string", format: "date-time" },
+                      updatedAt: { type: "string", format: "date-time" },
+                    },
+                    required: [
+                      "id",
+                      "email",
+                      "workspaceId",
+                      "token",
+                      "status",
+                      "expiresAt",
+                      "createdAt",
+                      "updatedAt",
+                    ],
+                  },
                 },
-                required: [
-                  "id",
-                  "email",
-                  "workspaceId",
-                  "token",
-                  "status",
-                  "expiresAt",
-                  "createdAt",
-                  "updatedAt",
-                ],
+                nextCursor: { type: ["string", "null"] },
               },
+              required: ["items", "nextCursor"],
             },
           },
           required: ["success", "data"],
@@ -85,13 +104,73 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       });
     }
 
-    const invites = await prisma.workspaceInvite.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "desc" },
+    // Parse and validate pagination query parameters
+    const parsed = cursorPaginationQuerySchema.safeParse(request.query);
+
+    if (!parsed.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: "INVALID_QUERY",
+          message: "Invalid pagination query parameters",
+          issues: parsed.error.issues,
+        },
+      });
+    }
+
+    const { limit, cursor } = normalizeCursorPaginationInput({
+      limit: parsed.data.limit,
+      cursor: parsed.data.cursor ?? null,
     });
 
+    // Build where clause with cursor pagination
+    const where: any = {
+      workspaceId,
+    };
+
+    if (cursor) {
+      // Cursor-based pagination: get invites created before the cursor invite
+      const cursorInvite = await prisma.workspaceInvite.findUnique({
+        where: { id: cursor },
+        select: { createdAt: true, id: true },
+      });
+
+      if (!cursorInvite) {
+        // Cursor not found, return empty
+        return reply.send({
+          success: true,
+          data: {
+            items: [],
+            nextCursor: null,
+          },
+        });
+      }
+
+      // For cursor pagination with createdAt, use id as secondary sort key
+      where.OR = [
+        { createdAt: { lt: cursorInvite.createdAt } },
+        {
+          createdAt: cursorInvite.createdAt,
+          id: { lt: cursorInvite.id },
+        },
+      ];
+    }
+
+    // Fetch invites with pagination
+    const invites = await prisma.workspaceInvite.findMany({
+      where,
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" }, // Secondary sort for deterministic ordering
+      ],
+      take: getPrismaTakeValue(limit), // Fetch one extra to check if there's a next page
+    });
+
+    // Create pagination result (removes extra item if present)
+    const paginationResult = createCursorPaginationResult(invites, limit, (invite) => invite.id);
+
     // Serialize dates properly
-    const serializedInvites = invites.map((invite) => ({
+    const serializedInvites = paginationResult.items.map((invite) => ({
       id: invite.id,
       email: invite.email,
       workspaceId: invite.workspaceId,
@@ -104,7 +183,13 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       updatedAt: invite.updatedAt.toISOString(),
     }));
 
-    return reply.send({ success: true, data: serializedInvites });
+    return reply.send({
+      success: true,
+      data: {
+        items: serializedInvites,
+        nextCursor: paginationResult.nextCursor,
+      },
+    });
   });
 
   // Create invite

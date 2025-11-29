@@ -588,7 +588,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         redirectTo: redirectTo ?? null,
       });
 
-      const magicLinkUrl = `${appUrlConfig.baseUrl}/auth/magic-link/verify?token=${result.token}`;
+      // Use frontend URL for magic link (frontend handles the verification UI)
+      const magicLinkUrl = `${appUrlConfig.frontendUrl}/auth/magic-link/verify?token=${result.token}`;
       
       // Enqueue email job instead of sending directly
       await enqueueMagicLinkEmail({
@@ -1050,8 +1051,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         refreshToken: result.refreshToken,
       });
 
-      // Return success response with all workspace information
-      // Frontend will decide redirect based on workspace ownership and membership
+      // Check if this is a browser request (Accept header contains text/html)
+      // If so, redirect to frontend verify page (fallback for old links)
+      const acceptHeader = request.headers.accept ?? '';
+      const isBrowserRequest = acceptHeader.includes('text/html');
+
+      if (isBrowserRequest) {
+        // Redirect browser to frontend verify page
+        const frontendVerifyUrl = `${appUrlConfig.frontendUrl}/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
+        return reply.redirect(302, frontendVerifyUrl);
+      }
+
+      // Return JSON response for API calls (frontend fetch requests)
       const response = {
         success: true,
         user: {

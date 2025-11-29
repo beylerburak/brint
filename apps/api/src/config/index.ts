@@ -70,6 +70,7 @@ export const oauthConfig = {
  */
 export const appUrlConfig = {
   baseUrl: env.APP_URL ?? `http://localhost:${appConfig.port}`,
+  frontendUrl: env.FRONTEND_URL ?? `http://localhost:3000`,
 } as const;
 
 /**

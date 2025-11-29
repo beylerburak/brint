@@ -1,0 +1,91 @@
+name: API CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  api-ci:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Set environment variables for API tests
+        run: |
+          echo "NODE_ENV=test" >> $GITHUB_ENV
+          echo "API_PORT=3000" >> $GITHUB_ENV
+          echo "API_HOST=0.0.0.0" >> $GITHUB_ENV
+          echo "API_LOG_LEVEL=info" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgres://test:test@localhost:5432/test" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+          echo "ACCESS_TOKEN_SECRET=ci-test-secret-for-access-token-min-32-chars" >> $GITHUB_ENV
+          echo "REFRESH_TOKEN_SECRET=ci-test-secret-for-refresh-token-min-32-chars" >> $GITHUB_ENV
+          echo "ACCESS_TOKEN_EXPIRES_IN_MINUTES=15" >> $GITHUB_ENV
+          echo "REFRESH_TOKEN_EXPIRES_IN_DAYS=30" >> $GITHUB_ENV
+          echo "GOOGLE_OAUTH_CLIENT_ID=ci-test-google-client-id" >> $GITHUB_ENV
+          echo "GOOGLE_OAUTH_CLIENT_SECRET=ci-test-google-client-secret" >> $GITHUB_ENV
+          echo "GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/callback" >> $GITHUB_ENV
+          echo "APP_URL=http://localhost:3000" >> $GITHUB_ENV
+          echo "FRONTEND_URL=http://localhost:3001" >> $GITHUB_ENV
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+          echo "S3_MEDIA_BUCKET=ci-test-media-bucket" >> $GITHUB_ENV
+          echo "S3_PUBLIC_CDN_URL=" >> $GITHUB_ENV
+          echo "STORAGE_UPLOAD_EXPIRE_SECONDS=60" >> $GITHUB_ENV
+          echo "STORAGE_DOWNLOAD_EXPIRE_SECONDS=120" >> $GITHUB_ENV
+          echo "STORAGE_AVATAR_MAX_MB=5" >> $GITHUB_ENV
+          echo "STORAGE_CONTENT_IMAGE_MAX_MB=50" >> $GITHUB_ENV
+          echo "STORAGE_CONTENT_VIDEO_MAX_MB=200" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_THUMB_WIDTH=240" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_THUMB_HEIGHT=240" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_THUMB_QUALITY=70" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_SM_WIDTH=480" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_SM_QUALITY=75" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_MD_WIDTH=960" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_MD_QUALITY=80" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_LG_WIDTH=1600" >> $GITHUB_ENV
+          echo "STORAGE_VARIANT_LG_QUALITY=80" >> $GITHUB_ENV
+          echo "SMTP_HOST=localhost" >> $GITHUB_ENV
+          echo "SMTP_PORT=1025" >> $GITHUB_ENV
+          echo "SMTP_SECURE=false" >> $GITHUB_ENV
+          echo "SMTP_USER=test" >> $GITHUB_ENV
+          echo "SMTP_PASS=test" >> $GITHUB_ENV
+          echo "SMTP_FROM=test@localhost" >> $GITHUB_ENV
+          echo "SENTRY_DSN_API=" >> $GITHUB_ENV
+          echo "SENTRY_ENVIRONMENT=ci" >> $GITHUB_ENV
+          echo "SENTRY_TRACES_SAMPLE_RATE=0" >> $GITHUB_ENV
+      
+      - name: Lint
+        run: pnpm lint
+      
+      - name: API tests
+        run: pnpm test:api
+

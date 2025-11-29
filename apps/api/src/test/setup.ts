@@ -1,7 +1,21 @@
 // Test environment setup
+// IMPORTANT: This file must set all environment variables BEFORE env.ts is imported
+// Set NODE_ENV first to enable test-specific behavior in env.ts
 process.env.NODE_ENV = 'test';
 
 // Set minimal required env vars for tests (can be overridden in individual tests)
+if (!process.env.API_PORT) {
+  process.env.API_PORT = '3000';
+}
+
+if (!process.env.API_HOST) {
+  process.env.API_HOST = '0.0.0.0';
+}
+
+if (!process.env.API_LOG_LEVEL) {
+  process.env.API_LOG_LEVEL = 'info';
+}
+
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 }
@@ -27,7 +41,7 @@ if (!process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
 }
 
 if (!process.env.GOOGLE_OAUTH_REDIRECT_URI) {
-  process.env.GOOGLE_OAUTH_REDIRECT_URI = 'http://localhost:3000/auth/google/callback';
+  process.env.GOOGLE_OAUTH_REDIRECT_URI = 'http://localhost:3000/api/auth/google/callback';
 }
 
 if (!process.env.APP_URL) {
@@ -44,9 +58,5 @@ if (!process.env.AWS_REGION) {
 
 if (!process.env.S3_MEDIA_BUCKET) {
   process.env.S3_MEDIA_BUCKET = 'test-bucket';
-}
-
-if (!process.env.API_PORT) {
-  process.env.API_PORT = '3000';
 }
 

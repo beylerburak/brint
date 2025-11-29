@@ -75,6 +75,15 @@ if (!parseResult.success) {
     console.error(`  - ${error.path.join('.')}: ${error.message}`);
   });
   console.error('\nPlease check your .env file and ensure all required variables are set.');
+  
+  // In test environment, throw error instead of exiting process
+  // This allows tests to handle the error gracefully
+  if (process.env.NODE_ENV === 'test') {
+    throw new Error(
+      `Environment validation failed: ${parseResult.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+    );
+  }
+  
   process.exit(1);
 }
 

@@ -30,6 +30,7 @@ model User {
   workspaceMembers WorkspaceMember[]
   sessions      Session[]
   avatarMedia   Media?            @relation(fields: [avatarMediaId], references: [id])
+  activityEvents ActivityEvent[]
 
   @@map("users")
 }
@@ -49,6 +50,7 @@ model Workspace {
   media     Media[]
   socialAccounts SocialAccount[]
   brandContents  BrandContent[]
+  activityEvents ActivityEvent[]
 
   @@map("workspaces")
 }
@@ -257,4 +259,26 @@ model BrandContent {
 
   @@map("brand_contents")
   @@index([workspaceId, brandId, createdAt])
+}
+
+model ActivityEvent {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  workspaceId String?
+  userId      String?
+  actorType   String   // 'user' | 'system' | 'integration'
+  source      String   // 'api' | 'worker' | 'webhook' | 'automation'
+  type        String   // event type, e.g. 'workspace.member_invited'
+  scopeType   String?  // 'workspace' | 'brand' | 'content' | 'publication' | 'user' | 'billing' | ...
+  scopeId     String?  // related entity id
+  requestId   String?  // X-Request-Id
+  metadata    Json?    // event-specific details
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("activity_events")
+  @@index([workspaceId, createdAt])
+  @@index([type])
+  @@index([scopeType, scopeId])
 }

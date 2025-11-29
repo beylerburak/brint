@@ -14,6 +14,7 @@ import { enqueueMagicLinkEmail } from '../../core/queue/email.queue.js';
 import { permissionService } from '../../core/auth/permission.service.js';
 import { BadRequestError, UnauthorizedError, ForbiddenError, HttpError, NotFoundError } from '../../lib/http-errors.js';
 import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
+import { logActivity } from '../activity/activity.service.js';
 
 /**
  * Registers authentication routes
@@ -241,10 +242,42 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         ipAddress: request.ip ?? null,
       });
 
+      // Get user's workspaces (for activity logging and response)
+      const allMemberships = await prisma.workspaceMember.findMany({
+        where: { userId: result.user.id },
+        include: { workspace: true },
+      });
+
+      // Sort by workspace updatedAt (most recently updated first)
+      allMemberships.sort((a, b) => 
+        b.workspace.updatedAt.getTime() - a.workspace.updatedAt.getTime()
+      );
+
+      // Get the most recently updated workspace (for activity logging)
+      const primaryWorkspace = allMemberships.length > 0 ? allMemberships[0].workspace : null;
+
       // 6. Set cookies
       setAuthCookies(reply, {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
+      });
+
+      // Log activity event (fire-and-forget, doesn't block response)
+      void logActivity({
+        type: "auth.google_oauth_login_success",
+        workspaceId: primaryWorkspace?.id ?? null,
+        userId: result.user.id,
+        actorType: "user",
+        source: "api",
+        scopeType: "user",
+        scopeId: result.user.id,
+        metadata: {
+          email: result.user.email,
+          googleId: profile.sub,
+          ip: request.ip,
+          hasWorkspaces: allMemberships.length > 0,
+        },
+        request,
       });
 
       // 7. If redirect override is provided, redirect after setting cookies
@@ -476,12 +509,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const refreshToken = request.cookies['refresh_token'];
+    let userId: string | null = null;
+    let workspaceId: string | null = null;
 
     if (refreshToken) {
       try {
         // Try to decode and revoke session
         const payload = tokenService.verifyRefreshToken(refreshToken);
-        const { tid } = payload;
+        const { tid, sub } = payload;
+        userId = sub;
+
+        // Get workspaceId from request.auth if available
+        workspaceId = request.auth?.workspaceId ?? null;
 
         // Best-effort revoke (don't fail if it errors)
         await sessionService.revokeSession(tid).catch((err) => {
@@ -513,12 +552,34 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         );
       }
     } else {
+      // Try to get userId from request.auth if no refresh token
+      userId = request.auth?.userId ?? null;
+      workspaceId = request.auth?.workspaceId ?? null;
+
       logger.debug(
         {
           reason: 'no-token',
         },
         'Logout without refresh token'
       );
+    }
+
+    // Log activity event (fire-and-forget, doesn't block response)
+    if (userId) {
+      void logActivity({
+        type: "auth.logout",
+        workspaceId,
+        userId,
+        actorType: "user",
+        source: "api",
+        scopeType: "user",
+        scopeId: userId,
+        metadata: {
+          ip: request.ip,
+          userAgent: request.headers["user-agent"],
+        },
+        request,
+      });
     }
 
     // Always clear cookies
@@ -596,6 +657,23 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         to: result.payload.email,
         url: magicLinkUrl,
         locale: null, // TODO: Get locale from request headers if available
+      });
+
+      // Log activity event (fire-and-forget, doesn't block response)
+      void logActivity({
+        type: "auth.magic_link_requested",
+        workspaceId: null,
+        userId: null, // User doesn't exist yet, just email
+        actorType: "user",
+        source: "api",
+        scopeType: "user",
+        scopeId: null,
+        metadata: {
+          email: result.payload.email,
+          ip: request.ip,
+          userAgent: request.headers["user-agent"],
+        },
+        request,
       });
 
       return reply.status(200).send({
@@ -1049,6 +1127,22 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       setAuthCookies(reply, {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
+      });
+
+      // Log activity event (fire-and-forget, doesn't block response)
+      void logActivity({
+        type: "auth.magic_link_login_success",
+        workspaceId: result.workspace?.id ?? null,
+        userId: result.user.id,
+        actorType: "user",
+        source: "api",
+        scopeType: "user",
+        scopeId: result.user.id,
+        metadata: {
+          email: result.user.email,
+          ip: request.ip,
+        },
+        request,
       });
 
       // Check if this is a browser request (Accept header contains text/html)

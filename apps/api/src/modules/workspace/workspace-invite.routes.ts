@@ -13,6 +13,7 @@ import { tokenService } from "../../core/auth/token.service.js";
 import { sessionService } from "../../core/auth/session.service.js";
 import { workspaceInviteCreateSchema } from "@brint/core-validation";
 import { validateBody } from "../../lib/validation.js";
+import { logActivity } from "../activity/activity.service.js";
 
 export async function workspaceInviteRoutes(app: FastifyInstance) {
   // List invites for a workspace
@@ -201,6 +202,22 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
         { err, inviteId: invite.id, email: invite.email },
         "Failed to enqueue workspace invite email"
       );
+    });
+
+    // Log activity event (fire-and-forget, doesn't block response)
+    void logActivity({
+      type: "workspace.member_invited",
+      workspaceId: workspaceId,
+      userId: request.auth?.userId ?? null,
+      actorType: "user",
+      source: "api",
+      scopeType: "workspace",
+      scopeId: workspaceId,
+      metadata: {
+        inviteId: invite.id,
+        invitedEmail: invite.email,
+      },
+      request,
     });
 
     // Ensure we return all fields properly serialized

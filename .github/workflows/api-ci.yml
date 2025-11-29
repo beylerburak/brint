@@ -57,6 +57,12 @@ jobs:
         working-directory: apps/api
         run: pnpm prisma:generate
       
+      - name: Run database migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/test
+        run: pnpm prisma migrate deploy
+      
       - name: Set environment variables for API tests
         run: |
           echo "NODE_ENV=test" >> $GITHUB_ENV

@@ -47,6 +47,7 @@ import { BrandReadinessPanel } from "./brand-readiness-panel";
 import { BrandWizard } from "./brand-wizard";
 import { HashtagPresetsPanel } from "./hashtag-presets-panel";
 import { BrandActivityPanel } from "./brand-activity-panel";
+import { BrandSocialAccountsPanel } from "./brand-social-accounts-panel";
 
 interface BrandDetailPageProps {
   brandSlug: string;
@@ -60,6 +61,7 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
   const canView = useHasPermission("studio:brand.view");
   const canUpdate = useHasPermission("studio:brand.update");
   const canDelete = useHasPermission("studio:brand.delete");
+  const canViewSocialAccounts = useHasPermission("studio:social_account.view");
 
   const { brand, loading, error, refresh } = useBrandBySlug(brandSlug);
   const { archiveBrand, loading: archiveLoading } = useArchiveBrand(brand?.id ?? null);
@@ -188,6 +190,9 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
       <Tabs defaultValue="overview" className="flex-1">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          {canViewSocialAccounts && (
+            <TabsTrigger value="social-accounts">Social Accounts</TabsTrigger>
+          )}
           <TabsTrigger value="hashtags">Hashtag Presets</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
@@ -195,6 +200,12 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
         <TabsContent value="overview" className="mt-4">
           <OverviewTab brand={brand} />
         </TabsContent>
+
+        {canViewSocialAccounts && (
+          <TabsContent value="social-accounts" className="mt-4">
+            <BrandSocialAccountsPanel brandId={brand.id} onBrandRefresh={refresh} />
+          </TabsContent>
+        )}
 
         <TabsContent value="hashtags" className="mt-4">
           <HashtagPresetsPanel brandId={brand.id} />

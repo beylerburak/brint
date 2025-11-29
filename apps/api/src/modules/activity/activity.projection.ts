@@ -175,6 +175,34 @@ export function projectActivityEventForAI(
       break;
     }
 
+    // Social Account events
+    case "social_account.connected": {
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const username = (event.metadata as any)?.username ?? (event.metadata as any)?.externalId ?? "unknown";
+      const brandName = (event.metadata as any)?.brandName ?? "unknown";
+      base.title = "Social account connected";
+      base.summary = `Social account @${username} (${platform}) was connected to brand "${brandName}".`;
+      break;
+    }
+
+    case "social_account.disconnected": {
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const username = (event.metadata as any)?.username ?? (event.metadata as any)?.externalId ?? "unknown";
+      const brandName = (event.metadata as any)?.brandName ?? "unknown";
+      base.title = "Social account disconnected";
+      base.summary = `Social account @${username} (${platform}) was disconnected from brand "${brandName}".`;
+      break;
+    }
+
+    case "social_account.removed": {
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const username = (event.metadata as any)?.username ?? (event.metadata as any)?.externalId ?? "unknown";
+      const brandName = (event.metadata as any)?.brandName ?? "unknown";
+      base.title = "Social account removed";
+      base.summary = `Social account @${username} (${platform}) was removed from brand "${brandName}".`;
+      break;
+    }
+
     case "brand.publishing_defaults_updated": {
       const brandName = (event.metadata as any)?.name ?? "unknown";
       base.title = "Publishing defaults updated";

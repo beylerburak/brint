@@ -21,6 +21,8 @@ import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerRealtimeRoutes } from '../../core/realtime/realtime.routes.js';
 import { registerActivityRoutes } from '../../modules/activity/activity.routes.js';
 import { registerBrandRoutes } from '../../modules/brand/brand.routes.js';
+import { registerSocialAccountRoutes } from '../../modules/social-account/social-account.routes.js';
+import { registerSocialAccountOAuthRoutes } from '../../modules/social-account/social-account-oauth.routes.js';
 import { redis } from '../../lib/redis.js';
 import { setupFastifyErrorHandler } from '../observability/sentry.js';
 import { requestIdHook } from './request-id.js';
@@ -157,6 +159,8 @@ export async function createServer(): Promise<FastifyInstance> {
     await registerMediaRoutes(fastify);
     await registerActivityRoutes(fastify);
     await registerBrandRoutes(fastify);
+    await registerSocialAccountRoutes(fastify);
+    await registerSocialAccountOAuthRoutes(fastify);
   }, { prefix: '/v1' });
 
   return app;

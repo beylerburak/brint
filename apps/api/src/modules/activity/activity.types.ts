@@ -8,7 +8,8 @@ export type ActivityScopeType =
   | "content"
   | "publication"
   | "user"
-  | "billing";
+  | "billing"
+  | "social_account";
 
 export type ActivityEventType =
   // Auth events
@@ -31,6 +32,10 @@ export type ActivityEventType =
   | "brand.social_account_connected"
   | "brand.social_account_disconnected"
   | "brand.publishing_defaults_updated"
+  // Social Account events
+  | "social_account.connected"
+  | "social_account.disconnected"
+  | "social_account.removed"
   // Content events
   | "content.created"
   | "content.updated"

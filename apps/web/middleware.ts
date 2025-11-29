@@ -45,9 +45,10 @@ export default function middleware(request: NextRequest) {
 export const config = {
   // Match all pathnames except for
   // - … if they start with `/api`, `/_next` or `/_vercel`
+  // - … if they start with `/oauth` (OAuth callback pages)
   // - … the ones containing a dot (e.g. `favicon.ico`)
   matcher: [
-    "/((?!api|_next|_vercel|.*\\..*).*)",
+    "/((?!api|_next|_vercel|oauth|.*\\..*).*)",
   ],
 };
 

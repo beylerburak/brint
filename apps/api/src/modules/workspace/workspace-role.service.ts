@@ -10,6 +10,7 @@ const permissionDescriptions: Record<string, string> = {
   [PERMISSIONS.STUDIO_BRAND_CREATE]: 'Create new brands',
   [PERMISSIONS.STUDIO_CONTENT_CREATE]: 'Create content',
   [PERMISSIONS.STUDIO_CONTENT_PUBLISH]: 'Publish content',
+  [PERMISSIONS.STUDIO_SOCIAL_ACCOUNT_VIEW]: 'View social accounts',
 };
 
 const ADMIN_PERMISSION_KEYS = [
@@ -21,6 +22,7 @@ const ADMIN_PERMISSION_KEYS = [
 
 const MEMBER_PERMISSION_KEYS = [
   PERMISSIONS.STUDIO_BRAND_VIEW,
+  PERMISSIONS.STUDIO_SOCIAL_ACCOUNT_VIEW,
 ] as const;
 
 interface RoleDefinition {

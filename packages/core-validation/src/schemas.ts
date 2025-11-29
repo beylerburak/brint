@@ -201,3 +201,82 @@ export const hashtagPresetParamsSchema = z.object({
   brandId: cuidSchema,
   presetId: cuidSchema,
 });
+
+// ======================
+// Social Account Validation Schemas
+// ======================
+
+/**
+ * Social platform enum schema
+ * Matches Prisma SocialPlatform enum
+ */
+export const socialPlatformSchema = z.enum([
+  "FACEBOOK_PAGE",
+  "INSTAGRAM_BUSINESS",
+  "INSTAGRAM_BASIC",
+  "YOUTUBE_CHANNEL",
+  "TIKTOK_BUSINESS",
+  "PINTEREST_PROFILE",
+  "X_ACCOUNT",
+  "LINKEDIN_PAGE",
+]);
+
+export type SocialPlatformInput = z.infer<typeof socialPlatformSchema>;
+
+/**
+ * Social account status enum schema
+ */
+export const socialAccountStatusSchema = z.enum([
+  "ACTIVE",
+  "DISCONNECTED",
+  "REMOVED",
+]);
+
+export type SocialAccountStatusInput = z.infer<typeof socialAccountStatusSchema>;
+
+/**
+ * Social account ID schema
+ */
+export const socialAccountIdSchema = cuidSchema;
+
+/**
+ * Connect social account body schema
+ * Used for POST /v1/brands/:brandId/social-accounts
+ */
+export const connectSocialAccountSchema = z.object({
+  platform: socialPlatformSchema,
+  externalId: z.string().min(1, 'validation.socialAccount.externalId.required').max(500, 'validation.socialAccount.externalId.max'),
+  username: z.string().min(1).max(255).optional(),
+  displayName: z.string().min(1).max(255).optional(),
+  profileUrl: z.string().url('validation.socialAccount.profileUrl.invalid').optional(),
+  platformData: z.record(z.any()).optional(),
+  // Credentials are flexible - service will validate/cast as needed
+  credentials: z.object({
+    platform: socialPlatformSchema,
+    data: z.record(z.any()),
+  }),
+});
+
+export type ConnectSocialAccountInput = z.infer<typeof connectSocialAccountSchema>;
+
+/**
+ * Social account params schema
+ * Used for validating route parameters like :brandId and :socialAccountId
+ */
+export const socialAccountParamsSchema = z.object({
+  brandId: cuidSchema,
+  socialAccountId: cuidSchema,
+});
+
+export type SocialAccountParamsInput = z.infer<typeof socialAccountParamsSchema>;
+
+/**
+ * Social account list query schema
+ * Extends cursor pagination with status filter
+ * - status: filter by specific status
+ * - includeRemoved: when true, includes REMOVED accounts (default: false, hides REMOVED)
+ */
+export const socialAccountListQuerySchema = cursorPaginationQuerySchema.extend({
+  status: socialAccountStatusSchema.optional(),
+  includeRemoved: z.boolean().optional(),
+});

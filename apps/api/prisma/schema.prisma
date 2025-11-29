@@ -236,6 +236,23 @@ enum PublicationPlatform {
   twitter
 }
 
+enum SocialPlatform {
+  FACEBOOK_PAGE
+  INSTAGRAM_BUSINESS
+  INSTAGRAM_BASIC
+  YOUTUBE_CHANNEL
+  TIKTOK_BUSINESS
+  PINTEREST_PROFILE
+  X_ACCOUNT
+  LINKEDIN_PAGE
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  REMOVED
+}
+
 enum PublicationContentType {
   feed_post
   reel
@@ -273,21 +290,34 @@ model Media {
 }
 
 model SocialAccount {
-  id          String   @id @default(cuid())
+  id          String              @id @default(cuid())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   workspaceId String
   brandId     String
-  provider    String
-  externalId  String
-  handle      String
+  platform    SocialPlatform
+  externalId  String              // pageId / channelId / profileId / etc.
+  username    String?
   displayName String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  profileUrl  String?
+  status      SocialAccountStatus @default(ACTIVE)
+  lastSyncedAt DateTime?
+  avatarMediaId String?           // future: mirror avatar into our Media service
 
-  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  /// Encrypted JSON blob with all provider credentials.
+  /// This is a STRING, not Json, because it is ENCRYPTED.
+  credentialsEncrypted String
+
+  /// Provider-specific non-secret meta data (safe to expose internally / to UI).
+  /// Example: pageName, igBusinessAccountId, avatarUrl, etc.
+  platformData Json?
+
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
-  @@unique([brandId, provider, externalId])
+  @@unique([workspaceId, platform, externalId])
   @@index([workspaceId, brandId])
+  @@index([platform, externalId])
   @@map("social_accounts")
 }
 

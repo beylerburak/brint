@@ -63,6 +63,31 @@ const envSchema = z.object({
   SENTRY_DSN_API: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
+  // Secret encryption key for sensitive data (social account credentials etc.)
+  SECRET_ENCRYPTION_KEY: z.string().min(32, 'SECRET_ENCRYPTION_KEY must be at least 32 characters').optional(),
+  // Facebook OAuth (for social account connection)
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
+  // TikTok OAuth (for social account connection)
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_REDIRECT_URI: z.string().url().optional(),
+  // LinkedIn OAuth (for social account connection)
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_REDIRECT_URI: z.string().url().optional(),
+  // X (Twitter) OAuth (for social account connection)
+  X_CLIENT_ID: z.string().optional(),
+  X_CLIENT_SECRET: z.string().optional(),
+  X_REDIRECT_URI: z.string().url().optional(),
+  // Pinterest OAuth (for social account connection)
+  PINTEREST_APP_ID: z.string().optional(),
+  PINTEREST_APP_SECRET: z.string().optional(),
+  PINTEREST_REDIRECT_URI: z.string().url().optional(),
+  // YouTube/Google OAuth (for social account connection)
+  YOUTUBE_CLIENT_ID: z.string().optional(),
+  YOUTUBE_CLIENT_SECRET: z.string().optional(),
+  YOUTUBE_REDIRECT_URI: z.string().url().optional(),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -140,6 +165,30 @@ export const env = {
   SENTRY_DSN_API: rawEnv.SENTRY_DSN_API,
   SENTRY_ENVIRONMENT: rawEnv.SENTRY_ENVIRONMENT,
   SENTRY_TRACES_SAMPLE_RATE: rawEnv.SENTRY_TRACES_SAMPLE_RATE,
+  SECRET_ENCRYPTION_KEY: rawEnv.SECRET_ENCRYPTION_KEY,
+  // Facebook OAuth
+  FACEBOOK_APP_ID: rawEnv.FACEBOOK_APP_ID,
+  FACEBOOK_APP_SECRET: rawEnv.FACEBOOK_APP_SECRET,
+  // TikTok OAuth
+  TIKTOK_CLIENT_KEY: rawEnv.TIKTOK_CLIENT_KEY,
+  TIKTOK_CLIENT_SECRET: rawEnv.TIKTOK_CLIENT_SECRET,
+  TIKTOK_REDIRECT_URI: rawEnv.TIKTOK_REDIRECT_URI,
+  // LinkedIn OAuth
+  LINKEDIN_CLIENT_ID: rawEnv.LINKEDIN_CLIENT_ID,
+  LINKEDIN_CLIENT_SECRET: rawEnv.LINKEDIN_CLIENT_SECRET,
+  LINKEDIN_REDIRECT_URI: rawEnv.LINKEDIN_REDIRECT_URI,
+  // X (Twitter) OAuth
+  X_CLIENT_ID: rawEnv.X_CLIENT_ID,
+  X_CLIENT_SECRET: rawEnv.X_CLIENT_SECRET,
+  X_REDIRECT_URI: rawEnv.X_REDIRECT_URI,
+  // Pinterest OAuth
+  PINTEREST_APP_ID: rawEnv.PINTEREST_APP_ID,
+  PINTEREST_APP_SECRET: rawEnv.PINTEREST_APP_SECRET,
+  PINTEREST_REDIRECT_URI: rawEnv.PINTEREST_REDIRECT_URI,
+  // YouTube/Google OAuth
+  YOUTUBE_CLIENT_ID: rawEnv.YOUTUBE_CLIENT_ID,
+  YOUTUBE_CLIENT_SECRET: rawEnv.YOUTUBE_CLIENT_SECRET,
+  YOUTUBE_REDIRECT_URI: rawEnv.YOUTUBE_REDIRECT_URI,
 } as const;
 
 export type Env = typeof env;

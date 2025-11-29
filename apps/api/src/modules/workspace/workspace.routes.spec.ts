@@ -240,8 +240,8 @@ describe('Workspace endpoints', () => {
 
       expect(roles.length).toBeGreaterThan(0);
       const roleNames = roles.map(r => r.name);
-      // Should have at least OWNER role
-      expect(roleNames).toContain('OWNER');
+      // Should have at least Workspace Owner role
+      expect(roleNames).toContain('Workspace Owner');
     });
   });
 });

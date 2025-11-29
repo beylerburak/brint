@@ -81,3 +81,7 @@ docker-compose.override.yml
 .taskrules
 docs
 tasks
+.cursor
+.cursorrules
+.taskrules
+.vscode

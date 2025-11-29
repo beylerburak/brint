@@ -96,7 +96,7 @@ jobs:
           echo "SMTP_SECURE=false" >> $GITHUB_ENV
           echo "SMTP_USER=test" >> $GITHUB_ENV
           echo "SMTP_PASS=test" >> $GITHUB_ENV
-          echo "SMTP_FROM=test@localhost" >> $GITHUB_ENV
+          echo "SMTP_FROM=test@example.com" >> $GITHUB_ENV
           echo "SENTRY_DSN_API=" >> $GITHUB_ENV
           echo "SENTRY_ENVIRONMENT=ci" >> $GITHUB_ENV
           echo "SENTRY_TRACES_SAMPLE_RATE=0" >> $GITHUB_ENV

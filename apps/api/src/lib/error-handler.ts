@@ -3,6 +3,7 @@ import { logger } from './logger.js';
 import { HttpError } from './http-errors.js';
 import { appConfig } from '../config/app-config.js';
 import { captureException } from '../core/observability/sentry.js';
+import { getRequestId } from '../core/http/request-id.js';
 
 /**
  * Standard error response format for all API errors
@@ -39,19 +40,26 @@ export function globalErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
-  // Log the error with request context
+  // Extract request context
+  const requestId = getRequestId(request);
+  const userId = (request as any).auth?.userId ?? undefined;
+  const workspaceId = (request as any).auth?.workspaceId ?? undefined;
+  const statusCode = (error as HttpError).statusCode ?? error.statusCode ?? 500;
+
+  // Log the error with structured context
   logger.error(
     {
+      msg: "Request failed",
       err: error,
+      requestId,
+      userId,
+      workspaceId,
       method: request.method,
-      url: request.url,
-      statusCode: error.statusCode || 500,
+      path: request.url,
+      statusCode,
     },
     'Error handled by global error handler'
   );
-
-  // Determine status code
-  const statusCode = (error as HttpError).statusCode ?? error.statusCode ?? 500;
 
   // Map error code
   const errorCode =
@@ -62,11 +70,8 @@ export function globalErrorHandler(
   // Send to Sentry for 5xx errors (server errors)
   // Skip 4xx errors (client errors) unless they're unexpected
   if (statusCode >= 500 || (statusCode >= 400 && !(error as HttpError).code)) {
-    // Extract context from request
-    const userId = (request as any).auth?.userId ?? undefined;
-    const workspaceId = (request as any).workspaceId ?? undefined;
-    
     captureException(error, {
+      requestId,
       userId,
       workspaceId,
       method: request.method,
@@ -102,6 +107,20 @@ export function notFoundHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
+  const requestId = getRequestId(request);
+  
+  // Log 404 with request context
+  logger.warn(
+    {
+      msg: "Route not found",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 404,
+    },
+    '404 Not Found'
+  );
+
   const errorResponse: ErrorResponse = {
     success: false,
     error: {

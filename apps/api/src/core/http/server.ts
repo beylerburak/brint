@@ -22,6 +22,7 @@ import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerRealtimeRoutes } from '../../core/realtime/realtime.routes.js';
 import { redis } from '../../lib/redis.js';
 import { setupFastifyErrorHandler } from '../observability/sentry.js';
+import { requestIdHook } from './request-id.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -33,6 +34,9 @@ export async function createServer(): Promise<FastifyInstance> {
   const app = Fastify({ 
     logger,
   });
+
+  // Register request ID hook (must be early, before other hooks)
+  requestIdHook(app);
 
   // Setup Sentry Fastify error handler (if Sentry is initialized)
   setupFastifyErrorHandler(app);
@@ -56,7 +60,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await app.register(cors, {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'X-Requested-With', 'X-Request-Id'],
 
     origin: (origin, cb) => {
       // Allow requests with no origin (curl, mobile app vs.)

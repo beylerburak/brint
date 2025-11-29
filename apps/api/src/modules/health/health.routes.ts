@@ -1,17 +1,21 @@
 import { FastifyInstance } from 'fastify';
 import { redis } from '../../lib/redis.js';
+import { prisma } from '../../lib/prisma.js';
+import { logger } from '../../lib/logger.js';
+import { getRequestId } from '../../core/http/request-id.js';
 
 /**
  * Registers health check routes
- * - GET /health/basic - Basic liveness check
- * - GET /health/redis - Redis health check
+ * - GET /health/live - Liveness check (process is running)
+ * - GET /health/ready - Readiness check (dependencies are healthy)
  */
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
-  // Basic health check endpoint
-  app.get('/health/basic', {
+  // Liveness check - process is running
+  app.get('/health/live', {
     schema: {
       tags: ['Health'],
-      summary: 'Basic liveness check',
+      summary: 'Liveness check',
+      description: 'Returns ok if the process is running',
       response: {
         200: {
           type: 'object',
@@ -22,23 +26,30 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
       },
     },
   }, async (request, reply) => {
-    return { status: 'ok' };
+    return reply.status(200).send({ status: 'ok' });
   });
 
-  // Redis health check endpoint
-  app.get('/health/redis', {
+  // Readiness check - dependencies are healthy
+  app.get('/health/ready', {
     schema: {
       tags: ['Health'],
-      summary: 'Redis health check',
+      summary: 'Readiness check',
+      description: 'Returns ok if all dependencies (DB, Redis) are healthy',
       response: {
         200: {
           type: 'object',
           properties: {
             status: { type: 'string' },
-            redis: {
+          },
+        },
+        503: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            details: {
               type: 'object',
-              properties: {
-                ping: { type: 'string' },
+              additionalProperties: {
+                type: 'string',
               },
             },
           },
@@ -46,11 +57,63 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
       },
     },
   }, async (request, reply) => {
-    const ping = await redis.ping();
-    return reply.status(200).send({
-      status: ping === 'PONG' ? 'ok' : 'degraded',
-      redis: { ping },
-    });
+    const requestId = getRequestId(request);
+    const checks: Record<string, string> = {};
+    let allHealthy = true;
+
+    // Check PostgreSQL connection
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      checks.db = 'ok';
+    } catch (error) {
+      checks.db = 'down';
+      allHealthy = false;
+      logger.error(
+        {
+          msg: 'Database health check failed',
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Readiness check: DB failed'
+      );
+    }
+
+    // Check Redis connection
+    try {
+      const ping = await redis.ping();
+      checks.redis = ping === 'PONG' ? 'ok' : 'down';
+      if (ping !== 'PONG') {
+        allHealthy = false;
+      }
+    } catch (error) {
+      checks.redis = 'down';
+      allHealthy = false;
+      logger.error(
+        {
+          msg: 'Redis health check failed',
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Readiness check: Redis failed'
+      );
+    }
+
+    if (allHealthy) {
+      return reply.status(200).send({ status: 'ok' });
+    } else {
+      logger.error(
+        {
+          msg: 'Readiness check failed',
+          requestId,
+          details: checks,
+        },
+        'Health check: Service unhealthy'
+      );
+      return reply.status(503).send({
+        status: 'unhealthy',
+        details: checks,
+      });
+    }
   });
 }
 

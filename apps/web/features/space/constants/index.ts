@@ -1,5 +1,6 @@
 import {
   Home,
+  Palette,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -8,6 +9,7 @@ export interface SpaceNavItem {
   route: string; // Route path without locale/workspace prefix (e.g., 'dashboard', 'settings')
   icon: LucideIcon;
   isActive?: boolean;
+  permission?: string; // Optional permission required to see this item
   items?: {
     title: string;
     route: string;
@@ -24,6 +26,12 @@ export const SPACE_NAV_ITEMS: SpaceNavItem[] = [
     route: 'dashboard',
     icon: Home,
     isActive: true,
+  },
+  {
+    title: 'Brand Studio',
+    route: 'studio/brands',
+    icon: Palette,
+    permission: 'studio:brand.view',
   },
 ];
 

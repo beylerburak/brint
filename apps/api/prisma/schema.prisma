@@ -11,169 +11,194 @@ generator client {
 }
 
 model User {
-  id            String            @id @default(cuid())
-  email         String            @unique
-  username      String?           @unique
-  name          String?
-  emailVerified DateTime?
-  googleId      String?           @unique
-  firstOnboardedAt DateTime?
-  completedOnboarding Boolean     @default(false)
-  lastLoginAt   DateTime?
-  locale        String            @default("en")
-  timezone      String            @default("UTC")
-  phone         String?
-  status        String            @default("active")
-  avatarMediaId String?           @unique
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  workspaceMembers WorkspaceMember[]
-  sessions      Session[]
-  avatarMedia   Media?            @relation(fields: [avatarMediaId], references: [id])
-  activityEvents ActivityEvent[]
+  id                  String            @id @default(cuid())
+  email               String            @unique
+  username            String?           @unique
+  name                String?
+  emailVerified       DateTime?
+  googleId            String?           @unique
+  firstOnboardedAt    DateTime?
+  completedOnboarding Boolean           @default(false)
+  lastLoginAt         DateTime?
+  locale              String            @default("en")
+  timezone            String            @default("UTC")
+  phone               String?
+  status              String            @default("active")
+  avatarMediaId       String?           @unique
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  workspaceMembers    WorkspaceMember[]
+  sessions            Session[]
+  avatarMedia         Media?            @relation(fields: [avatarMediaId], references: [id])
+  activityEvents      ActivityEvent[]
 
   @@map("users")
 }
 
 model Workspace {
-  id        String            @id @default(cuid())
-  name      String
-  slug      String            @unique
-  isActive  Boolean           @default(true)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  members   WorkspaceMember[]
-  roles     Role[]
-  brands    Brand[]
-  subscription Subscription? @relation("WorkspaceSubscription")
-  invites   WorkspaceInvite[]
-  media     Media[]
+  id             String               @id @default(cuid())
+  name           String
+  slug           String               @unique
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  members        WorkspaceMember[]
+  roles          Role[]
+  brands         Brand[]
+  subscription   Subscription?        @relation("WorkspaceSubscription")
+  invites        WorkspaceInvite[]
+  media          Media[]
   socialAccounts SocialAccount[]
   brandContents  BrandContent[]
+  hashtagPresets BrandHashtagPreset[]
+  contents       Content[]
+  publications   Publication[]
   activityEvents ActivityEvent[]
 
   @@map("workspaces")
 }
 
 model WorkspaceMember {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String
   workspaceId String
   role        WorkspaceRole @default(MEMBER)
   invitedBy   String?
   invitedAt   DateTime?
   joinedAt    DateTime?
-  status      String   @default("active")
-  createdAt   DateTime @default(now())
-  user      User      @relation(fields: [userId], references: [id])
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  status      String        @default("active")
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
 }
 
 model Role {
-  id           String   @id @default(cuid())
-  workspaceId  String?  // null ise global role, doluysa workspace-specific role
-  key          String   // örn: "workspace-owner", "content-manager"
-  name         String
-  description  String?
-  builtIn      Boolean  @default(false)
-  order        Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String           @id @default(cuid())
+  workspaceId     String? // null ise global role, doluysa workspace-specific role
+  key             String // örn: "workspace-owner", "content-manager"
+  name            String
+  description     String?
+  builtIn         Boolean          @default(false)
+  order           Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
   rolePermissions RolePermission[]
 
-  @@map("roles")
   @@unique([workspaceId, key]) // aynı workspace içinde aynı key iki kez olmasın, global roller için workspaceId null
+  @@map("roles")
 }
 
 model Permission {
-  id          String   @id @default(cuid())
-  key         String   @unique // örn: "workspace:settings.view"
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String           @id @default(cuid())
+  key             String           @unique // örn: "workspace:settings.view"
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   rolePermissions RolePermission[]
 
   @@map("permissions")
 }
 
 model RolePermission {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   roleId       String
   permissionId String
-  createdAt    DateTime @default(now())
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  @@map("role_permissions")
   @@unique([roleId, permissionId])
+  @@map("role_permissions")
 }
 
 model Session {
-  id           String   @id            // refresh token payload'daki `tid` ile birebir
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt    DateTime
-  userAgent    String?
-  ipAddress    String?
-  lastActiveAt DateTime @default(now())
+  id               String    @id // refresh token payload'daki `tid` ile birebir
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt        DateTime
+  userAgent        String?
+  ipAddress        String?
+  lastActiveAt     DateTime  @default(now())
   refreshTokenHash String?
-  revokedAt    DateTime?
-  createdAt    DateTime @default(now())
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
 
-  @@map("sessions")
   @@index([userId, expiresAt])
+  @@map("sessions")
 }
 
 model Brand {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   workspaceId String
   name        String
   slug        String
   description String?
-  isActive    Boolean   @default(true)
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  media       Media[]
-  socialAccounts SocialAccount[]
-  contents    BrandContent[]
+  industry    String?
+  language    String? // "tr", "en" etc.
+  timezone    String? // IANA timezone
+  toneOfVoice String? // friendly, corporate, etc.
 
-  @@map("brands")
+  // Wizard / readiness
+  profileCompleted             Boolean @default(false)
+  hasAtLeastOneSocialAccount   Boolean @default(false)
+  publishingDefaultsConfigured Boolean @default(false)
+  readinessScore               Int     @default(0) // 0-100
+
+  // Brand-level settings
+  primaryColor   String? // "#RRGGBB"
+  secondaryColor String?
+  websiteUrl     String?
+  logoMediaId    String?
+
+  isArchived Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdBy  String?
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workspace      Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  media          Media[]
+  socialAccounts SocialAccount[]
+  brandContents  BrandContent[]
+  hashtagPresets BrandHashtagPreset[]
+  studioContents Content[]
+  publications   Publication[]
+
   @@unique([workspaceId, slug])
-  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, createdAt])
+  @@map("brands")
 }
 
 model Subscription {
-  id          String   @id @default(cuid())
-  workspaceId String   @unique
+  id          String             @id @default(cuid())
+  workspaceId String             @unique
   plan        SubscriptionPlan   @default(FREE)
   status      SubscriptionStatus @default(ACTIVE)
   periodStart DateTime?
   periodEnd   DateTime?
   cancelAt    DateTime?
 
-  workspace   Workspace @relation("WorkspaceSubscription", fields: [workspaceId], references: [id])
+  workspace Workspace @relation("WorkspaceSubscription", fields: [workspaceId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model WorkspaceInvite {
-  id           String   @id @default(cuid())
-  email        String
-  workspaceId  String
-  invitedBy    String
-  token        String @unique
-  status       InviteStatus @default(PENDING)
-  expiresAt    DateTime
+  id          String       @id @default(cuid())
+  email       String
+  workspaceId String
+  invitedBy   String
+  token       String       @unique
+  status      InviteStatus @default(PENDING)
+  expiresAt   DateTime
 
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,6 +228,30 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum PublicationPlatform {
+  instagram
+  facebook
+  linkedin
+  tiktok
+  twitter
+}
+
+enum PublicationContentType {
+  feed_post
+  reel
+  story
+  carousel
+}
+
+enum PublicationStatus {
+  draft
+  scheduled
+  publishing
+  published
+  failed
+  cancelled
+}
+
 model Media {
   id           String   @id @default(cuid())
   workspaceId  String
@@ -216,49 +265,109 @@ model Media {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  Workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  Brand     Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  Workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  Brand      Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   userAvatar User?
 
   @@map("media")
 }
 
 model SocialAccount {
-  id           String   @id @default(cuid())
-  workspaceId  String
-  brandId      String
-  provider     String
-  externalId   String
-  handle       String
-  displayName  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  workspaceId String
+  brandId     String
+  provider    String
+  externalId  String
+  handle      String
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@map("social_accounts")
   @@unique([brandId, provider, externalId])
   @@index([workspaceId, brandId])
+  @@map("social_accounts")
 }
 
 model BrandContent {
-  id           String   @id @default(cuid())
-  workspaceId  String
-  brandId      String
-  title        String
-  body         String?
-  status       String   @default("draft")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  publishedAt  DateTime?
-  scheduledAt  DateTime?
+  id          String    @id @default(cuid())
+  workspaceId String
+  brandId     String
+  title       String
+  body        String?
+  status      String    @default("draft")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  scheduledAt DateTime?
 
-  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@map("brand_contents")
   @@index([workspaceId, brandId, createdAt])
+  @@map("brand_contents")
+}
+
+model BrandHashtagPreset {
+  id          String   @id @default(cuid())
+  workspaceId String
+  brandId     String
+  name        String
+  tags        Json // JSONB: string[] of hashtags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, brandId])
+  @@map("brand_hashtag_presets")
+}
+
+model Content {
+  id          String   @id @default(cuid())
+  workspaceId String
+  brandId     String
+  title       String
+  baseCaption String? // platform-agnostic caption
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand        Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  publications Publication[]
+
+  @@index([workspaceId, brandId])
+  @@map("contents")
+}
+
+model Publication {
+  id             String                 @id @default(cuid())
+  workspaceId    String
+  brandId        String
+  contentId      String
+  platform       PublicationPlatform
+  contentType    PublicationContentType
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  status         PublicationStatus
+  settings       Json // JSONB: platform/type-specific payload
+  error          Json? // JSONB: error details
+  externalPostId String?
+  jobId          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, brandId])
+  @@index([contentId])
+  @@index([status, scheduledAt]) // Worker query: WHERE status='scheduled' AND scheduledAt<=now()
+  @@map("publications")
 }
 
 model ActivityEvent {
@@ -266,19 +375,19 @@ model ActivityEvent {
   createdAt   DateTime @default(now())
   workspaceId String?
   userId      String?
-  actorType   String   // 'user' | 'system' | 'integration'
-  source      String   // 'api' | 'worker' | 'webhook' | 'automation'
-  type        String   // event type, e.g. 'workspace.member_invited'
-  scopeType   String?  // 'workspace' | 'brand' | 'content' | 'publication' | 'user' | 'billing' | ...
-  scopeId     String?  // related entity id
-  requestId   String?  // X-Request-Id
-  metadata    Json?    // event-specific details
+  actorType   String // 'user' | 'system' | 'integration'
+  source      String // 'api' | 'worker' | 'webhook' | 'automation'
+  type        String // event type, e.g. 'workspace.member_invited'
+  scopeType   String? // 'workspace' | 'brand' | 'content' | 'publication' | 'user' | 'billing' | ...
+  scopeId     String? // related entity id
+  requestId   String? // X-Request-Id
+  metadata    Json? // event-specific details
 
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@map("activity_events")
   @@index([workspaceId, createdAt])
   @@index([type])
   @@index([scopeType, scopeId])
+  @@map("activity_events")
 }

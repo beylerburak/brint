@@ -28,27 +28,37 @@ import { SpaceNavUser } from './space-nav-user';
 import { SPACE_NAV_ITEMS, buildWorkspaceRoute } from '@/features/space/constants';
 import { useWorkspace } from '@/features/space/context/workspace-context';
 import { SettingsDialog } from '@/features/settings';
+import { usePermissions } from '@/features/permissions/hooks/hooks';
+import type { PermissionKey } from '@/features/permissions/permission-keys';
 
 export const SpaceSidebar = () => {
   const locale = useLocale();
   const { workspace } = useWorkspace();
   const t = useTranslations('common');
+  const { permissions } = usePermissions();
 
-  // Build navigation items with full routes
+  // Build navigation items with full routes, filtering by permission
   const navItems = React.useMemo(() => {
     if (!workspace?.slug) return [];
 
-    return SPACE_NAV_ITEMS.map((item) => ({
-      title: item.title,
-      url: buildWorkspaceRoute(locale, workspace.slug, item.route),
-      icon: item.icon,
-      isActive: item.isActive,
-      items: item.items?.map((subItem) => ({
-        title: subItem.title,
-        url: buildWorkspaceRoute(locale, workspace.slug, subItem.route),
-      })),
-    }));
-  }, [locale, workspace?.slug]);
+    return SPACE_NAV_ITEMS
+      .filter((item) => {
+        // If no permission required, show the item
+        if (!item.permission) return true;
+        // Check if user has the required permission
+        return permissions.includes(item.permission as PermissionKey);
+      })
+      .map((item) => ({
+        title: item.title,
+        url: buildWorkspaceRoute(locale, workspace.slug, item.route),
+        icon: item.icon,
+        isActive: item.isActive,
+        items: item.items?.map((subItem) => ({
+          title: subItem.title,
+          url: buildWorkspaceRoute(locale, workspace.slug, subItem.route),
+        })),
+      }));
+  }, [locale, workspace?.slug, permissions]);
 
   // Memoize secondary items (they don't change)
   const secondaryItems = React.useMemo(() => [

@@ -91,3 +91,113 @@ export const cursorPaginationQuerySchema = z.object({
 });
 
 export type CursorPaginationQueryInput = z.infer<typeof cursorPaginationQuerySchema>;
+
+// ======================
+// Brand Validation Schemas
+// ======================
+
+/**
+ * CUID validation schema
+ * Used for validating entity IDs that use cuid format
+ */
+export const cuidSchema = z.string().min(1, 'validation.cuid.required');
+
+/**
+ * Create brand schema
+ * Used for POST /v1/brands endpoint
+ * 
+ * Note: slug is optional - if not provided, backend will generate from name
+ */
+export const createBrandSchema = z.object({
+  name: z.string().min(1, 'validation.brand.name.required').max(255, 'validation.brand.name.max'),
+  slug: z.string().min(1, 'validation.brand.slug.required').max(255, 'validation.brand.slug.max')
+    .regex(/^[a-z0-9-]+$/, 'validation.brand.slug.pattern').optional(),
+  description: z.string().max(2000, 'validation.brand.description.max').optional().nullable(),
+  industry: z.string().max(255, 'validation.brand.industry.max').optional().nullable(),
+  language: z.string().max(10, 'validation.brand.language.max').optional().nullable(),
+  timezone: z.string().max(100, 'validation.brand.timezone.max').optional().nullable(),
+  toneOfVoice: z.string().max(500, 'validation.brand.toneOfVoice.max').optional().nullable(),
+  primaryColor: z.string().max(20, 'validation.brand.primaryColor.max')
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'validation.brand.primaryColor.pattern').optional().nullable(),
+  secondaryColor: z.string().max(20, 'validation.brand.secondaryColor.max')
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'validation.brand.secondaryColor.pattern').optional().nullable(),
+  websiteUrl: z.string().url('validation.brand.websiteUrl.invalid').max(2000, 'validation.brand.websiteUrl.max').optional().nullable(),
+});
+
+export type CreateBrandInput = z.infer<typeof createBrandSchema>;
+
+/**
+ * Update brand schema (partial)
+ * Used for PATCH /v1/brands/:brandId endpoint
+ */
+export const updateBrandSchema = createBrandSchema.partial();
+
+export type UpdateBrandInput = z.infer<typeof updateBrandSchema>;
+
+/**
+ * Update brand readiness schema
+ * Used for updating wizard/progress fields
+ */
+export const updateBrandReadinessSchema = z.object({
+  profileCompleted: z.boolean().optional(),
+  publishingDefaultsConfigured: z.boolean().optional(),
+});
+
+export type UpdateBrandReadinessInput = z.infer<typeof updateBrandReadinessSchema>;
+
+/**
+ * Brand params schema
+ * Used for validating route parameters like :brandId
+ */
+export const brandParamsSchema = z.object({
+  brandId: cuidSchema,
+});
+
+export type BrandParamsInput = z.infer<typeof brandParamsSchema>;
+
+/**
+ * Brand list query schema
+ * Extends cursor pagination with brand-specific filters
+ */
+export const brandListQuerySchema = cursorPaginationQuerySchema.extend({
+  includeArchived: z.preprocess(
+    (val) => val === 'true' || val === true,
+    z.boolean().optional().default(false)
+  ),
+});
+
+export type BrandListQueryInput = z.infer<typeof brandListQuerySchema>;
+
+// ======================
+// Brand Hashtag Preset Schemas
+// ======================
+
+/**
+ * Create brand hashtag preset schema
+ * Used for POST /v1/brands/:brandId/hashtag-presets endpoint
+ */
+export const createBrandHashtagPresetSchema = z.object({
+  name: z.string().min(1, 'validation.hashtagPreset.name.required').max(255, 'validation.hashtagPreset.name.max'),
+  tags: z.array(z.string().min(1, 'validation.hashtagPreset.tag.required'))
+    .min(1, 'validation.hashtagPreset.tags.required')
+    .max(100, 'validation.hashtagPreset.tags.max'),
+});
+
+export type CreateBrandHashtagPresetInput = z.infer<typeof createBrandHashtagPresetSchema>;
+
+/**
+ * Update brand hashtag preset schema (partial)
+ * Used for PATCH /v1/brands/:brandId/hashtag-presets/:presetId endpoint
+ */
+export const updateBrandHashtagPresetSchema = createBrandHashtagPresetSchema.partial();
+
+export type UpdateBrandHashtagPresetInput = z.infer<typeof updateBrandHashtagPresetSchema>;
+
+/**
+ * Hashtag preset params schema
+ * Used for validating route parameters like :brandId and :presetId
+ */
+export const hashtagPresetParamsSchema = z.object({
+  brandId: cuidSchema,
+  presetId: cuidSchema,
+});

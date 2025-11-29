@@ -116,6 +116,148 @@ export function projectActivityEventForAI(
       break;
     }
 
+    // Brand events
+    case "brand.created": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const brandSlug = (event.metadata as any)?.slug ?? "unknown";
+      base.title = "Brand created";
+      base.summary = `A new brand "${brandName}" (${brandSlug}) was created.`;
+      break;
+    }
+
+    case "brand.updated": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const changes = (event.metadata as any)?.changes ?? {};
+      const changedFields = Object.keys(changes).join(", ");
+      base.title = "Brand updated";
+      base.summary = `Brand "${brandName}" was updated.`;
+      if (changedFields) {
+        base.details = `Changed fields: ${changedFields}`;
+      }
+      break;
+    }
+
+    case "brand.deleted": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const softDeleted = (event.metadata as any)?.softDeleted ?? false;
+      base.title = softDeleted ? "Brand archived" : "Brand deleted";
+      base.summary = softDeleted
+        ? `Brand "${brandName}" was archived.`
+        : `Brand "${brandName}" was permanently deleted.`;
+      break;
+    }
+
+    case "brand.profile_completed": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const previousScore = (event.metadata as any)?.previousScore ?? 0;
+      const newScore = (event.metadata as any)?.newScore ?? 0;
+      base.title = "Brand profile completed";
+      base.summary = `Brand "${brandName}" profile was completed.`;
+      base.details = `Readiness score increased from ${previousScore} to ${newScore}.`;
+      break;
+    }
+
+    case "brand.social_account_connected": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const provider = (event.metadata as any)?.provider ?? "unknown";
+      const handle = (event.metadata as any)?.handle ?? "unknown";
+      base.title = "Social account connected";
+      base.summary = `Social account @${handle} (${provider}) was connected to brand "${brandName}".`;
+      break;
+    }
+
+    case "brand.social_account_disconnected": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      const provider = (event.metadata as any)?.provider ?? "unknown";
+      const handle = (event.metadata as any)?.handle ?? "unknown";
+      base.title = "Social account disconnected";
+      base.summary = `Social account @${handle} (${provider}) was disconnected from brand "${brandName}".`;
+      break;
+    }
+
+    case "brand.publishing_defaults_updated": {
+      const brandName = (event.metadata as any)?.name ?? "unknown";
+      base.title = "Publishing defaults updated";
+      base.summary = `Publishing defaults for brand "${brandName}" were updated.`;
+      break;
+    }
+
+    // Content events
+    case "content.created": {
+      const title = (event.metadata as any)?.title ?? "unknown";
+      const brandName = (event.metadata as any)?.brandName ?? "unknown";
+      base.title = "Content created";
+      base.summary = `New content "${title}" was created for brand "${brandName}".`;
+      break;
+    }
+
+    case "content.updated": {
+      const title = (event.metadata as any)?.title ?? "unknown";
+      const changes = (event.metadata as any)?.changes ?? {};
+      const changedFields = Object.keys(changes).join(", ");
+      base.title = "Content updated";
+      base.summary = `Content "${title}" was updated.`;
+      if (changedFields) {
+        base.details = `Changed fields: ${changedFields}`;
+      }
+      break;
+    }
+
+    case "content.deleted": {
+      const title = (event.metadata as any)?.title ?? "unknown";
+      base.title = "Content deleted";
+      base.summary = `Content "${title}" was deleted.`;
+      break;
+    }
+
+    // Publication events
+    case "publication.scheduled": {
+      const contentTitle = (event.metadata as any)?.contentTitle ?? "unknown";
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const scheduledAt = (event.metadata as any)?.scheduledAt ?? "unknown";
+      base.title = "Publication scheduled";
+      base.summary = `Content "${contentTitle}" was scheduled for publication on ${platform} at ${scheduledAt}.`;
+      break;
+    }
+
+    case "publication.updated": {
+      const contentTitle = (event.metadata as any)?.contentTitle ?? "unknown";
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      base.title = "Publication updated";
+      base.summary = `Publication of "${contentTitle}" on ${platform} was updated.`;
+      break;
+    }
+
+    case "publication.cancelled": {
+      const contentTitle = (event.metadata as any)?.contentTitle ?? "unknown";
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      base.title = "Publication cancelled";
+      base.summary = `Publication of "${contentTitle}" on ${platform} was cancelled.`;
+      break;
+    }
+
+    case "publication.published": {
+      const contentTitle = (event.metadata as any)?.contentTitle ?? "unknown";
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const externalId = (event.metadata as any)?.externalPostId ?? null;
+      base.title = "Publication completed";
+      base.summary = `Content "${contentTitle}" was successfully published on ${platform}.`;
+      if (externalId) {
+        base.details = `External post ID: ${externalId}`;
+      }
+      break;
+    }
+
+    case "publication.failed": {
+      const contentTitle = (event.metadata as any)?.contentTitle ?? "unknown";
+      const platform = (event.metadata as any)?.platform ?? "unknown";
+      const errorMessage = (event.metadata as any)?.error ?? "Unknown error";
+      base.title = "Publication failed";
+      base.summary = `Publication of "${contentTitle}" on ${platform} failed.`;
+      base.details = `Error: ${errorMessage}`;
+      break;
+    }
+
     default: {
       // Unknown event type - use generic format
       base.title = event.type;

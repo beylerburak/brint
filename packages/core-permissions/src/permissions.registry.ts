@@ -18,11 +18,95 @@ export const PERMISSIONS = {
   WORKSPACE_SETTINGS_MANAGE: 'workspace:settings.manage',
   WORKSPACE_MEMBERS_MANAGE: 'workspace:members.manage',
 
-  // Studio permissions
+  // Studio - Brand permissions
   STUDIO_BRAND_VIEW: 'studio:brand.view',
   STUDIO_BRAND_CREATE: 'studio:brand.create',
+  STUDIO_BRAND_UPDATE: 'studio:brand.update',
+  STUDIO_BRAND_DELETE: 'studio:brand.delete',
+  STUDIO_BRAND_MANAGE_SOCIAL_ACCOUNTS: 'studio:brand.manage_social_accounts',
+  STUDIO_BRAND_MANAGE_PUBLISHING_DEFAULTS: 'studio:brand.manage_publishing_defaults',
+
+  // Studio - Content permissions
+  STUDIO_CONTENT_VIEW: 'studio:content.view',
   STUDIO_CONTENT_CREATE: 'studio:content.create',
+  STUDIO_CONTENT_UPDATE: 'studio:content.update',
+  STUDIO_CONTENT_DELETE: 'studio:content.delete',
   STUDIO_CONTENT_PUBLISH: 'studio:content.publish',
+  STUDIO_CONTENT_MANAGE_PUBLICATIONS: 'studio:content.manage_publications',
+} as const;
+
+/**
+ * Role-Permission Matrix
+ * 
+ * Defines which roles have which permissions by default.
+ * This is used for seeding and documentation.
+ * 
+ * Legend:
+ * - OWNER: Full access to everything
+ * - ADMIN: Full access to everything (same as Owner)
+ * - EDITOR: Can view/create/update brands, full content access, no brand delete
+ * - VIEWER: Read-only access to brands and content
+ */
+export const ROLE_PERMISSION_MATRIX = {
+  OWNER: [
+    // Workspace
+    PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+    PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+    // Brand - all
+    PERMISSIONS.STUDIO_BRAND_VIEW,
+    PERMISSIONS.STUDIO_BRAND_CREATE,
+    PERMISSIONS.STUDIO_BRAND_UPDATE,
+    PERMISSIONS.STUDIO_BRAND_DELETE,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_SOCIAL_ACCOUNTS,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_PUBLISHING_DEFAULTS,
+    // Content - all
+    PERMISSIONS.STUDIO_CONTENT_VIEW,
+    PERMISSIONS.STUDIO_CONTENT_CREATE,
+    PERMISSIONS.STUDIO_CONTENT_UPDATE,
+    PERMISSIONS.STUDIO_CONTENT_DELETE,
+    PERMISSIONS.STUDIO_CONTENT_PUBLISH,
+    PERMISSIONS.STUDIO_CONTENT_MANAGE_PUBLICATIONS,
+  ],
+  ADMIN: [
+    // Workspace
+    PERMISSIONS.WORKSPACE_SETTINGS_MANAGE,
+    PERMISSIONS.WORKSPACE_MEMBERS_MANAGE,
+    // Brand - all
+    PERMISSIONS.STUDIO_BRAND_VIEW,
+    PERMISSIONS.STUDIO_BRAND_CREATE,
+    PERMISSIONS.STUDIO_BRAND_UPDATE,
+    PERMISSIONS.STUDIO_BRAND_DELETE,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_SOCIAL_ACCOUNTS,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_PUBLISHING_DEFAULTS,
+    // Content - all
+    PERMISSIONS.STUDIO_CONTENT_VIEW,
+    PERMISSIONS.STUDIO_CONTENT_CREATE,
+    PERMISSIONS.STUDIO_CONTENT_UPDATE,
+    PERMISSIONS.STUDIO_CONTENT_DELETE,
+    PERMISSIONS.STUDIO_CONTENT_PUBLISH,
+    PERMISSIONS.STUDIO_CONTENT_MANAGE_PUBLICATIONS,
+  ],
+  EDITOR: [
+    // Brand - view/create/update + manage, no delete
+    PERMISSIONS.STUDIO_BRAND_VIEW,
+    PERMISSIONS.STUDIO_BRAND_CREATE,
+    PERMISSIONS.STUDIO_BRAND_UPDATE,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_SOCIAL_ACCOUNTS,
+    PERMISSIONS.STUDIO_BRAND_MANAGE_PUBLISHING_DEFAULTS,
+    // Content - all
+    PERMISSIONS.STUDIO_CONTENT_VIEW,
+    PERMISSIONS.STUDIO_CONTENT_CREATE,
+    PERMISSIONS.STUDIO_CONTENT_UPDATE,
+    PERMISSIONS.STUDIO_CONTENT_DELETE,
+    PERMISSIONS.STUDIO_CONTENT_PUBLISH,
+    PERMISSIONS.STUDIO_CONTENT_MANAGE_PUBLICATIONS,
+  ],
+  VIEWER: [
+    // Brand - view only
+    PERMISSIONS.STUDIO_BRAND_VIEW,
+    // Content - view only
+    PERMISSIONS.STUDIO_CONTENT_VIEW,
+  ],
 } as const;
 
 /**

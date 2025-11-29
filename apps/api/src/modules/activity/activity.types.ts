@@ -11,22 +11,36 @@ export type ActivityScopeType =
   | "billing";
 
 export type ActivityEventType =
+  // Auth events
   | "auth.magic_link_requested"
   | "auth.magic_link_login_success"
   | "auth.google_oauth_login_success"
   | "auth.logout"
+  // Workspace events
   | "workspace.member_invited"
+  // Email events
   | "email.magic_link_sent"
   | "email.magic_link_failed"
   | "email.workspace_invite_sent"
   | "email.workspace_invite_failed"
-  // Future event types will be added here:
-  // | "snapshot.generated"
-  // | "publication.completed"
-  // | "workspace.member_role_changed"
-  // | "content.created"
-  // | "content.updated"
-  // | etc.
+  // Brand events
+  | "brand.created"
+  | "brand.updated"
+  | "brand.deleted"
+  | "brand.profile_completed"
+  | "brand.social_account_connected"
+  | "brand.social_account_disconnected"
+  | "brand.publishing_defaults_updated"
+  // Content events
+  | "content.created"
+  | "content.updated"
+  | "content.deleted"
+  // Publication events
+  | "publication.scheduled"
+  | "publication.updated"
+  | "publication.cancelled"
+  | "publication.published"
+  | "publication.failed";
 
 export type ActivityEventRaw = {
   id: string;

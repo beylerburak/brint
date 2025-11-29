@@ -20,6 +20,7 @@ import { appConfig } from '../../config/app-config.js';
 import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerRealtimeRoutes } from '../../core/realtime/realtime.routes.js';
 import { registerActivityRoutes } from '../../modules/activity/activity.routes.js';
+import { registerBrandRoutes } from '../../modules/brand/brand.routes.js';
 import { redis } from '../../lib/redis.js';
 import { setupFastifyErrorHandler } from '../observability/sentry.js';
 import { requestIdHook } from './request-id.js';
@@ -155,6 +156,7 @@ export async function createServer(): Promise<FastifyInstance> {
     await registerWorkspaceRoutes(fastify);
     await registerMediaRoutes(fastify);
     await registerActivityRoutes(fastify);
+    await registerBrandRoutes(fastify);
   }, { prefix: '/v1' });
 
   return app;

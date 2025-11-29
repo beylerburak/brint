@@ -62,7 +62,7 @@ describe('Auth endpoints', () => {
         url: '/v1/auth/magic-link',
         payload: { 
           email: 'test@example.com',
-          redirectTo: '/dashboard'
+          redirectTo: 'http://localhost:3001/dashboard'
         },
       });
 

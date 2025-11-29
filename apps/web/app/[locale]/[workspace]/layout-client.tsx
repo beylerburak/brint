@@ -8,6 +8,7 @@ import { SpaceHeader } from "@/features/space/components/space-header";
 import { ProfileCompletionDialog } from "@/features/space/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/space/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
+import { NotificationsProvider } from "@/features/notifications";
 import { logger } from "@/shared/utils/logger";
 
 export function WorkspaceLayoutClient({
@@ -85,20 +86,20 @@ export function WorkspaceLayoutClient({
   }
 
   return (
-    <>
+    <NotificationsProvider>
       {showProfileDialog && userProfile && (
         <ProfileCompletionDialog user={userProfile} onComplete={handleProfileComplete} />
       )}
-    <SidebarProvider>
-      <SpaceSidebar />
-      <SidebarInset>
-        <SpaceHeader workspace={workspace} />
-        <div className="flex flex-1 flex-col">
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
-    </>
+      <SidebarProvider>
+        <SpaceSidebar />
+        <SidebarInset>
+          <SpaceHeader workspace={workspace} />
+          <div className="flex flex-1 flex-col">
+            {children}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </NotificationsProvider>
   );
 }
 

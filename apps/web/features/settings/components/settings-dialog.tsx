@@ -1887,7 +1887,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <ConnectionCard
-                      icon="/assets/🏢 Company=Google, 🏵️ Style=Original.svg"
+                      icon="/assets/google.svg"
                       title={t("settings.account.connections.google.title") || "Google"}
                       description={t("settings.account.connections.google.description") || "Connect your Google account to sign in and access Google services."}
                       buttonText={

@@ -86,7 +86,7 @@ export async function getCurrentSession(): Promise<ServerSession | null> {
       user: {
         id: userData.id,
         email: userData.email,
-        name: userData.name,
+        name: userData.name ?? undefined,
         username: userData.username,
         googleId: userData.googleId,
         completedOnboarding: userData.completedOnboarding,

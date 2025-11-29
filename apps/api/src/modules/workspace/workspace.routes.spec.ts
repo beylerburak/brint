@@ -42,8 +42,8 @@ describe('Workspace endpoints', () => {
         await prisma.workspaceMember.deleteMany({ where: { workspaceId: wsId } });
         // Delete subscriptions
         await prisma.subscription.deleteMany({ where: { workspaceId: wsId } });
-        // Delete workspace roles
-        await prisma.workspaceRole.deleteMany({ where: { workspaceId: wsId } });
+        // Delete workspace roles (model name is Role, not WorkspaceRole)
+        await prisma.role.deleteMany({ where: { workspaceId: wsId } });
         // Delete workspace
         await prisma.workspace.delete({ where: { id: wsId } });
       } catch {
@@ -159,7 +159,7 @@ describe('Workspace endpoints', () => {
     it('should return 409 for duplicate slug', async () => {
       const slug = `duplicate-ws-${Date.now()}`;
       
-      // Create first workspace
+      // Create first workspace with ENTERPRISE plan to bypass workspace limits
       const first = await app.inject({
         method: 'POST',
         url: '/v1/workspaces',
@@ -169,13 +169,14 @@ describe('Workspace endpoints', () => {
         payload: {
           name: 'First Workspace',
           slug,
+          plan: 'ENTERPRISE', // Use ENTERPRISE to allow multiple workspaces
         },
       });
 
       expect(first.statusCode).toBe(201);
       createdWorkspaceIds.push(JSON.parse(first.body).data.workspace.id);
 
-      // Try to create second with same slug
+      // Try to create second with same slug (also ENTERPRISE to bypass limits)
       const second = await app.inject({
         method: 'POST',
         url: '/v1/workspaces',
@@ -185,6 +186,7 @@ describe('Workspace endpoints', () => {
         payload: {
           name: 'Second Workspace',
           slug,
+          plan: 'ENTERPRISE',
         },
       });
 
@@ -231,16 +233,15 @@ describe('Workspace endpoints', () => {
       const workspaceId = body.data.workspace.id;
       createdWorkspaceIds.push(workspaceId);
 
-      // Verify default roles were created
-      const roles = await prisma.workspaceRole.findMany({
+      // Verify default roles were created (model name is Role, not WorkspaceRole)
+      const roles = await prisma.role.findMany({
         where: { workspaceId },
       });
 
       expect(roles.length).toBeGreaterThan(0);
       const roleNames = roles.map(r => r.name);
-      // Should have at least OWNER, ADMIN, MEMBER roles
+      // Should have at least OWNER role
       expect(roleNames).toContain('OWNER');
     });
   });
 });
-

@@ -13,8 +13,8 @@ export default fp(async function swaggerPlugin(app: FastifyInstance) {
       },
       servers: [
         {
-          url: `http://localhost:${appConfig.port}`,
-          description: 'Local dev',
+          url: `http://localhost:${appConfig.port}/v1`,
+          description: 'Local dev (v1)',
         },
       ],
       components: {

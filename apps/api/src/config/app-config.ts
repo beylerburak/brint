@@ -15,5 +15,7 @@ export const appConfig = {
   appUrl: env.APP_URL,
   frontendUrl: env.FRONTEND_URL,
   additionalAllowedOrigins: env.ADDITIONAL_ALLOWED_ORIGINS,
+  corsAllowedOrigins: env.CORS_ALLOWED_ORIGINS,
+  corsAllowCredentials: env.CORS_ALLOW_CREDENTIALS === 'true' || env.CORS_ALLOW_CREDENTIALS === '1',
 } as const;
 

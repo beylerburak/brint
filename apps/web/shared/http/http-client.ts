@@ -48,7 +48,16 @@ class HttpClient {
     }
     // Remove leading slash if present to avoid double slashes
     const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-    return `${this.baseUrl}/${cleanPath}`;
+    
+    // Non-versioned routes (health, debug, realtime) don't get /v1 prefix
+    const nonVersionedRoutes = ["health", "debug", "realtime"];
+    const isNonVersioned = nonVersionedRoutes.some((route) => 
+      cleanPath.startsWith(`${route}/`) || cleanPath === route
+    );
+    
+    // Add /v1 prefix for all API routes except non-versioned ones
+    const versionedPath = isNonVersioned ? cleanPath : `v1/${cleanPath}`;
+    return `${this.baseUrl}/${versionedPath}`;
   }
 
   private async attemptRefresh(): Promise<string | null> {

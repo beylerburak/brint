@@ -9,7 +9,6 @@ import authContextPlugin from '../auth/auth.context.js';
 import { registerHealthRoutes } from '../../modules/health/health.routes.js';
 import { registerDebugRoutes } from '../../modules/debug/debug.routes.js';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
-import { registerStudioRoutes } from '../../modules/studio/studio.routes.js';
 import { registerUserRoutes } from '../../modules/user/user.routes.js';
 import { workspaceInviteRoutes } from '../../modules/workspace/workspace-invite.routes.js';
 import { registerSubscriptionRoutes } from '../../modules/workspace/subscription.routes.js';
@@ -49,19 +48,23 @@ export async function createServer(): Promise<FastifyInstance> {
   app.setNotFoundHandler(notFoundHandler);
 
   // Build allowed origins whitelist
-  const allowedOrigins = [
-    appConfig.appUrl,
-    appConfig.frontendUrl,
-    ...(appConfig.additionalAllowedOrigins
-      ? appConfig.additionalAllowedOrigins.split(',').map((origin) => origin.trim())
-      : []),
-  ].filter(Boolean);
+  // Priority: CORS_ALLOWED_ORIGINS (prod) > ADDITIONAL_ALLOWED_ORIGINS > default (appUrl, frontendUrl)
+  const allowedOrigins = appConfig.isProd && appConfig.corsAllowedOrigins
+    ? appConfig.corsAllowedOrigins.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [
+        appConfig.appUrl,
+        appConfig.frontendUrl,
+        ...(appConfig.additionalAllowedOrigins
+          ? appConfig.additionalAllowedOrigins.split(',').map((origin) => origin.trim())
+          : []),
+      ].filter(Boolean);
 
   // Register CORS plugin (must be before other plugins)
   await app.register(cors, {
-    credentials: true,
+    credentials: appConfig.corsAllowCredentials,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'X-Requested-With', 'X-Request-Id'],
+    maxAge: 600, // Preflight cache for 10 minutes
 
     origin: (origin, cb) => {
       // Allow requests with no origin (curl, mobile app vs.)
@@ -134,20 +137,25 @@ export async function createServer(): Promise<FastifyInstance> {
   // Register auth context plugin (runs before all routes)
   await app.register(authContextPlugin);
 
-  // Register module routes
+  // Register non-versioned routes (health, debug, realtime)
   await registerHealthRoutes(app);
   await registerDebugRoutes(app);
-  await registerAuthRoutes(app);
-  await registerUserRoutes(app);
-  await registerSubscriptionRoutes(app);
-  await registerWorkspaceMemberRoutes(app);
-  await registerWorkspaceRoleRoutes(app);
-  await workspaceInviteRoutes(app);
-  await registerUsageRoutes(app);
-  await registerWorkspaceRoutes(app);
-  await registerMediaRoutes(app);
   await registerRealtimeRoutes(app);
-  await registerActivityRoutes(app);
+
+  // Register v1 API routes under /v1 prefix
+  await app.register(async function v1Routes(fastify) {
+    // All public API routes go under /v1
+    await registerAuthRoutes(fastify);
+    await registerUserRoutes(fastify);
+    await registerSubscriptionRoutes(fastify);
+    await registerWorkspaceMemberRoutes(fastify);
+    await registerWorkspaceRoleRoutes(fastify);
+    await workspaceInviteRoutes(fastify);
+    await registerUsageRoutes(fastify);
+    await registerWorkspaceRoutes(fastify);
+    await registerMediaRoutes(fastify);
+    await registerActivityRoutes(fastify);
+  }, { prefix: '/v1' });
 
   return app;
 }

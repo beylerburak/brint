@@ -13,6 +13,7 @@
     "build": "echo 'todo: build'"
   },
   "devDependencies": {
+    "shadcn": "^3.5.1",
     "typescript": "^5.3.3"
   },
   "engines": {
@@ -20,4 +21,3 @@
     "pnpm": ">=8.0.0"
   }
 }
-

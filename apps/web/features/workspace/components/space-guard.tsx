@@ -53,24 +53,7 @@ export function SpaceGuard({ children }: SpaceGuardProps) {
           return;
         }
       } catch (error) {
-        // 401 or other auth error - logout and redirect to login
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (
-          errorMessage.includes("401") ||
-          errorMessage.includes("Authentication") ||
-          errorMessage.includes("UNAUTHORIZED") ||
-          errorMessage.includes("Request failed with status 401")
-        ) {
-          console.warn("SpaceGuard: Session invalid (401), logging out user:", errorMessage);
-          clearAccessToken();
-          localStorage.removeItem("auth_user");
-          apiCache.invalidate("session:current");
-          apiCache.invalidate("user:profile");
-          const localePrefix = locale === "en" ? "" : `/${locale}`;
-          router.replace(`${localePrefix}/login`);
-          return;
-        }
-        // Other errors - log but don't redirect (might be network issues)
+        // Unexpected error (network issues, etc.) - log but don't redirect
         console.error("SpaceGuard: Error verifying session:", error);
       }
     })();

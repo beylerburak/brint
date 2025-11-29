@@ -101,7 +101,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
       void (async () => {
         try {
           // Verify session is still valid by calling /auth/me
-          // This will throw if 401, or return null if invalid
+          // Returns null if session is invalid (401 or other error)
           const session = await getCurrentSession();
           if (!session) {
             // Session invalid - clear auth state and redirect to login
@@ -114,23 +114,8 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
             return;
           }
         } catch (error) {
-          // 401 or other auth error - logout and redirect to login
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (
-            errorMessage.includes("401") ||
-            errorMessage.includes("Authentication") ||
-            errorMessage.includes("UNAUTHORIZED") ||
-            errorMessage.includes("Request failed with status 401")
-          ) {
-            console.warn("Session invalid (401), logging out user:", errorMessage);
-            clearAccessToken();
-            localStorage.removeItem("auth_user");
-            apiCache.invalidate("session:current");
-            apiCache.invalidate("user:profile");
-            router.replace(`${localePrefix}/login`);
-          } else {
-            console.error("ProtectedLayout session verification error:", error);
-          }
+          // Unexpected error (network issues, etc.) - log but don't redirect
+          console.error("ProtectedLayout session verification error:", error);
         }
       })();
       return;

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/features/auth/components/language-switcher";
 import { useBrand } from "@/features/brand/context/brand-context";

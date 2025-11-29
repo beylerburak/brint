@@ -2,8 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { SpaceSidebar } from "@/features/workspace/components/sidebar/space-sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
+import { SpaceSidebar } from "@/features/space/components/space-sidebar";
 import { SpaceHeader } from "@/features/workspace/components/space-header";
 import { ProfileCompletionDialog } from "@/features/workspace/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/workspace/api/user-api";

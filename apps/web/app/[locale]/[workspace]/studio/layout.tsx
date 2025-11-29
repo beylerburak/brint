@@ -1,5 +1,7 @@
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { StudioSidebar, StudioHeader } from "@/features/studio";
+import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
+// import { StudioSidebar, StudioHeader } from "@/features/studio";
+import { StudioSidebar2 } from "@/features/studio/components_v2/studio-sidebar-2";
+import { StudioHeader } from "@/features/studio";
 
 export default async function StudioLayout({
   children,
@@ -11,7 +13,7 @@ export default async function StudioLayout({
   // But we show studio sidebar here for /studio route
   return (
     <SidebarProvider>
-      <StudioSidebar />
+      <StudioSidebar2 />
       <SidebarInset>
         <StudioHeader />
         <div className="flex flex-1 flex-col">

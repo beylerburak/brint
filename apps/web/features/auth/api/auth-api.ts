@@ -261,11 +261,11 @@ export async function getCurrentSession(): Promise<{
         }>("/auth/me");
 
         if (!response.ok) {
-          // If 401, invalidate cache and throw error
+          // If 401, invalidate cache and return null (don't throw - let callers handle it)
           if (response.status === 401) {
             apiCache.invalidate("session:current");
             apiCache.invalidate("user:profile");
-            throw new Error("Request failed with status 401");
+            return null;
           }
           return null;
         }

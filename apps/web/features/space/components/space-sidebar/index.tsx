@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
-import { ChevronRight } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ChevronRight, Settings, LifeBuoy } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,6 +12,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
@@ -26,10 +27,12 @@ import { SpaceSidebarHeader } from './space-sidebar-header';
 import { SpaceNavUser } from './space-nav-user';
 import { SPACE_NAV_ITEMS, buildWorkspaceRoute } from '@/features/space/constants';
 import { useWorkspace } from '@/features/workspace/context/workspace-context';
+import { SettingsDialog } from '@/features/settings';
 
 export const SpaceSidebar = () => {
   const locale = useLocale();
   const { workspace } = useWorkspace();
+  const t = useTranslations('common');
 
   // Build navigation items with full routes
   const navItems = React.useMemo(() => {
@@ -46,6 +49,22 @@ export const SpaceSidebar = () => {
       })),
     }));
   }, [locale, workspace?.slug]);
+
+  // Memoize secondary items (they don't change)
+  const secondaryItems = React.useMemo(() => [
+    {
+      id: 'preferences',
+      label: t('preferences'),
+      icon: Settings,
+      href: '#',
+    },
+    {
+      id: 'support',
+      label: t('support'),
+      icon: LifeBuoy,
+      href: '#',
+    },
+  ], [t]);
 
   return (
     <Sidebar collapsible="icon">
@@ -109,7 +128,37 @@ export const SpaceSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
 
-      <SpaceNavUser />
+      <SidebarFooter>
+        <SidebarMenu>
+          {secondaryItems.map((item) => {
+            if (item.id === 'preferences') {
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SettingsDialog>
+                    <SidebarMenuButton asChild>
+                      <button type="button" className="w-full">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SettingsDialog>
+                </SidebarMenuItem>
+              );
+            }
+            return (
+              <SidebarMenuItem key={item.id}>
+                <SidebarMenuButton asChild>
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenu>
+        <SpaceNavUser />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

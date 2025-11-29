@@ -229,11 +229,12 @@ dosyalarını referans al.
 
 Her yeni domain / endpoint:
 
-- Swagger/OpenAPI’de tanımlanmalı.
+- Swagger/OpenAPI'de tanımlanmalı.
 - Geliştirme sırasında:
   - Eğer yeni cross-cutting pattern (örn. yeni bir standard) getiriyorsa:
     - `docs/guides-for-ai/<yeni-guide>.md` oluştur.
-    - `backend-architecture.md` içine referans ekle.
+    - `apps/api/docs/backend-architecture.md` içine referans ekle.
+    - Bu playbook'a da referans ekle (gerekiyorsa).
 
 ---
 
@@ -343,8 +344,9 @@ GÖREV: Yeni bir domain/feature geliştir: <DOMAIN_ADI_KOY>
   - Gerekli Zod şemalarını packages/core-validation/src/schemas.ts içine ekle.
   - Endpoint’lerde validateBody / validateQuery / validateParams kullan.
 - Permission & tenant guard:
-  - permissions.registry.ts içine gerekli permission key’lerini ekle.
-  - Tüm workspace-scoped endpoint’lere requirePermission ve tenant guard uygula.
+  - `packages/core-permissions/src/permissions.registry.ts` içine gerekli permission key'lerini ekle.
+  - Tüm workspace-scoped endpoint'lere `requirePermission()` ve tenant guard uygula.
+  - Route param varsa `requireWorkspaceMatch()` kullan.
 - Activity log:
   - ActivityEventType union’ına yeni event type’larını ekle.
   - Başarılı create/update/delete ve önemli sistem aksiyonlarında logActivity çağır.
@@ -364,11 +366,16 @@ GÖREV: Yeni bir domain/feature geliştir: <DOMAIN_ADI_KOY>
 - Testler Vitest ile, mevcut workspace-member/workspace-invite testlerini referans al.
 
 4) FRONTEND
-- apps/web/features/<domain>/ altında feature klasörü oluştur.
-- app/[locale]/[workspace]/... altında route dosyası ekle ve ilgili page component’ini render et.
-- API çağrılarını shared/http veya domain özel api dosyasında implement et.
-- Query & mutation hook’larını yaz (React Query veya mevcut pattern’e göre).
-- UI component’lerini ShadCN + mevcut design system’e uygun şekilde yaz.
+- `apps/web/features/<domain>/` altında feature klasörü oluştur:
+  - `api/` - API çağrıları (opsiyonel)
+  - `components/` - UI component'leri
+  - `context/` - React context (gerekiyorsa)
+  - `hooks/` - Custom hook'lar
+  - `pages/` - Page component'leri
+- `app/[locale]/[workspace]/...` altında route dosyası ekle ve ilgili page component'ini render et.
+- HTTP client kullanımı: `import { httpClient } from '@/shared/http/http-client';`
+- Query & mutation hook'larını yaz (React Query veya mevcut pattern'e göre).
+- UI component'lerini ShadCN + mevcut design system'e uygun şekilde yaz.
 
 5) DOKÜMANTASYON
 - Swagger/OpenAPI dokümantasyonunu güncelle.

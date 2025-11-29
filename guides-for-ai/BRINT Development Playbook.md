@@ -32,13 +32,15 @@ Her yeni geliştirmede önce bu rehber okunmalı, ilgili checklist takip edilmel
 
 Yeni bir şey yaparken ilgili rehberi kullan:
 
-- `docs/guides-for-ai/tenant-guard.md`
-- `docs/guides-for-ai/pagination-standard.md`
-- `docs/guides-for-ai/validation-standard.md`
-- `docs/guides-for-ai/realtime-websocket.md`
-- `docs/guides-for-ai/backend-audit-report.md` (yüksek seviye kalite kriterleri)
+- `docs/guides-for-ai/tenant-guard.md` - Multi-tenant guard pattern'leri
+- `docs/guides-for-ai/pagination-standard.md` - Cursor-based pagination
+- `docs/guides-for-ai/validation-standard.md` - Zod validation standardı
+- `docs/guides-for-ai/api-versioning-and-cors.md` - API versioning ve CORS
+- `guides-for-ai/realtime-websocket.md` - WebSocket ve realtime events
+- `guides-for-ai/ssr-patterns.md` - Frontend SSR pattern'leri
+- `apps/api/docs/backend-architecture.md` - Backend mimari detayları
 
-Bu playbook, onların üstünde “orkestra dokümanı”dır.
+Bu playbook, onların üstünde "orkestra dokümanı"dır.
 
 ---
 
@@ -116,8 +118,9 @@ Yeni bir backend domain’i eklerken aşağıdaki sırayı kullan.
 **Her workspace-scoped endpoint’de:**
 
 1. **Permission guard**:
-   - `requirePermission("workspace:settings.manage")` veya ilgili permission key
-   - Permission registry: `src/core/auth/permissions.registry.ts` içinde tanımlı olmalı.
+   - `requirePermission(PERMISSIONS.WORKSPACE_SETTINGS_MANAGE)` veya ilgili permission key
+   - Permission registry: `packages/core-permissions/src/permissions.registry.ts` içinde tanımlı
+   - Backend'de import: `import { PERMISSIONS } from '@brint/core-permissions';`
 
 2. **Tenant guard**:
    - `X-Workspace-Id` header’ı **zorunlu**  
@@ -259,13 +262,15 @@ Yeni domain örneği: **Brand Studio**
 
 ### 3.2 API client ve error handling
 
-Backend `/v1/...` endpoint’leri için:
+Backend `/v1/...` endpoint'leri için:
 
-- Ortak HTTP client → `shared/api/http-client.ts` (veya mevcut yapın neyse)
+- Ortak HTTP client → `shared/http/http-client.ts`
+- Workspace header → `shared/http/workspace-header.ts` (getter/setter)
 - Tüm istekler:
-  - `X-Workspace-Id` otomatik eklenmeli (workspace context’ten)
+  - `X-Workspace-Id` otomatik eklenmeli (WorkspaceContext'ten alınır)
+  - `/v1/` prefix'i HTTP client tarafından otomatik eklenir
   - Hata formatı validation standardına göre parse edilmeli
-  - Auth error’larında: login ekranına yönlendirme / toast
+  - 401 error'larında: token refresh denenir, başarısız olursa logout
 
 ---
 
@@ -316,13 +321,14 @@ Bunu doğrudan Cursor’a verebileceğin bir şablon olarak düşün:
 GÖREV: Yeni bir domain/feature geliştir: <DOMAIN_ADI_KOY>
 
 1) ANALİZ
-- apps/api/ARCHITECTURE.md ve docs/guides-for-ai/*.md dosyalarını oku:
-  - tenant-guard.md
-  - validation-standard.md
-  - pagination-standard.md
-  - realtime-websocket.md
-  - backend-architecture.md
-  - development-playbook.md (bu dosya)
+- Aşağıdaki guide dosyalarını oku:
+  - `docs/guides-for-ai/tenant-guard.md`
+  - `docs/guides-for-ai/validation-standard.md`
+  - `docs/guides-for-ai/pagination-standard.md`
+  - `docs/guides-for-ai/api-versioning-and-cors.md`
+  - `guides-for-ai/realtime-websocket.md`
+  - `apps/api/docs/backend-architecture.md`
+  - `guides-for-ai/BRINT Development Playbook.md` (bu dosya)
 - İlgili benzer domain’leri incele (ör: workspace-member, workspace-invite).
 
 2) BACKEND

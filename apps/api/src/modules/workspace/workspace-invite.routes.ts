@@ -197,6 +197,9 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       inviteLink: inviteUrl,
       invitedByName: inviter?.name ?? inviter?.email ?? null,
       locale: null, // TODO: Get locale from request headers if available
+      workspaceId: workspaceId, // Required for workspace invites
+      inviterUserId: request.auth?.userId ?? null, // User who sent the invite
+      inviteId: invite.id, // Invite ID for reference
     }).catch((err) => {
       logger.error(
         { err, inviteId: invite.id, email: invite.email },

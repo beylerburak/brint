@@ -6,6 +6,7 @@ import {
 } from "../email/email.service.js";
 import { logger } from "../../lib/logger.js";
 import { captureException, isSentryInitialized } from "../observability/sentry.js";
+import { logActivity } from "../../modules/activity/activity.service.js";
 
 /**
  * Email job types
@@ -20,6 +21,8 @@ export type MagicLinkEmailJobData = {
   to: string;
   url: string;
   locale?: string | null;
+  workspaceId?: string | null; // Workspace ID if available
+  requestedByUserId?: string | null; // User ID who requested the magic link (if authenticated)
 };
 
 /**
@@ -32,6 +35,9 @@ export type WorkspaceInviteEmailJobData = {
   inviteLink: string;
   invitedByName?: string | null;
   locale?: string | null;
+  workspaceId: string; // Workspace ID (required for workspace invites)
+  inviterUserId?: string | null; // User ID who sent the invite
+  inviteId?: string | null; // Invite ID for reference
 };
 
 /**
@@ -119,6 +125,22 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
           },
           "Magic link email sent successfully"
         );
+
+        // Log activity event (fire-and-forget)
+        void logActivity({
+          type: "email.magic_link_sent",
+          workspaceId: data.workspaceId ?? null,
+          userId: data.requestedByUserId ?? null,
+          actorType: "system",
+          source: "worker",
+          scopeType: "user",
+          scopeId: data.requestedByUserId ?? null,
+          metadata: {
+            email: data.to,
+            jobId: job.id?.toString(),
+            queue: EMAIL_QUEUE_NAME,
+          },
+        });
         break;
       }
 
@@ -133,6 +155,23 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
           },
           "Workspace invite email sent successfully"
         );
+
+        // Log activity event (fire-and-forget)
+        void logActivity({
+          type: "email.workspace_invite_sent",
+          workspaceId: data.workspaceId,
+          userId: data.inviterUserId ?? null,
+          actorType: "system",
+          source: "worker",
+          scopeType: "workspace",
+          scopeId: data.workspaceId,
+          metadata: {
+            inviteId: data.inviteId ?? null,
+            invitedEmail: data.to,
+            jobId: job.id?.toString(),
+            queue: EMAIL_QUEUE_NAME,
+          },
+        });
         break;
       }
 
@@ -181,4 +220,65 @@ export const emailWorker = createWorker<EmailJobData>(
     concurrency: 5,
   }
 );
+
+// Add email-specific failure handler for activity logging
+emailWorker.on("failed", async (job, err) => {
+  if (!job) return;
+
+  try {
+    const attempts = job.attemptsMade ?? 0;
+    const maxAttempts = job.opts.attempts ?? 3;
+
+    // Only log activity for final failure (all retries exhausted)
+    if (attempts < maxAttempts) {
+      return; // Still retrying, don't log yet
+    }
+
+    const data = job.data;
+
+    // Log activity event based on job type
+    if (data.type === "magic-link") {
+      await logActivity({
+        type: "email.magic_link_failed",
+        workspaceId: data.workspaceId ?? null,
+        userId: data.requestedByUserId ?? null,
+        actorType: "system",
+        source: "worker",
+        scopeType: "user",
+        scopeId: data.requestedByUserId ?? null,
+        metadata: {
+          email: data.to,
+          jobId: job.id?.toString(),
+          queue: EMAIL_QUEUE_NAME,
+          errorMessage: err?.message ?? "Unknown error",
+          attempts: attempts,
+        },
+      });
+    } else if (data.type === "workspace-invite") {
+      await logActivity({
+        type: "email.workspace_invite_failed",
+        workspaceId: data.workspaceId,
+        userId: data.inviterUserId ?? null,
+        actorType: "system",
+        source: "worker",
+        scopeType: "workspace",
+        scopeId: data.workspaceId,
+        metadata: {
+          invitedEmail: data.to,
+          inviteId: data.inviteId ?? null,
+          jobId: job.id?.toString(),
+          queue: EMAIL_QUEUE_NAME,
+          errorMessage: err?.message ?? "Unknown error",
+          attempts: attempts,
+        },
+      });
+    }
+  } catch (activityError) {
+    // Activity log hatasını swallow et, worker akışını bozmadan sadece logla
+    logger.error(
+      { err: activityError, jobId: job.id },
+      "Failed to log activity for email job failure"
+    );
+  }
+});
 

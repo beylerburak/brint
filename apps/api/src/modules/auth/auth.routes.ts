@@ -657,6 +657,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         to: result.payload.email,
         url: magicLinkUrl,
         locale: null, // TODO: Get locale from request headers if available
+        workspaceId: null, // Magic link request doesn't have workspace context
+        requestedByUserId: request.auth?.userId ?? null, // User requesting magic link (if authenticated)
       });
 
       // Log activity event (fire-and-forget, doesn't block response)

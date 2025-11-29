@@ -284,4 +284,92 @@ export async function registerWorkspaceMemberRoutes(app: FastifyInstance) {
 
     return reply.send({ success: true, data: member });
   });
+
+  // Remove member from workspace
+  app.delete("/workspaces/:workspaceId/members/:userId", {
+    preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_MANAGE)],
+    schema: {
+      tags: ["Workspaces"],
+      summary: "Remove member from workspace",
+      params: {
+        type: "object",
+        properties: {
+          workspaceId: { type: "string" },
+          userId: { type: "string" },
+        },
+        required: ["workspaceId", "userId"],
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                message: { type: "string" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
+    const headerWorkspaceId = request.auth?.workspaceId;
+    const currentUserId = request.auth?.userId;
+
+    if (!headerWorkspaceId) {
+      throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+    }
+
+    if (headerWorkspaceId !== workspaceId) {
+      throw new ForbiddenError("WORKSPACE_MISMATCH", { headerWorkspaceId, paramWorkspaceId: workspaceId });
+    }
+
+    // Prevent self-removal
+    if (currentUserId === userId) {
+      throw new BadRequestError("CANNOT_REMOVE_SELF", "You cannot remove yourself from the workspace");
+    }
+
+    // Check if member exists
+    const member = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new BadRequestError("MEMBER_NOT_FOUND", "Member not found in this workspace");
+    }
+
+    // Prevent removing the owner
+    if (member.role === "OWNER") {
+      throw new ForbiddenError("CANNOT_REMOVE_OWNER", "Cannot remove workspace owner");
+    }
+
+    // Delete the member
+    await prisma.workspaceMember.delete({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+    });
+
+    // Invalidate permission cache for removed user
+    await permissionService.invalidateUserWorkspace(userId, workspaceId);
+
+    return reply.send({
+      success: true,
+      data: {
+        message: "Member removed from workspace",
+      },
+    });
+  });
 }

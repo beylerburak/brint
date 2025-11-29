@@ -25,6 +25,7 @@ import { CancelInviteDialog } from "./cancel-invite-dialog";
 import {
   getWorkspaceMembers,
   updateWorkspaceMember,
+  removeWorkspaceMember,
   type WorkspaceMember,
 } from "@/features/space/api/members-api";
 import {
@@ -69,7 +70,8 @@ function getStatusTranslation(status: string): string {
 }
 
 function createColumns(
-  t: (key: string) => string
+  t: (key: string) => string,
+  removeMember?: (userId: string) => Promise<void>
 ): ColumnDef<TableRow>[] {
   return [
   {
@@ -168,8 +170,20 @@ function createColumns(
       };
 
       const handleRemove = async () => {
-        // TODO: Implement remove member functionality
-        toast.info(t("settings.workspace.people.removeMemberComingSoon"));
+        // Get the remove function from table meta
+        const removeMemberFn = (table.options.meta as any)?.removeMember;
+        if (!removeMemberFn) return;
+        
+        try {
+          await removeMemberFn(member.userId);
+          toast.success(t("settings.workspace.people.removeMemberSuccess"));
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : t("settings.workspace.people.removeMemberError")
+          );
+        }
       };
 
       const variant =
@@ -366,6 +380,26 @@ export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: Workspa
     [workspace?.id]
   );
 
+  const removeMember = React.useCallback(
+    async (userId: string) => {
+      if (!workspace?.id) return;
+
+      try {
+        await removeWorkspaceMember(workspace.id, userId);
+        // Reload data after removal
+        const [membersData, invitesData] = await Promise.all([
+          getWorkspaceMembers(workspace.id),
+          getWorkspaceInvites(workspace.id),
+        ]);
+        setMembers(Array.isArray(membersData) ? membersData : []);
+        setInvites(Array.isArray(invitesData) ? invitesData : []);
+      } catch (error) {
+        throw error;
+      }
+    },
+    [workspace?.id]
+  );
+
   const handleCancelInvite = React.useCallback(
     async (inviteId: string) => {
       if (!workspace?.id) return;
@@ -453,7 +487,7 @@ export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: Workspa
     }
   }, [tableData.length, onCountChange]);
 
-  const columns = React.useMemo(() => createColumns(t), [t]);
+  const columns = React.useMemo(() => createColumns(t, removeMember), [t, removeMember]);
 
   const table = useReactTable({
     data: tableData,
@@ -462,6 +496,7 @@ export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: Workspa
     meta: {
       updateRole,
       openCancelDialog,
+      removeMember,
     },
   });
 

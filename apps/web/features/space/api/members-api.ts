@@ -90,3 +90,31 @@ export async function updateWorkspaceMember(
   return response.data.data;
 }
 
+export interface RemoveWorkspaceMemberResponse {
+  success: boolean;
+  data: {
+    message: string;
+  };
+}
+
+/**
+ * Remove a member from the workspace
+ */
+export async function removeWorkspaceMember(
+  workspaceId: string,
+  userId: string
+): Promise<void> {
+  // Ensure we use UUID from workspace header getter, not slug
+  const resolvedWorkspaceId = getWorkspaceId() || workspaceId;
+  
+  const response = await httpClient.delete<RemoveWorkspaceMemberResponse>(
+    `/workspaces/${resolvedWorkspaceId}/members/${userId}`
+  );
+
+  if (!response.ok) {
+    // Extract error message from response
+    const errorMessage = (response.details as any)?.error?.message || response.message || "Failed to remove workspace member";
+    throw new Error(errorMessage);
+  }
+}
+

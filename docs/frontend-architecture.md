@@ -37,22 +37,24 @@ apps/web/
 ├── features/                  # Domain katmanı (feature-based)
 │   ├── auth/                  # Auth feature
 │   │   ├── api/               # auth-api.ts
-│   │   ├── components/         # login-form, signup-form, logout-button, language-switcher
+│   │   ├── components/         # login-form, logout-button, language-switcher
 │   │   └── context/            # auth-context.tsx
-│   ├── workspace/              # Workspace feature
-│   │   ├── api/                # subscription-api.ts, user-api.ts
-│   │   ├── components/         # sidebar, space-guard, space-header
+│   ├── space/                  # Space feature (workspace management)
+│   │   ├── api/                # subscription-api.ts, user-api.ts, members-api.ts, invites-api.ts
+│   │   ├── components/         # space-sidebar, space-guard, space-header, profile-completion-dialog
+│   │   ├── constants/          # navigation constants (SPACE_NAV_ITEMS)
 │   │   ├── context/            # workspace-context.tsx
-│   │   ├── navigation/        # navigation.ts (sidebar config)
-│   │   └── pages/             # dashboard-page, settings-page, studio-page, brand-dashboard-page
-│   ├── brand/                 # Brand feature
-│   │   └── context/           # brand-context.tsx
+│   │   ├── navigation/         # navigation.ts (sidebar config)
+│   │   └── pages/              # dashboard-page
 │   ├── permissions/           # Permissions feature
 │   │   ├── components/        # PermissionGate.tsx
 │   │   ├── context/           # permission-context.tsx
-│   │   ├── hooks/            # hooks.ts (usePermissions, useHasPermission)
-│   │   └── index.ts          # Re-export dosyası
-│   └── subscription/         # Subscription feature
+│   │   ├── hooks/             # hooks.ts (usePermissions, useHasPermission)
+│   │   └── index.ts           # Re-export dosyası
+│   ├── settings/              # Settings feature
+│   │   ├── components/        # settings-dialog, workspace-members-table, invite-member-dialog
+│   │   └── index.ts           # Re-export dosyası
+│   └── subscription/          # Subscription feature
 │       ├── config/            # plans.ts, limits.ts
 │       ├── context/           # subscription-context.tsx
 │       ├── hooks/            # use-has-limit.ts, use-subscription-limits.ts
@@ -92,30 +94,46 @@ features/{feature-name}/
 ```
 
 **Örnekler:**
-- `features/auth/` - Authentication domain (login, signup, logout, session management)
-- `features/workspace/` - Workspace domain (workspace management, sidebar, navigation)
-- `features/brand/` - Brand domain (brand context, studio features)
+- `features/auth/` - Authentication domain (login, logout, session management)
+- `features/space/` - Space domain (workspace management, sidebar, navigation, pages)
 - `features/permissions/` - Permissions domain (permission checks, gates)
+- `features/settings/` - Settings domain (settings dialog, workspace management UI)
+- `features/subscription/` - Subscription domain (plan limits, feature gating)
 
 ## Layout / Provider Zinciri
+
+### Locale Layout (`app/[locale]/layout.tsx`)
 Sıra değişmez:
 ```tsx
-<AuthProvider>
-  <WorkspaceProvider params={{ locale }}>
-    <PermissionProvider>
-      <SubscriptionProvider>
-        <BrandProvider params={{ brand, workspace, locale }}>
-          {children}
-        </BrandProvider>
-      </SubscriptionProvider>
-    </PermissionProvider>
-  </WorkspaceProvider>
-</AuthProvider>
+<NextIntlClientProvider>
+  <AuthProvider>
+    <WorkspaceProvider params={{ locale }}>
+      <PermissionProvider>
+        <ProtectedLayout>
+          <SpaceGuard>
+            {children}
+          </SpaceGuard>
+        </ProtectedLayout>
+      </PermissionProvider>
+    </WorkspaceProvider>
+  </AuthProvider>
+</NextIntlClientProvider>
 ```
-- Root layout: ThemeProvider + Toaster.
-- Locale layout: NextIntlClientProvider + ProtectedLayout + SpaceGuard.
-- Workspace layout: SubscriptionProvider + sidebar + header (workspace shell).
-- Studio layout: BrandProvider sarıyor (brand context).
+
+### Workspace Layout (`app/[locale]/[workspace]/layout.tsx`)
+```tsx
+<SubscriptionProvider>
+  <WorkspaceLayoutClient>
+    {children}
+  </WorkspaceLayoutClient>
+</SubscriptionProvider>
+```
+
+**Notlar:**
+- Root layout: ThemeProvider + Toaster (app/layout.tsx)
+- Locale layout: Provider zinciri + ProtectedLayout + SpaceGuard
+- Workspace layout: SubscriptionProvider + SpaceSidebar + SpaceHeader
+- WorkspaceProvider is located in `@/features/space/context/workspace-context`
 
 ## Feature Modülleri
 
@@ -125,17 +143,20 @@ Sıra değişmez:
 - **Context**: `context/auth-context.tsx` - AuthProvider, useAuth hook
 - **Kullanım**: Authentication, session yönetimi, login/logout akışları
 
-### Workspace Feature (`features/workspace/`)
-- **API**: `api/` - subscription-api.ts, user-api.ts (workspace-specific API'ler)
-- **Components**: `components/` - Sidebar (space-sidebar, nav-main, nav-projects, nav-user, space-switcher), SpaceGuard, SpaceHeader
+### Space Feature (`features/space/`)
+- **API**: `api/` - subscription-api.ts, user-api.ts, members-api.ts, invites-api.ts, roles-api.ts, usage-api.ts, accept-invite.ts
+- **Components**: 
+  - `components/space-sidebar/` - SpaceSidebar (index.tsx), SpaceSidebarHeader, SpaceNavUser, SpaceSwitcher
+  - `components/` - SpaceGuard, SpaceHeader, ProfileCompletionDialog
+- **Constants**: `constants/index.ts` - SPACE_NAV_ITEMS (navigation configuration, actively used by SpaceSidebar, currently only dashboard)
 - **Context**: `context/workspace-context.tsx` - WorkspaceProvider, useWorkspace hook
-- **Navigation**: `navigation/navigation.ts` - Sidebar navigation configuration
-- **Pages**: `pages/` - DashboardPage, SettingsPage, StudioPage, BrandDashboardPage
-- **Kullanım**: Workspace yönetimi, sidebar, workspace routing
+- **Navigation**: `navigation/navigation.ts` - Sidebar navigation configuration (sidebarNavigation array, currently only dashboard, legacy/unused)
+- **Pages**: `pages/` - DashboardPage (WorkspaceDashboardPage)
+- **Kullanım**: Workspace yönetimi, sidebar, workspace routing, workspace state management
 
-### Brand Feature (`features/brand/`)
-- **Context**: `context/brand-context.tsx` - BrandProvider, useBrand hook
-- **Kullanım**: Brand context (studio/brand rotaları için)
+### Settings Feature (`features/settings/`)
+- **Components**: `components/` - SettingsDialog, WorkspaceMembersTable, InviteMemberDialog, WorkspaceRolesTable
+- **Kullanım**: Settings dialog, workspace members management, invite management
 
 ### Permissions Feature (`features/permissions/`)
 - **Components**: `components/PermissionGate.tsx` - Permission-based UI gating
@@ -166,17 +187,15 @@ Shared katmanı, tüm feature'lar tarafından kullanılan altyapı ve utility'le
 - **Hooks**: `shared/hooks/use-mobile.ts` - Mobile detection hook
 - **API**: `shared/api/media.ts` - Media upload API (workspace-specific olmayan, genel API)
 
-**Not**: Workspace-specific API'ler (`subscription`, `user`) artık `features/workspace/api/` altında.
+**Not**: Workspace-specific API'ler (`subscription`, `user`, `members`, `invites`, `roles`, `usage`) artık `features/space/api/` altında.
 
 ## Routing & Delege Kalıpları
 - App dosyaları routing-only, feature page bileşenlerine delege:
   - `/[locale]/[workspace]/dashboard` → `WorkspaceDashboardPage`
-  - `/[locale]/[workspace]/settings` → `WorkspaceSettingsPage`
-  - `/[locale]/[workspace]/studio` → `WorkspaceStudioPage`
-  - `/[locale]/[workspace]/studio/[brand]/dashboard` → `BrandDashboardPage`
-- Auth sayfaları: `LoginForm` / `SignupForm` `features/auth/components` altından kullanılır.
+  - `/[locale]/[workspace]` → `WorkspaceDashboardPage` (root workspace route)
+- Auth sayfaları: `LoginForm` `features/auth/components` altından kullanılır.
 - Locale prefix: `localePrefix: "as-needed"` (en prefixsiz, diğerleri prefiksli).
-- Reserved routes (workspace sayılmaz): `login`, `signup`, `debug-*`, `config-debug`, `http-debug`, `auth/*`, `invites`.
+- Reserved routes (workspace sayılmaz): `login`, `config-debug`, `http-debug`, `onboarding`, `invites`, `auth/*`, `not-found`, `404`.
 
 ## UI / DS
 - `components/ui/*`: ShadCN kit.
@@ -207,15 +226,15 @@ import { useAuth, AuthProvider } from "@/features/auth/context/auth-context";
 import { requestMagicLink, getGoogleOAuthUrl } from "@/features/auth/api/auth-api";
 import { LoginForm, SignupForm } from "@/features/auth/components/login-form";
 
-// Workspace feature
-import { useWorkspace, WorkspaceProvider } from "@/features/workspace/context/workspace-context";
-import { getWorkspaceSubscription } from "@/features/workspace/api/subscription-api";
-import { SpaceSidebar } from "@/features/workspace/components/sidebar/space-sidebar";
-import { sidebarNavigation } from "@/features/workspace/navigation/navigation";
-import { DashboardPage } from "@/features/workspace/pages/dashboard-page";
+// Space feature
+import { useWorkspace, WorkspaceProvider } from "@/features/space/context/workspace-context";
+import { getWorkspaceSubscription } from "@/features/space/api/subscription-api";
+import { SpaceSidebar } from "@/features/space/components/space-sidebar";
+import { sidebarNavigation } from "@/features/space/navigation/navigation";
+import { WorkspaceDashboardPage } from "@/features/space/pages/dashboard-page";
 
-// Brand feature
-import { useBrand, BrandProvider } from "@/features/brand/context/brand-context";
+// Settings feature
+import { SettingsDialog } from "@/features/settings";
 
 // Permissions feature
 import { useHasPermission, PermissionGate } from "@/permissions";

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/features/auth/context/auth-context";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { clearAccessToken } from "@/shared/auth/token-storage";
 import { apiCache } from "@/shared/api/cache";

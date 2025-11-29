@@ -26,7 +26,7 @@ import {
 import { SpaceSidebarHeader } from './space-sidebar-header';
 import { SpaceNavUser } from './space-nav-user';
 import { SPACE_NAV_ITEMS, buildWorkspaceRoute } from '@/features/space/constants';
-import { useWorkspace } from '@/features/workspace/context/workspace-context';
+import { useWorkspace } from '@/features/space/context/workspace-context';
 import { SettingsDialog } from '@/features/settings';
 
 export const SpaceSidebar = () => {

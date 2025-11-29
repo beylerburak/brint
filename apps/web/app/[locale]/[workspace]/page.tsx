@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { WorkspaceDashboardPage } from "@/features/workspace/pages/dashboard-page";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { WorkspaceDashboardPage } from "@/features/space/pages/dashboard-page";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useAuth } from "@/features/auth/context/auth-context";
 
 export default function WorkspacePage() {

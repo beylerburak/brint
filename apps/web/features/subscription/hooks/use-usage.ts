@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
-import { getUsage, type UsageResult } from "@/features/workspace/api/usage-api";
+import { useWorkspace } from "@/features/space/context/workspace-context";
+import { getUsage, type UsageResult } from "@/features/space/api/usage-api";
 import { apiCache } from "@/shared/api/cache";
 import type { LimitKey } from "../config/limits";
 

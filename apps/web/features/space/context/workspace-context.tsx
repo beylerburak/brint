@@ -162,9 +162,6 @@ function deriveWorkspace(paramSlug?: string, pathname?: string | null): Workspac
 
   const reservedRoutes = [
     "login",
-    "signup",
-    "sign-up",
-    "debug-context",
     "config-debug",
     "http-debug",
     "onboarding",

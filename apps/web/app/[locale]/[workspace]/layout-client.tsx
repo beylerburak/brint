@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
 import { SpaceSidebar } from "@/features/space/components/space-sidebar";
-import { SpaceHeader } from "@/features/workspace/components/space-header";
-import { ProfileCompletionDialog } from "@/features/workspace/components/profile-completion-dialog";
-import { getUserProfile, type UserProfile } from "@/features/workspace/api/user-api";
+import { SpaceHeader } from "@/features/space/components/space-header";
+import { ProfileCompletionDialog } from "@/features/space/components/profile-completion-dialog";
+import { getUserProfile, type UserProfile } from "@/features/space/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
 
 export function WorkspaceLayoutClient({
@@ -21,9 +21,6 @@ export function WorkspaceLayoutClient({
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasCheckedProfile, setHasCheckedProfile] = useState(false);
-  
-  // Don't show workspace sidebar in studio routes (both /studio and /studio/[brand])
-  const isStudioRoute = pathname?.includes("/studio");
 
 
   // Check if user profile needs completion
@@ -84,11 +81,6 @@ export function WorkspaceLayoutClient({
   // Show nothing while auth is loading
   if (authLoading || !isAuthenticated) {
     return null;
-  }
-
-  if (isStudioRoute) {
-    // In studio routes, only render children (studio sidebar will be in studio layout)
-    return <>{children}</>;
   }
 
   return (

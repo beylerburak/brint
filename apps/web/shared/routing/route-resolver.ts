@@ -34,7 +34,7 @@ export function routeResolver(input: RouteResolverInput): string {
   }
 
   const normalizedPath = normalizePath(currentPath, locale);
-  const isAuthPage = normalizedPath === "/login" || normalizedPath === "/sign-up" || normalizedPath === "/signup";
+  const isAuthPage = normalizedPath === "/login";
 
   const allWorkspaces = [...ownerWorkspaces, ...memberWorkspaces].sort((a, b) => {
     const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
@@ -42,7 +42,7 @@ export function routeResolver(input: RouteResolverInput): string {
     return bTime - aTime;
   });
 
-  // If user is on login/sign-up while authenticated, send to workspace selection logic
+  // If user is on login while authenticated, send to workspace selection logic
   if (isAuthPage) {
     const target = selectWorkspace(allWorkspaces, fallbackWorkspaceSlug);
     if (target) return `${localePrefix}/${target}/dashboard`;
@@ -83,7 +83,7 @@ function selectWorkspace(workspaces: WorkspaceLike[], fallbackSlug?: string | nu
 
 /**
  * Resolves the workspace-aware path when switching workspaces.
- * Preserves the current route template (settings, studio, dashboard) in the new workspace.
+ * Preserves the current route template (settings, dashboard) in the new workspace.
  */
 export function resolveWorkspacePath(locale: string, newWorkspace: string, pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
@@ -91,7 +91,6 @@ export function resolveWorkspacePath(locale: string, newWorkspace: string, pathn
   const last = segments[segments.length - 1];
 
   if (last === "settings") return `/${locale}/${newWorkspace}/settings`;
-  if (last === "studio") return `/${locale}/${newWorkspace}/studio`;
 
   // default → workspace homepage (dashboard)
   return `/${locale}/${newWorkspace}`;

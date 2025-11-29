@@ -17,13 +17,13 @@ import { useTranslations } from "next-intl";
 import {
   getWorkspaceMembers,
   type WorkspaceMember,
-} from "@/features/workspace/api/members-api";
+} from "@/features/space/api/members-api";
 import {
   createWorkspaceInvite,
   getWorkspaceInvites,
   type WorkspaceInvite,
-} from "@/features/workspace/api/invites-api";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+} from "@/features/space/api/invites-api";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { toast } from "sonner";
 
 interface InviteMemberDialogProps {

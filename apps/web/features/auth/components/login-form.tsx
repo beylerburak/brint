@@ -34,7 +34,6 @@ export function LoginForm({
   const t = useTranslations("common")
   const locale = useLocale()
   const searchParams = useSearchParams()
-  const signupPath = locale === "en" ? "/signup" : `/${locale}/signup`
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false)
@@ -111,9 +110,6 @@ export function LoginForm({
             </a>
             <div className="flex flex-col items-center gap-2">
               <h1 className="text-xl font-bold">{t("loginTitle")}</h1>
-              <FieldDescription>
-                {t("dontHaveAccount")} <Link href={signupPath}>{t("signUp")}</Link>
-              </FieldDescription>
             </div>
           </div>
           <Field>

@@ -26,13 +26,13 @@ import {
   getWorkspaceMembers,
   updateWorkspaceMember,
   type WorkspaceMember,
-} from "@/features/workspace/api/members-api";
+} from "@/features/space/api/members-api";
 import {
   getWorkspaceInvites,
   cancelWorkspaceInvite,
   type WorkspaceInvite,
-} from "@/features/workspace/api/invites-api";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+} from "@/features/space/api/invites-api";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";

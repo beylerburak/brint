@@ -13,7 +13,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/animate-ui/components/radix/dropdown-menu';
-import { useWorkspace } from '@/features/workspace/context/workspace-context';
+import { useWorkspace } from '@/features/space/context/workspace-context';
 import { getCurrentSession } from '@/features/auth/api/auth-api';
 
 function getSpaceInitial(name: string): string {

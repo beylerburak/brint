@@ -1,4 +1,4 @@
-import { WorkspaceDashboardPage } from "@/features/workspace/pages/dashboard-page";
+import { WorkspaceDashboardPage } from "@/features/space/pages/dashboard-page";
 
 export default async function DashboardPage({
   params,

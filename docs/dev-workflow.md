@@ -74,15 +74,13 @@ When AI receives a task, it MUST follow this sequence:
 1. `docs/dev-workflow.md` ← **This file** (you are reading it)
 2. `docs/backend-architecture.md` (for backend work)
 3. `docs/frontend-architecture.md` (for frontend work)
-4. `docs/auth-claims-i18n.md` (for auth/claims/i18n work)
-5. `docs/tiny-steps.md` (to find the current step)
+4. `docs/guide/shared/auth-claims-i18n.md` (for auth/claims/i18n work)
 
 **Why**: These documents define the project's architecture, patterns, and rules. Without reading them, AI cannot work correctly.
 
 #### 2. Identify the Task
 
-- **Task Format**: Tasks come as `TS-XX` (e.g., `TS-41`, `TS-23`)
-- **Find in tiny-steps.md**: Locate the specific TS in `docs/tiny-steps.md`
+- **Task Format**: Tasks come as `TS-XX` (e.g., `TS-41`, `TS-23`) or direct feature requests
 - **Read Requirements**: Understand the goal, content, and test criteria
 - **Scope Check**: Verify what files/modules are affected
 
@@ -120,6 +118,7 @@ When AI receives a task, it MUST follow this sequence:
 
 **Frontend**:
 - Maintain provider hierarchy (Auth → Workspace → Permission)
+- WorkspaceProvider is in `@/features/space/context/workspace-context`
 - Use `useHasPermission()` + `PermissionGate` for permissions
 - Use HTTP client (no direct `fetch`)
 - Forms: React Hook Form + Zod
@@ -206,8 +205,8 @@ import { httpClient } from "@/shared/http";
 import { requirePermission } from "@/core/auth/require-permission";
 import { PERMISSIONS } from "@/core/auth/permissions.registry";
 
-app.get('/studio/brands', {
-  preHandler: [requirePermission(PERMISSIONS.STUDIO_BRAND_VIEW)],
+app.get('/workspaces/:workspaceId/members', {
+  preHandler: [requirePermission(PERMISSIONS.WORKSPACE_MEMBERS_VIEW)],
 }, async (request, reply) => {
   // Handler code
 });
@@ -236,18 +235,18 @@ const { userId, workspaceId } = request.auth!;
 **Pattern**:
 ```typescript
 // Service (business logic)
-export class BrandStudioService {
-  constructor(private brandRepository: BrandRepository) {}
+export class WorkspaceMemberService {
+  constructor(private memberRepository: WorkspaceMemberRepository) {}
   
-  async getAccessibleBrands({ userId, workspaceId }: { userId: string; workspaceId: string }) {
-    return this.brandRepository.listByWorkspace(workspaceId);
+  async getMembers({ userId, workspaceId }: { userId: string; workspaceId: string }) {
+    return this.memberRepository.listByWorkspace(workspaceId);
   }
 }
 
 // Repository (data access)
-export class BrandRepository {
+export class WorkspaceMemberRepository {
   async listByWorkspace(workspaceId: string) {
-    return prisma.brand.findMany({
+    return prisma.workspaceMember.findMany({
       where: { workspaceId },
     });
   }
@@ -317,10 +316,24 @@ return reply.send({
 
 **Location**: `apps/web/app/[locale]/layout.tsx`
 
+**Implementation**:
+```tsx
+import { WorkspaceProvider } from "@/features/space/context/workspace-context";
+
+<AuthProvider>
+  <WorkspaceProvider params={{ locale }}>
+    <PermissionProvider>
+      {children}
+    </PermissionProvider>
+  </WorkspaceProvider>
+</AuthProvider>
+```
+
 **Rules**:
 - Hierarchy must not be broken
 - Providers must be in this exact order
 - Do not add providers outside this structure
+- WorkspaceProvider is located in `@/features/space/context/workspace-context`
 
 #### 2. Permission Checks
 
@@ -328,8 +341,8 @@ return reply.send({
 ```tsx
 import { useHasPermission, useAnyPermission } from "@/permissions";
 
-const canView = useHasPermission("studio:brand.view");
-const canEdit = useAnyPermission(["studio:brand.edit", "studio:brand.create"]);
+const canView = useHasPermission("workspace:members.view");
+const canEdit = useAnyPermission(["workspace:members.edit", "workspace:members.create"]);
 ```
 
 **Component**:
@@ -337,10 +350,10 @@ const canEdit = useAnyPermission(["studio:brand.edit", "studio:brand.create"]);
 import { PermissionGate } from "@/permissions";
 
 <PermissionGate 
-  permission="studio:brand.view"
+  permission="workspace:members.view"
   fallback={<p>No access</p>}
 >
-  <BrandList />
+  <MembersList />
 </PermissionGate>
 ```
 
@@ -355,7 +368,7 @@ import { PermissionGate } from "@/permissions";
 ```tsx
 import { httpClient } from "@/shared/http";
 
-const response = await httpClient.get("/studio/brands", {
+const response = await httpClient.get(`/workspaces/${workspace?.id}/members`, {
   headers: {
     "X-Workspace-Id": workspace?.id,
   },
@@ -573,9 +586,9 @@ TS-XX: Brief description of what was implemented
 
 **Examples**:
 ```
-TS-37: Brand Studio routing skeleton implemented
 TS-41: dev-workflow.md documentation created
-TS-23: Brand Studio sample endpoint with permission check
+TS-50: Workspace members management implemented
+TS-45: User profile settings page added
 ```
 
 ### PR Description Template
@@ -761,14 +774,13 @@ AI **MUST** complete this checklist before starting any task:
 - [ ] Read `docs/dev-workflow.md` (this file)
 - [ ] Read `docs/backend-architecture.md` (for backend work)
 - [ ] Read `docs/frontend-architecture.md` (for frontend work)
-- [ ] Read `docs/auth-claims-i18n.md` (for auth/claims/i18n work)
-- [ ] Read `docs/tiny-steps.md` and locate the current TS
+- [ ] Read `docs/guide/shared/auth-claims-i18n.md` (for auth/claims/i18n work)
 
 ### ✅ Task Understanding
 
-- [ ] Identify the TS number (e.g., TS-41)
-- [ ] Understand the goal of the TS
-- [ ] Read the test criteria
+- [ ] Identify the task (TS-XX format or feature request)
+- [ ] Understand the goal of the task
+- [ ] Identify test criteria (if applicable)
 - [ ] Identify affected files/modules
 
 ### ✅ Codebase Examination
@@ -843,7 +855,7 @@ This document defines how AI (Cursor/ChatGPT) should work within this project:
 When in doubt, refer to:
 - `docs/backend-architecture.md` for backend patterns
 - `docs/frontend-architecture.md` for frontend patterns
-- `docs/auth-claims-i18n.md` for auth/claims/i18n rules
-- `docs/tiny-steps.md` for current step requirements
+- `docs/guide/shared/auth-claims-i18n.md` for auth/claims/i18n rules
+- `docs/guide/` directory for specific feature guides
 
 **Remember**: A Tiny Step is NOT complete until all test criteria are met and the code follows all project rules.

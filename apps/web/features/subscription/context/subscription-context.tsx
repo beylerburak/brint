@@ -1,11 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { useHasPermission } from "@/permissions";
 import { SUBSCRIPTION_PERMISSION } from "@/features/permissions/permission-keys";
-import { getWorkspaceSubscription, type SubscriptionResult } from "@/features/workspace/api/subscription-api";
+import { getWorkspaceSubscription, type SubscriptionResult } from "@/features/space/api/subscription-api";
 import { apiCache } from "@/shared/api/cache";
 import type { SubscriptionPlan } from "../config/plans";
 

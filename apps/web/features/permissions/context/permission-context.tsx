@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { fetchPermissionsSnapshot } from "@/shared/api/permissions";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useAuth } from "@/features/auth/context/auth-context";
 import { PermissionKey } from "../permission-keys";
 

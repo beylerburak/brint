@@ -1,10 +1,5 @@
 import {
   Home,
-  Building2,
-  Wand2,
-  Settings2,
-  Users,
-  SquareTerminal,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -29,45 +24,6 @@ export const SPACE_NAV_ITEMS: SpaceNavItem[] = [
     route: 'dashboard',
     icon: Home,
     isActive: true,
-  },
-  {
-    title: 'Brands',
-    route: 'brands',
-    icon: Building2,
-  },
-  {
-    title: 'Studio',
-    route: 'studio',
-    icon: Wand2,
-  },
-  {
-    title: 'Members',
-    route: 'members',
-    icon: Users,
-  },
-  {
-    title: 'Settings',
-    route: 'settings',
-    icon: Settings2,
-    items: [
-      {
-        title: 'General',
-        route: 'settings',
-      },
-      {
-        title: 'Team',
-        route: 'settings/team',
-      },
-      {
-        title: 'Billing',
-        route: 'settings/billing',
-      },
-    ],
-  },
-  {
-    title: 'Playground',
-    route: 'playground',
-    icon: SquareTerminal,
   },
 ];
 

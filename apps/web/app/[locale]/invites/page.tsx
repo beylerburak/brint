@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { acceptWorkspaceInvite } from "@/features/workspace/api/accept-invite";
-import { getInviteDetails, loginWithInviteToken } from "@/features/workspace/api/invites-api";
+import { acceptWorkspaceInvite } from "@/features/space/api/accept-invite";
+import { getInviteDetails, loginWithInviteToken } from "@/features/space/api/invites-api";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";

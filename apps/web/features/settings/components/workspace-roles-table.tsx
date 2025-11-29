@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   getWorkspaceRoles,
   type WorkspaceRole,
-} from "@/features/workspace/api/roles-api";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+} from "@/features/space/api/roles-api";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 
 const columns: ColumnDef<WorkspaceRole>[] = [

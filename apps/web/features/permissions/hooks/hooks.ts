@@ -1,7 +1,7 @@
 "use client";
 
 import { usePermissionContext } from "../context/permission-context";
-import { useWorkspace } from "@/features/workspace/context/workspace-context";
+import { useWorkspace } from "@/features/space/context/workspace-context";
 import type { PermissionKey } from "../permission-keys";
 
 /**

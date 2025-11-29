@@ -79,7 +79,6 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerDebugRoutes(app);
   await registerAuthRoutes(app);
-  await registerStudioRoutes(app);
   await registerUserRoutes(app);
   await registerSubscriptionRoutes(app);
   await registerWorkspaceMemberRoutes(app);

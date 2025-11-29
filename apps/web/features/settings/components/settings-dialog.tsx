@@ -62,10 +62,10 @@ import { useTranslations, useLocale } from "next-intl"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/features/auth/context/auth-context"
-import { useWorkspace } from "@/features/workspace/context/workspace-context"
+import { useWorkspace } from "@/features/space/context/workspace-context"
 import { useHasPermission, PERMISSIONS } from "@/permissions"
 import { presignUpload, finalizeUpload, getMediaConfig, type MediaConfig } from "@/shared/api/media"
-import { updateUserProfile, checkUsernameAvailability, disconnectGoogleConnection, type UserProfile } from "@/features/workspace/api/user-api"
+import { updateUserProfile, checkUsernameAvailability, disconnectGoogleConnection, type UserProfile } from "@/features/space/api/user-api"
 import { getCurrentSession, refreshToken, getGoogleOAuthUrl } from "@/features/auth/api/auth-api"
 import { apiCache } from "@/shared/api/cache"
 import { getAccessToken } from "@/shared/auth/token-storage"
@@ -709,28 +709,18 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
-  // Check if we're on a brand studio page: /[locale]/[workspace]/studio/[brandslug]/*
-  const isBrandStudioPage = React.useMemo(() => {
-    const segments = pathname.split("/").filter(Boolean)
-    const studioIndex = segments.findIndex((segment) => segment === "studio")
-    if (studioIndex === -1) return false
-    // Check if there's a segment after "studio" (the brand slug)
-    return studioIndex + 1 < segments.length
-  }, [pathname])
-
-  // Filter nav groups to exclude brand group if not on brand studio page
-  // and exclude workspace group if user doesn't have workspace:settings.manage permission
+  // Filter nav groups to exclude workspace group if user doesn't have workspace:settings.manage permission
   const visibleNavGroups = React.useMemo(() => {
     return navGroups.filter((group) => {
       if (group.id === "brand") {
-        return isBrandStudioPage
+        return false // Brand group removed
       }
       if (group.id === "workspace") {
         return hasWorkspaceSettingsManage
       }
       return true
     })
-  }, [isBrandStudioPage, hasWorkspaceSettingsManage])
+  }, [hasWorkspaceSettingsManage])
 
   // Load media config when dialog opens (used across multiple tabs)
   React.useEffect(() => {

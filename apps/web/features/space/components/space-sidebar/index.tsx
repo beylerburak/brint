@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ChevronRight, Settings, LifeBuoy } from 'lucide-react';
+import { ChevronRight, Settings, LifeBuoy, Home, Inbox } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -81,8 +81,33 @@ export const SpaceSidebar = () => {
       <SpaceSidebarHeader />
 
       <SidebarContent>
+        {/* Home and Inbox - above Platform */}
         <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Home" asChild>
+                <Link href={workspace?.slug ? buildWorkspaceRoute(locale, workspace.slug, 'dashboard') : '#'}>
+                  <Home />
+                  <span>Home</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Inbox" asChild>
+                <button type="button" className="w-full">
+                  <Inbox />
+                  <span>Inbox</span>
+                </button>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup className="gap-1">
+          <div className="flex items-center gap- px-0">
+            <SidebarGroupLabel className="uppercase text-muted-foreground/80 text-xs">Platform</SidebarGroupLabel>
+            <div className="flex-1 h-px bg-border" />
+          </div>
           <SidebarMenu>
             {navItems.map((item) => {
               // If item has subitems, render as collapsible

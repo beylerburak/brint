@@ -23,12 +23,6 @@ export interface SpaceNavItem {
  */
 export const SPACE_NAV_ITEMS: SpaceNavItem[] = [
   {
-    title: 'Dashboard',
-    route: 'dashboard',
-    icon: Home,
-    isActive: true,
-  },
-  {
     title: 'Brands',
     route: 'brands',
     icon: Briefcase,

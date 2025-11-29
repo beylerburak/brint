@@ -5,7 +5,7 @@ import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
 import { prisma } from "../../lib/prisma.js";
 import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
-import { sendWorkspaceInviteEmail } from "../../core/email/email.service.js";
+import { enqueueWorkspaceInviteEmail } from "../../core/queue/email.queue.js";
 import { appUrlConfig } from "../../config/index.js";
 import { logger } from "../../lib/logger.js";
 import { setAuthCookies } from "../../core/auth/auth.cookies.js";
@@ -174,10 +174,33 @@ export async function workspaceInviteRoutes(app: FastifyInstance) {
       expiresAt,
     });
 
-    // Fire-and-forget invite email; do not fail API if email sending fails
+    // Get workspace name and inviter name for email
+    const [workspace, inviter] = await Promise.all([
+      prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true },
+      }),
+      request.auth?.userId
+        ? prisma.user.findUnique({
+            where: { id: request.auth.userId },
+            select: { name: true, email: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    // Enqueue invite email job instead of sending directly
     const inviteUrl = `${appUrlConfig.baseUrl}/invites?token=${token}`;
-    void sendWorkspaceInviteEmail(invite.email, inviteUrl).catch((err) => {
-      logger.error({ err, inviteId: invite.id, email: invite.email }, "Failed to send workspace invite email");
+    void enqueueWorkspaceInviteEmail({
+      to: invite.email,
+      workspaceName: workspace?.name ?? "Workspace",
+      inviteLink: inviteUrl,
+      invitedByName: inviter?.name ?? inviter?.email ?? null,
+      locale: null, // TODO: Get locale from request headers if available
+    }).catch((err) => {
+      logger.error(
+        { err, inviteId: invite.id, email: invite.email },
+        "Failed to enqueue workspace invite email"
+      );
     });
 
     // Ensure we return all fields properly serialized

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Progress as ProgressPrimitive } from 'radix-ui';
 import { motion } from 'motion/react';
 
-import { getStrictContext } from '@/components/animate-ui/lib/get-strict-context';
+import { getStrictContext } from '@/shared/lib/get-strict-context';
 
 type ProgressContextType = {
   value: number;

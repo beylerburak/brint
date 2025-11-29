@@ -9,7 +9,7 @@ import {
 } from '@/components/animate-ui/primitives/animate/code-block';
 import { cn } from '@/shared/utils';
 import { CopyButton } from '@/components/animate-ui/components/buttons/copy';
-import { getStrictContext } from '@/components/animate-ui/lib/get-strict-context';
+import { getStrictContext } from '@/shared/lib/get-strict-context';
 
 type CodeContextType = {
   code: string;

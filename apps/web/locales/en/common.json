@@ -56,6 +56,8 @@
   "username": "Username",
   "usernamePlaceholder": "pick a username",
   "usernameDescription": "Username can only contain letters, numbers, underscores, and hyphens.",
+  "fullName": "Full Name",
+  "fullNamePlaceholder": "Enter your full name",
   "usernameAvailable": "This username is available",
   "usernameTaken": "This username is already taken",
   "save": "Save",

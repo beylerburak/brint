@@ -29,7 +29,7 @@ import {
   Highlight,
   HighlightItem,
 } from '@/components/animate-ui/primitives/effects/highlight';
-import { getStrictContext } from '@/components/animate-ui/lib/get-strict-context';
+import { getStrictContext } from '@/shared/lib/get-strict-context';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;

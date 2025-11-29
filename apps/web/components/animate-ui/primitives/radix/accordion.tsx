@@ -4,8 +4,8 @@ import * as React from 'react';
 import { Accordion as AccordionPrimitive } from 'radix-ui';
 import { motion, AnimatePresence, type HTMLMotionProps } from 'motion/react';
 
-import { useControlledState } from '@/hooks/use-controlled-state';
-import { getStrictContext } from '@/components/animate-ui/lib/get-strict-context';
+import { useControlledState } from '@/shared/hooks/use-controlled-state';
+import { getStrictContext } from '@/shared/lib/get-strict-context';
 
 type AccordionContextType = {
   value: string | string[] | undefined;

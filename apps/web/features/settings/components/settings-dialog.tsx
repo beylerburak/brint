@@ -724,8 +724,17 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   }, [hasWorkspaceSettingsManage])
 
   // Load media config when dialog opens (used across multiple tabs)
+  // Optimized: Check cache first, only fetch if not cached or stale
   React.useEffect(() => {
     if (open && !mediaConfig) {
+      // Check cache first (5 minute TTL)
+      const cachedConfig = apiCache.get<MediaConfig>("media:config", 300000)
+      if (cachedConfig) {
+        setMediaConfig(cachedConfig)
+        return
+      }
+
+      // Only fetch if not in cache
       getMediaConfig()
         .then((config) => {
           setMediaConfig(config)
@@ -752,17 +761,37 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
     const loadProfile = async () => {
       try {
-        // First try to read from cache (getCurrentSession populates user:profile cache)
-        let profile: UserProfile | null = apiCache.get<UserProfile>("user:profile", 30000) ?? null
+        // Optimized: Check cache first (60 second TTL for user profile)
+        // This prevents unnecessary /auth/me requests when dialog is reopened
+        let profile: UserProfile | null = apiCache.get<UserProfile>("user:profile", 60000) ?? null
         
-        // If not in cache, get from session (this will populate cache)
-        if (!profile) {
-          const session = await getCurrentSession()
-          if (cancelled || !session) return
+        // If cache is fresh, use it directly
+        if (profile) {
+          if (cancelled) return
           
-          // Read from cache again (getCurrentSession populates it)
-          profile = apiCache.get<UserProfile>("user:profile", 30000) ?? null
+          setProfileUser(profile)
+          const nameValue = profile.name || ""
+          const usernameValue = profile.username || ""
+          setOriginalName(nameValue)
+          setOriginalUsername(usernameValue)
+          form.reset({
+            name: nameValue,
+            username: usernameValue,
+            email: profile.email,
+            phone: profile.phone || "",
+          })
+          if (profile.username) {
+            setUsernameManuallyEdited(true)
+          }
+          return
         }
+        
+        // Cache miss or stale: fetch from session (this will populate cache)
+        const session = await getCurrentSession()
+        if (cancelled || !session) return
+        
+        // Read from cache again (getCurrentSession populates it)
+        profile = apiCache.get<UserProfile>("user:profile", 60000) ?? null
         
         if (cancelled || !profile) {
           // Fallback to auth user data

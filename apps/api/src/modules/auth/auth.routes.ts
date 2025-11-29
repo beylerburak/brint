@@ -10,7 +10,7 @@ import { sessionService } from '../../core/auth/session.service.js';
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { magicLinkService } from './magic-link.service.js';
-import { sendMagicLinkEmail } from '../../core/email/email.service.js';
+import { enqueueMagicLinkEmail } from '../../core/queue/email.queue.js';
 import { permissionService } from '../../core/auth/permission.service.js';
 import { BadRequestError, UnauthorizedError, ForbiddenError, HttpError, NotFoundError } from '../../lib/http-errors.js';
 import { S3StorageService } from '../../lib/storage/s3.storage.service.js';
@@ -589,7 +589,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       });
 
       const magicLinkUrl = `${appUrlConfig.baseUrl}/auth/magic-link/verify?token=${result.token}`;
-      await sendMagicLinkEmail(result.payload.email, magicLinkUrl);
+      
+      // Enqueue email job instead of sending directly
+      await enqueueMagicLinkEmail({
+        to: result.payload.email,
+        url: magicLinkUrl,
+        locale: null, // TODO: Get locale from request headers if available
+      });
 
       return reply.status(200).send({
         success: true,

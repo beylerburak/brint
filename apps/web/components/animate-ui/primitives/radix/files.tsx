@@ -21,8 +21,8 @@ import {
   type AccordionTriggerProps,
   type AccordionContentProps,
 } from '@/components/animate-ui/primitives/radix/accordion';
-import { getStrictContext } from '@/components/animate-ui/lib/get-strict-context';
-import { useControlledState } from '@/hooks/use-controlled-state';
+import { getStrictContext } from '@/shared/lib/get-strict-context';
+import { useControlledState } from '@/shared/hooks/use-controlled-state';
 
 type FilesContextType = {
   open: string[];

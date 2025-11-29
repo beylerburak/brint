@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import {
   verifyMagicLink,
   logout as logoutApi,
@@ -107,6 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(result.accessToken);
     setTokenReady(true);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user));
+    
+    // Set user context in Sentry
+    Sentry.setUser({
+      id: result.user.id,
+      email: result.user.email,
+      username: result.user.name,
+    });
+    
     // Clear cache on login to force fresh data fetch
     apiCache.invalidate("session:current");
     apiCache.invalidate("user:profile");
@@ -137,6 +146,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAccessToken();
       setTokenReady(false);
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      
+      // Clear user context in Sentry
+      Sentry.setUser(null);
+      
       // Clear API cache on logout
       apiCache.invalidate("session:current");
       apiCache.invalidate("user:profile");

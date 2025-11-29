@@ -58,6 +58,9 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
+  SENTRY_DSN_API: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -121,6 +124,9 @@ export const env = {
   SMTP_USER: rawEnv.SMTP_USER,
   SMTP_PASS: rawEnv.SMTP_PASS,
   SMTP_FROM: rawEnv.SMTP_FROM,
+  SENTRY_DSN_API: rawEnv.SENTRY_DSN_API,
+  SENTRY_ENVIRONMENT: rawEnv.SENTRY_ENVIRONMENT,
+  SENTRY_TRACES_SAMPLE_RATE: rawEnv.SENTRY_TRACES_SAMPLE_RATE,
 } as const;
 
 export type Env = typeof env;

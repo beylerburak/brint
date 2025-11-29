@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import { locales } from "@/shared/i18n/locales";
 import { setWorkspaceIdGetter } from "@/shared/http/workspace-header";
 import { getCurrentSession } from "@/features/auth/api/auth-api";
@@ -114,8 +115,17 @@ export function WorkspaceProvider({
               slug: match.slug,
               name: match.name,
             });
+            // Set workspace tag in Sentry
+            Sentry.setTag("workspaceId", match.id);
+            Sentry.setTag("workspaceSlug", match.slug);
           } else {
             setResolvedWorkspace(baseWorkspace);
+            if (baseWorkspace?.id) {
+              Sentry.setTag("workspaceId", baseWorkspace.id);
+            }
+            if (baseWorkspace?.slug) {
+              Sentry.setTag("workspaceSlug", baseWorkspace.slug);
+            }
           }
           setIsOwner(isOwnerWorkspace);
           setWorkspaceReady(true);

@@ -37,7 +37,9 @@
     "sharp": "^0.33.4",
     "nodemailer": "^7.0.11",
     "pino": "^8.16.2",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@sentry/node": "^8.0.0",
+    "@sentry/profiling-node": "^8.0.0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.5",

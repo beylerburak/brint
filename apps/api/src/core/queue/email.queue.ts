@@ -5,6 +5,7 @@ import {
   sendWorkspaceInviteEmail,
 } from "../email/email.service.js";
 import { logger } from "../../lib/logger.js";
+import { captureException, isSentryInitialized } from "../observability/sentry.js";
 
 /**
  * Email job types
@@ -152,6 +153,18 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
       },
       "Failed to process email job"
     );
+
+    // Send to Sentry if initialized
+    if (isSentryInitialized()) {
+      captureException(error, {
+        queue: EMAIL_QUEUE_NAME,
+        jobId: job.id?.toString(),
+        jobName: job.name,
+        emailType: data.type,
+        to: data.to,
+      });
+    }
+
     // Re-throw to let BullMQ handle retry logic
     throw error;
   }

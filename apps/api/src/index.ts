@@ -3,8 +3,13 @@ import { appConfig } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { redis } from './lib/redis.js';
 import { createServer } from './core/http/server.js';
+// Initialize Sentry before anything else
+import { initSentry } from './core/observability/sentry.js';
 // Bootstrap email queue worker
 import './core/queue/email.queue.js';
+
+// Initialize Sentry
+initSentry();
 
 let app: FastifyInstance | null = null;
 

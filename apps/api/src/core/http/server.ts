@@ -21,6 +21,7 @@ import { appConfig } from '../../config/app-config.js';
 import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerRealtimeRoutes } from '../../core/realtime/realtime.routes.js';
 import { redis } from '../../lib/redis.js';
+import { setupFastifyErrorHandler } from '../observability/sentry.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -33,7 +34,10 @@ export async function createServer(): Promise<FastifyInstance> {
     logger,
   });
 
-  // Register global error handler
+  // Setup Sentry Fastify error handler (if Sentry is initialized)
+  setupFastifyErrorHandler(app);
+
+  // Register global error handler (our custom handler, Sentry is already integrated)
   app.setErrorHandler(globalErrorHandler);
 
   // Register 404 handler

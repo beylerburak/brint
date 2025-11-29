@@ -2,6 +2,7 @@ import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { logger } from './logger.js';
 import { HttpError } from './http-errors.js';
 import { appConfig } from '../config/app-config.js';
+import { captureException } from '../core/observability/sentry.js';
 
 /**
  * Standard error response format for all API errors
@@ -57,6 +58,23 @@ export function globalErrorHandler(
     (error as HttpError).code ??
     (typeof error.code === 'string' ? error.code : undefined) ??
     mapErrorCode(error);
+
+  // Send to Sentry for 5xx errors (server errors)
+  // Skip 4xx errors (client errors) unless they're unexpected
+  if (statusCode >= 500 || (statusCode >= 400 && !(error as HttpError).code)) {
+    // Extract context from request
+    const userId = (request as any).auth?.userId ?? undefined;
+    const workspaceId = (request as any).workspaceId ?? undefined;
+    
+    captureException(error, {
+      userId,
+      workspaceId,
+      method: request.method,
+      path: request.url,
+      statusCode,
+      errorCode,
+    });
+  }
 
   // Build error response
   const errorResponse: ErrorResponse = {

@@ -2,6 +2,7 @@ import { Queue, Worker, QueueOptions, WorkerOptions } from "bullmq";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import IORedis from "ioredis";
+import { captureException, isSentryInitialized } from "../observability/sentry.js";
 
 /**
  * BullMQ connection configuration
@@ -64,6 +65,15 @@ export function createWorker<T = any>(
       },
       "Job failed"
     );
+
+    // Send to Sentry if initialized
+    if (isSentryInitialized()) {
+      captureException(err, {
+        queue: name,
+        jobId: job?.id?.toString(),
+        jobName: job?.name,
+      });
+    }
   });
 
   worker.on("error", (err) => {
@@ -75,6 +85,14 @@ export function createWorker<T = any>(
       },
       "Worker error"
     );
+
+    // Send to Sentry if initialized
+    if (isSentryInitialized()) {
+      captureException(err, {
+        queue: name,
+        errorType: "worker_error",
+      });
+    }
   });
 
   logger.info({ queue: name }, "Worker started");

@@ -143,5 +143,36 @@ export async function registerDebugRoutes(app: FastifyInstance): Promise<void> {
       });
     }
   );
+
+  // Test endpoint for Sentry
+  app.get(
+    '/debug/sentry-test',
+    {
+      schema: {
+        tags: ['Debug'],
+        summary: 'Test Sentry error reporting',
+        description: 'Throws a test error to verify Sentry integration',
+        response: {
+          500: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      // Throw a test error to verify Sentry integration
+      throw new Error('Sentry test error - this should appear in Sentry dashboard');
+    }
+  );
 }
 

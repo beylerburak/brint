@@ -51,7 +51,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from "@/components/ui/sidebar"
+} from "@/components/animate-ui/components/radix/sidebar"
 import {
   Tabs,
   TabsContent,
@@ -76,6 +76,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { logger } from "@/shared/utils/logger"
 import { z } from "zod"
+import { motion } from "motion/react"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Form,
@@ -304,6 +305,7 @@ const navGroups: NavGroup[] = [
 
 interface SettingsDialogProps {
   children: React.ReactNode
+  defaultActiveItem?: string | null
 }
 
 function getInitials(name: string | null | undefined, email: string): string {
@@ -320,7 +322,6 @@ function getInitials(name: string | null | undefined, email: string): string {
 function ThemePreferenceSelect() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
-  const [open, setOpen] = React.useState(false)
   const t = useTranslations("common")
 
   React.useEffect(() => {
@@ -347,7 +348,7 @@ function ThemePreferenceSelect() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
@@ -358,28 +359,19 @@ function ThemePreferenceSelect() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-[180px]" align="end">
         <DropdownMenuItem
-          onClick={() => {
-            setTheme("light")
-            setOpen(false)
-          }}
+          onClick={() => setTheme("light")}
           className={currentTheme === "light" ? "bg-accent" : ""}
         >
           {themeLabels.light}
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => {
-            setTheme("dark")
-            setOpen(false)
-          }}
+          onClick={() => setTheme("dark")}
           className={currentTheme === "dark" ? "bg-accent" : ""}
         >
           {themeLabels.dark}
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => {
-            setTheme("system")
-            setOpen(false)
-          }}
+          onClick={() => setTheme("system")}
           className={currentTheme === "system" ? "bg-accent" : ""}
         >
           {themeLabels.system}
@@ -401,7 +393,6 @@ function LanguagePreferenceSelect({
   const router = useRouter()
   const pathname = usePathname()
   const currentLocale = (useLocale() as Locale) || (initialLocale as Locale) || "en"
-  const [open, setOpen] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
   const t = useTranslations("common")
 
@@ -422,8 +413,7 @@ function LanguagePreferenceSelect({
         ? pathWithoutLocale || "/"
         : `/${newLocale}${pathWithoutLocale}`
       
-      // Close dropdown and dialog before navigation to prevent overlay from staying
-      setOpen(false)
+      // Close dialog before navigation to prevent overlay from staying
       onBeforeNavigate?.()
       
       // Use setTimeout to ensure dialog closes before navigation
@@ -438,7 +428,7 @@ function LanguagePreferenceSelect({
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
@@ -635,9 +625,9 @@ function CookieSettingsPopover() {
   )
 }
 
-export function SettingsDialog({ children }: SettingsDialogProps) {
+export function SettingsDialog({ children, defaultActiveItem }: SettingsDialogProps) {
   const [open, setOpen] = React.useState(false)
-  const [activeItem, setActiveItem] = React.useState<string | null>(null)
+  const [activeItem, setActiveItem] = React.useState<string | null>(defaultActiveItem ?? null)
   const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false)
   const [membersTableRefresh, setMembersTableRefresh] = React.useState(0)
   const [membersCount, setMembersCount] = React.useState<number>(0)
@@ -1348,6 +1338,13 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     setActiveItem(itemId);
   }, []);
 
+  // Update activeItem when dialog opens and defaultActiveItem is provided
+  React.useEffect(() => {
+    if (open && defaultActiveItem) {
+      setActiveItem(defaultActiveItem)
+    }
+  }, [open, defaultActiveItem])
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -1752,15 +1749,16 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             ) : (
               <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-4 pt-0">
                 {activeItem === "people" ? (
-                 <div className="flex flex-col gap-6">
-                   <div className="flex items-center justify-between gap-4 rounded-lg border p-4 w-full">
-                     <div className="flex flex-col gap-2 flex-1 min-w-0">
-                       <div className="font-medium w-full break-words">{t("settings.workspace.people.inviteLinkTitle")}</div>
-                       <p className="text-sm text-muted-foreground w-full break-words">
+                 <div className="flex flex-col gap-4 md:gap-6">
+                   {/* Invite block - mobile friendly */}
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 rounded-lg border p-3 md:p-4 w-full">
+                     <div className="flex flex-col gap-1 md:gap-2 flex-1 min-w-0">
+                       <div className="font-medium text-sm md:text-base w-full break-words">{t("settings.workspace.people.inviteLinkTitle")}</div>
+                       <p className="text-xs md:text-sm text-muted-foreground w-full break-words">
                          {t("settings.workspace.people.inviteLinkDescription")}
                        </p>
                      </div>
-                     <Button onClick={() => setInviteDialogOpen(true)} className="shrink-0">
+                     <Button onClick={() => setInviteDialogOpen(true)} className="w-full md:w-auto shrink-0">
                        {t("settings.workspace.people.inviteButton")}
                      </Button>
                    </div>
@@ -1918,7 +1916,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <ConnectionCard
-                      icon="/assets/google.svg"
+                      icon="/assets/google-original.svg"
                       title={t("settings.account.connections.google.title") || "Google"}
                       description={t("settings.account.connections.google.description") || "Connect your Google account to sign in and access Google services."}
                       buttonText={
@@ -1949,7 +1947,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                       disabled={isGoogleActionLoading}
                     />
                     <ConnectionCard
-                      icon="/assets/🏢 Company=Telegram, 🏵️ Style=Original.svg"
+                      icon="/assets/telegram-original.svg"
                       title={t("settings.account.connections.telegram.title") || "Telegram"}
                       description={t("settings.account.connections.telegram.description") || "Connect your Telegram account to manage your messaging and notifications."}
                       buttonText={t("comingSoon") || "Coming soon"}
@@ -2071,63 +2069,75 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
       {/* Disconnect Google Dialog */}
       <Dialog open={disconnectGoogleDialogOpen} onOpenChange={setDisconnectGoogleDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("settings.account.connections.google.disconnect") || "Disconnect Google"}</DialogTitle>
-            <DialogDescription>
-              {t("settings.account.connections.google.disconnectConfirmDescription") || "You will need to reconnect your Google account to use Google services again."}
-            </DialogDescription>
-          </DialogHeader>
-          <Alert variant="destructive" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {t("settings.account.connections.google.disconnectAlert") || "To access your account again, you will need to use your email address:"} <strong>{authUser?.email || profileUser?.email}</strong>
-            </AlertDescription>
-          </Alert>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDisconnectGoogleDialogOpen(false)}
-              disabled={isGoogleActionLoading}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <DialogHeader>
+              <DialogTitle>{t("settings.account.connections.google.disconnect") || "Disconnect Google"}</DialogTitle>
+              <DialogDescription>
+                {t("settings.account.connections.google.disconnectConfirmDescription") || "You will need to reconnect your Google account to use Google services again."}
+              </DialogDescription>
+            </DialogHeader>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
             >
-              {t("cancel") || "Cancel"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                setIsGoogleActionLoading(true)
-                try {
-                  const updatedProfile = await disconnectGoogleConnection()
-                  setProfileUser(updatedProfile)
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {t("settings.account.connections.google.disconnectAlert") || "To access your account again, you will need to use your email address:"} <strong>{authUser?.email || profileUser?.email}</strong>
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+            <DialogFooter className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setDisconnectGoogleDialogOpen(false)}
+                disabled={isGoogleActionLoading}
+              >
+                {t("cancel") || "Cancel"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  setIsGoogleActionLoading(true)
+                  try {
+                    const updatedProfile = await disconnectGoogleConnection()
+                    setProfileUser(updatedProfile)
 
-                  const token = getAccessToken()
-                  if (authUser && token) {
-                    await login({
-                      user: { ...authUser, googleId: null },
-                      workspaces: [],
-                      accessToken: token,
+                    const token = getAccessToken()
+                    if (authUser && token) {
+                      await login({
+                        user: { ...authUser, googleId: null },
+                        workspaces: [],
+                        accessToken: token,
+                      })
+                    }
+
+                    setDisconnectGoogleDialogOpen(false)
+                    toast({
+                      title: t("settings.account.connections.google.disconnect") || "Disconnect Google",
+                      description: t("settings.account.connections.google.disconnectDescription") || "Google connection will be disconnected.",
                     })
+                  } catch (error) {
+                    toast({
+                      title: t("error") || "Error",
+                      description: error instanceof Error ? error.message : (t("settings.account.connections.google.disconnectDescription") || "Failed to disconnect Google"),
+                      variant: "destructive",
+                    })
+                  } finally {
+                    setIsGoogleActionLoading(false)
                   }
-
-                  setDisconnectGoogleDialogOpen(false)
-                  toast({
-                    title: t("settings.account.connections.google.disconnect") || "Disconnect Google",
-                    description: t("settings.account.connections.google.disconnectDescription") || "Google connection will be disconnected.",
-                  })
-                } catch (error) {
-                  toast({
-                    title: t("error") || "Error",
-                    description: error instanceof Error ? error.message : (t("settings.account.connections.google.disconnectDescription") || "Failed to disconnect Google"),
-                    variant: "destructive",
-                  })
-                } finally {
-                  setIsGoogleActionLoading(false)
-                }
-              }}
-              disabled={isGoogleActionLoading}
-            >
-              {isGoogleActionLoading ? (t("saving") || "Disconnecting...") : (t("settings.account.connections.google.disconnect") || "Disconnect")}
-            </Button>
-          </DialogFooter>
+                }}
+                disabled={isGoogleActionLoading}
+              >
+                {isGoogleActionLoading ? (t("saving") || "Disconnecting...") : (t("settings.account.connections.google.disconnect") || "Disconnect")}
+              </Button>
+            </DialogFooter>
+          </motion.div>
         </DialogContent>
       </Dialog>
       <InviteMemberDialog

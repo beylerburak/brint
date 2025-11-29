@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, { createContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -14,27 +14,13 @@ import { onUnauthenticated } from "@/shared/http";
 import { apiCache } from "@/shared/api/cache";
 import type { LoginResult } from "@/features/auth/api/auth-api";
 import { logger } from "@/shared/utils/logger";
+import type { AuthUser, AuthContextValue } from "../types";
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  googleId?: string | null;
-};
+// Re-export types for convenience
+export type { AuthUser, AuthContextValue };
 
-interface AuthContextValue {
-  user: AuthUser | null;
-  isAuthenticated: boolean;
-  loading: boolean;
-  accessToken: string | null;
-  tokenReady: boolean;
-  login: (result: LoginResult) => Promise<void>;
-  loginWithSession: (result: LoginResult) => Promise<void>;
-  logout: () => Promise<void>;
-  verifyMagicLinkToken: (token: string) => Promise<LoginResult & { verifyData?: MagicLinkVerifyResult }>;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+// Export context for use by useAuth hook
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = "auth_user";
 
@@ -173,11 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
+// Re-export useAuth from hooks for backward compatibility
+export { useAuth } from "../hooks/use-auth";
 

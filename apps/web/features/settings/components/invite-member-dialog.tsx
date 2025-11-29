@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -201,14 +202,20 @@ export function InviteMemberDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="font-semibold text-foreground">
-            {t("settings.workspace.people.inviteDialog.title")}
-          </DialogTitle>
-          <DialogDescription className="text-sm leading-6 text-muted-foreground">
-            {t("settings.workspace.people.inviteDialog.description")}
-          </DialogDescription>
-        </DialogHeader>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="font-semibold text-foreground">
+              {t("settings.workspace.people.inviteDialog.title")}
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-muted-foreground">
+              {t("settings.workspace.people.inviteDialog.description")}
+            </DialogDescription>
+          </DialogHeader>
+        </motion.div>
         <form onSubmit={handleInvite}>
           <div className="flex w-full items-center space-x-2">
             <div className="relative flex-1">

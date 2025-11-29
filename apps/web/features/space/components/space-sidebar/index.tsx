@@ -134,7 +134,7 @@ export const SpaceSidebar = () => {
             if (item.id === 'preferences') {
               return (
                 <SidebarMenuItem key={item.id}>
-                  <SettingsDialog>
+                  <SettingsDialog defaultActiveItem="preferences">
                     <SidebarMenuButton asChild>
                       <button type="button" className="w-full">
                         <item.icon />

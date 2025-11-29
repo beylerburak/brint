@@ -13,6 +13,7 @@ import {
 import { AlertTriangleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { motion } from "motion/react";
 
 interface CancelInviteDialogProps {
   open: boolean;
@@ -45,31 +46,42 @@ export function CancelInviteDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <div className="flex items-start space-x-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-            <AlertTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <div className="flex items-start space-x-4">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 20 }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20"
+            >
+              <AlertTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+            </motion.div>
+            <DialogHeader>
+              <DialogTitle>{t("settings.workspace.people.cancelInviteDialog.title")}</DialogTitle>
+              <DialogDescription>
+                {t("settings.workspace.people.cancelInviteDialog.description", { email })}
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <DialogHeader>
-            <DialogTitle>{t("settings.workspace.people.cancelInviteDialog.title")}</DialogTitle>
-            <DialogDescription>
-              {t("settings.workspace.people.cancelInviteDialog.description", { email })}
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={loading}>
-              {t("cancel")}
+          <DialogFooter className="mt-4">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={loading}>
+                {t("cancel")}
+              </Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleConfirm}
+              disabled={loading}
+            >
+              {t("settings.workspace.people.cancelInvite")}
             </Button>
-          </DialogClose>
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={loading}
-          >
-            {t("settings.workspace.people.cancelInvite")}
-          </Button>
-        </DialogFooter>
+          </DialogFooter>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CancelInviteDialog } from "./cancel-invite-dialog";
@@ -67,6 +68,16 @@ function getStatusTranslation(status: string): string {
   };
   const key = statusMap[status.toUpperCase()] || status.toLowerCase();
   return `settings.workspace.people.table.status.${key}`;
+}
+
+function getStatusStyles(status: string): string {
+  const statusUpper = status.toUpperCase();
+  const statusStyles: Record<string, string> = {
+    ACTIVE: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+    INACTIVE: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-700",
+    PENDING: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+  };
+  return statusStyles[statusUpper] || "";
 }
 
 function createColumns(
@@ -238,7 +249,10 @@ function createColumns(
     cell: ({ row }) => {
       const status = row.original.status;
       return (
-        <Badge variant="outline">
+        <Badge 
+          variant="outline" 
+          className={getStatusStyles(status)}
+        >
           {t(getStatusTranslation(status))}
         </Badge>
       );
@@ -297,6 +311,7 @@ type TableRow = WorkspaceMember | {
 export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: WorkspaceMembersTableProps = {}) {
   const { workspace } = useWorkspace();
   const t = useTranslations("common");
+  const isMobile = useIsMobile();
   const [members, setMembers] = React.useState<WorkspaceMember[]>([]);
   const [invites, setInvites] = React.useState<WorkspaceInvite[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -524,6 +539,121 @@ export function WorkspaceMembersTable({ refreshTrigger, onCountChange }: Workspa
     );
   }
 
+  // Mobile card view
+  if (isMobile) {
+    return (
+      <>
+        <div className="flex flex-col gap-3">
+          {tableData.map((member) => {
+            const isInvite = "isInvite" in member && member.isInvite;
+            const displayName = isInvite ? member.inviteEmail : (member.user.name || member.user.email);
+            const email = isInvite ? member.inviteEmail : member.user.email;
+            const initials = getInitials(isInvite ? null : member.user.name, email);
+            const role = member.role;
+            const status = member.status;
+            const joinedAt = new Date(member.joinedAt).toLocaleDateString();
+
+            const variant = role === "OWNER" ? "default" : role === "ADMIN" ? "secondary" : "outline";
+
+            return (
+              <div
+                key={member.id}
+                className="flex flex-col gap-3 rounded-lg border p-3 bg-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Avatar className="h-10 w-10 shrink-0">
+                      {!isInvite && member.user.avatarUrl && (
+                        <AvatarImage src={member.user.avatarUrl} alt={displayName} />
+                      )}
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-medium truncate">{displayName}</span>
+                      {!isInvite && member.user.name && (
+                        <span className="text-xs text-muted-foreground truncate">{email}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className={`shrink-0 text-xs ${getStatusStyles(status)}`}>
+                    {t(getStatusTranslation(status))}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    {isInvite ? (
+                      <Badge variant="outline" className="text-xs">
+                        {t(getRoleTranslationKey("MEMBER"))}
+                      </Badge>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
+                            <Badge variant={variant} className="text-xs">{t(getRoleTranslationKey(role))}</Badge>
+                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem
+                            onClick={() => updateRole(member.userId, "OWNER")}
+                            disabled={role === "OWNER"}
+                          >
+                            {t(getRoleTranslationKey("OWNER"))}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateRole(member.userId, "ADMIN")}
+                            disabled={role === "ADMIN"}
+                          >
+                            {t(getRoleTranslationKey("ADMIN"))}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateRole(member.userId, "MEMBER")}
+                            disabled={role === "MEMBER"}
+                          >
+                            {t(getRoleTranslationKey("MEMBER"))}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => removeMember(member.userId)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            {t("settings.workspace.remove")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    <span className="text-xs text-muted-foreground">{joinedAt}</span>
+                  </div>
+
+                  {isInvite && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                      onClick={() => openCancelDialog(member.id, member.inviteEmail)}
+                    >
+                      {t("settings.workspace.people.cancelInvite")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {selectedInvite && (
+          <CancelInviteDialog
+            open={cancelDialogOpen}
+            onOpenChange={setCancelDialogOpen}
+            onConfirm={handleConfirmCancel}
+            email={selectedInvite.email}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Desktop table view
   return (
     <>
       <div className="rounded-md border">

@@ -238,13 +238,17 @@ export function SpaceNavUser() {
               <DropdownMenuGroup>
                 <SpaceSwitcherDropdownContent />
               </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem>
-                  <Sparkles />
-                  Upgrade to Pro
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              {workspacePlan === 'FREE' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem>
+                      <Sparkles />
+                      Upgrade to Pro
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem>

@@ -13,7 +13,7 @@ Bu dokümantasyon, BRINT frontend projesinde Server-Side Rendering (SSR) kullan�
 
 ---
 
-##- Genel Prensipler
+## Genel Prensipler
 
 ### ✅ Yapılması Gerekenler
 

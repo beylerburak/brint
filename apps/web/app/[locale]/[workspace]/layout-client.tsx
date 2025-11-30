@@ -1,10 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
 import { SpaceSidebar } from "@/features/space/components/space-sidebar";
-import { SpaceHeaderAlt } from "@/features/space/components/space-header-alt";
+import { SpacePageHeader } from "@/features/space/components/space-page-header";
+import { PageHeaderProvider } from "@/features/space/context/page-header-context";
 import { ProfileCompletionDialog } from "@/features/space/components/profile-completion-dialog";
 import { getUserProfile, type UserProfile } from "@/features/space/api/user-api";
 import { useAuth } from "@/features/auth/context/auth-context";
@@ -18,7 +18,6 @@ export function WorkspaceLayoutClient({
   children: React.ReactNode;
   workspace: string;
 }) {
-  const pathname = usePathname();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
@@ -93,10 +92,12 @@ export function WorkspaceLayoutClient({
       <SidebarProvider>
         <SpaceSidebar />
         <SidebarInset>
-          {/* <SpaceHeaderAlt workspace={workspace} /> */}
+          <PageHeaderProvider>
+            <SpacePageHeader />
           <div className="flex flex-1 flex-col">
             {children}
           </div>
+          </PageHeaderProvider>
         </SidebarInset>
       </SidebarProvider>
     </NotificationsProvider>

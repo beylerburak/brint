@@ -27,7 +27,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/animate-ui/components/radix/dropdown-menu';
 import {
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -149,19 +148,17 @@ export function SpaceNavUser() {
   // Show loading state while auth is loading
   if (authLoading || !user) {
     return (
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" disabled>
-              <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
-              <div className="grid flex-1 text-left text-sm leading-tight gap-1">
-                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-3 w-32 bg-muted animate-pulse rounded" />
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" disabled>
+            <div className="h-8 w-8 rounded-lg bg-muted animate-pulse shrink-0" />
+            <div className="grid flex-1 text-left text-sm leading-tight gap-1 group-data-[collapsible=icon]:hidden">
+              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
     );
   }
 
@@ -174,37 +171,37 @@ export function SpaceNavUser() {
   const workspaceSlugDisplay = workspace?.slug ? `@${workspace.slug}` : '';
 
   return (
-    <SidebarFooter>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <Avatar className="h-8 w-8 rounded-lg">
-                  {user.avatarUrl && (
-                    <AvatarImage src={user.avatarUrl} alt={displayName} />
-                  )}
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{displayName}</span>
-                  {workspaceSlugDisplay && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-xs">{workspaceSlugDisplay}</span>
-                      {workspacePlan && (
-                        <Badge variant="outline" className="text-xs h-4 px-1.5">
-                          {workspacePlan}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              tooltip={displayName}
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="h-8 w-8 rounded-lg shrink-0">
+                {user.avatarUrl && (
+                  <AvatarImage src={user.avatarUrl} alt={displayName} />
+                )}
+                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <span className="truncate font-semibold">{displayName}</span>
+                {workspaceSlugDisplay && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs">{workspaceSlugDisplay}</span>
+                    {workspacePlan && (
+                      <Badge variant="outline" className="text-xs h-4 px-1.5">
+                        {workspacePlan}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+              <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
             <DropdownMenuContent
               className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
               side={isMobile ? 'bottom' : 'right'}
@@ -273,7 +270,6 @@ export function SpaceNavUser() {
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-    </SidebarFooter>
   );
 }
 

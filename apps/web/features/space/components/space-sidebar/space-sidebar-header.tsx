@@ -1,13 +1,18 @@
 'use client';
 
+import { PanelLeftClose } from 'lucide-react';
 import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from '@/components/animate-ui/components/radix/sidebar';
+import { Button } from '@/components/ui/button';
 
 export function SpaceSidebarHeader() {
+  const { toggleSidebar, state } = useSidebar();
+
   return (
     <SidebarHeader>
       <SidebarMenu>
@@ -25,6 +30,21 @@ export function SpaceSidebarHeader() {
                 <span className="truncate font-medium">Agency Management</span>
                 <span className="truncate text-xs">by Beyler Interactive</span>
               </div>
+              {state === 'expanded' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSidebar();
+                  }}
+                >
+                  <PanelLeftClose className="size-4" />
+                  <span className="sr-only">Close sidebar</span>
+                </Button>
+              )}
             </a>
           </SidebarMenuButton>
         </SidebarMenuItem>

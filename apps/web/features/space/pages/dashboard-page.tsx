@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+import { usePageHeader } from "@/features/space/context/page-header-context";
 import type { WorkspaceDashboardData } from "@/shared/api/server/space";
 
 interface DashboardPageProps {
@@ -9,19 +11,19 @@ interface DashboardPageProps {
 export function WorkspaceDashboardPage({ initialData }: DashboardPageProps) {
   const { workspace, user } = initialData;
 
+  const headerConfig = useMemo(() => ({
+    title: workspace.name || workspace.slug,
+    description: `Welcome, ${user.name || user.email}`,
+  }), [workspace.name, workspace.slug, user.name, user.email]);
+
+  usePageHeader(headerConfig);
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">
-          {workspace.name || workspace.slug}
-        </h1>
-        <p className="text-muted-foreground">
-          Welcome, {user.name || user.email}
-        </p>
         {workspace.isOwner && (
           <p className="text-sm text-muted-foreground">You are the owner</p>
         )}
-      </div>
+      {/* Dashboard content will go here */}
     </div>
   );
 }

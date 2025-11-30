@@ -603,20 +603,24 @@ function SidebarMenuButton({
     </HighlightItem>
   );
 
-  if (!tooltip) {
+  // Only show tooltip when sidebar is collapsed and not on mobile
+  const showTooltip = tooltip && state === 'collapsed' && !isMobile;
+
+  if (!showTooltip) {
     return button;
   }
 
-  if (typeof tooltip === 'string') {
-    tooltip = {
-      children: tooltip,
-    };
-  }
+  const tooltipProps = typeof tooltip === 'string' 
+    ? { children: tooltip } 
+    : tooltip;
 
   return (
-    <Tooltip side="right" align="center">
+    <Tooltip side="right" align="center" sideOffset={8}>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
-      <TooltipContent hidden={state !== 'collapsed' || isMobile} {...tooltip} />
+      <TooltipContent 
+        className="bg-popover text-popover-foreground border shadow-md rounded-md px-3 py-1.5 text-sm"
+        {...tooltipProps} 
+      />
     </Tooltip>
   );
 }

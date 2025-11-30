@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ChevronRight, Settings, LifeBuoy, Home, Inbox } from 'lucide-react';
+import { ChevronRight, Settings, LifeBuoy, Home, Inbox, Palette, Command, Search } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,6 +26,8 @@ import {
 import { SpaceSidebarHeader } from './space-sidebar-header';
 import { SpaceNavUser } from './space-nav-user';
 import { SPACE_NAV_ITEMS, buildWorkspaceRoute } from '@/features/space/constants';
+import { Kbd } from '@/components/ui/kbd';
+import { Button } from '@/components/ui/button';
 import { useWorkspace } from '@/features/space/context/workspace-context';
 import { SettingsDialog } from '@/features/settings';
 import { usePermissions } from '@/features/permissions/hooks/hooks';
@@ -81,7 +83,30 @@ export const SpaceSidebar = () => {
       <SpaceSidebarHeader />
 
       <SidebarContent>
-        {/* Home and Inbox - above Platform */}
+        {/* Quick Actions & Search - contained side by side */}
+        <SidebarGroup className="pb-0">
+          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 justify-start gap-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            >
+              <Command className="size-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Quick actions</span>
+              <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            >
+              <Search className="size-4 shrink-0" />
+              <Kbd className="ml-1 group-data-[collapsible=icon]:hidden">/</Kbd>
+            </Button>
+          </div>
+        </SidebarGroup>
+
+        {/* Featured Items */}
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -100,6 +125,16 @@ export const SpaceSidebar = () => {
                 </button>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {permissions.includes('studio:brand.view' as PermissionKey) && (
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Brand Studio" asChild>
+                  <Link href={workspace?.slug ? buildWorkspaceRoute(locale, workspace.slug, 'studio/brands') : '#'}>
+                    <Palette />
+                    <span>Brand Studio</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -170,7 +205,7 @@ export const SpaceSidebar = () => {
               return (
                 <SidebarMenuItem key={item.id}>
                   <SettingsDialog defaultActiveItem="preferences">
-                    <SidebarMenuButton asChild>
+                    <SidebarMenuButton tooltip={item.label} asChild>
                       <button type="button" className="w-full">
                         <item.icon />
                         <span>{item.label}</span>
@@ -182,7 +217,7 @@ export const SpaceSidebar = () => {
             }
             return (
               <SidebarMenuItem key={item.id}>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton tooltip={item.label} asChild>
                   <Link href={item.href}>
                     <item.icon />
                     <span>{item.label}</span>

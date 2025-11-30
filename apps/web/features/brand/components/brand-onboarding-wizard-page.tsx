@@ -52,14 +52,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Progress } from "@/components/ui/progress";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -229,8 +221,6 @@ export function BrandOnboardingWizardPage({ brandId }: BrandOnboardingWizardPage
     }
   }, [brand, loading, locale, workspace?.slug, router]);
 
-  const totalSteps = STEPS.length;
-  const progress = (currentStep / totalSteps) * 100;
 
   // Handle step save
   const handleSaveStep = useCallback(async (stepData: UpdateBrandRequest, stepNumber: number) => {
@@ -315,121 +305,135 @@ export function BrandOnboardingWizardPage({ brandId }: BrandOnboardingWizardPage
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "brands"))}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold">Set up {brand.name}</h1>
-                <p className="text-sm text-muted-foreground">
-                  Complete the steps below to activate your brand
-                </p>
-              </div>
-            </div>
+    <div className="fixed inset-0 z-50 flex bg-background">
+      {/* Left Sidebar */}
+      <aside className="flex w-72 flex-col border-r bg-background shrink-0">
+        {/* Logo */}
+        <div className="p-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-lg">
+            {brand.name.charAt(0).toUpperCase()}
           </div>
         </div>
-      </div>
 
-      {/* Progress */}
-      <div className="border-b">
-        <div className="container max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">
-              Step {currentStep} of {totalSteps}
-            </span>
-            <span className="text-sm font-medium">
-              {STEPS[currentStep - 1].title}
-            </span>
-          </div>
-          <Progress value={progress} className="h-2" />
-          
-          {/* Step indicators */}
-          <div className="flex justify-between mt-4">
+        {/* Title */}
+        <div className="px-6 pb-6">
+          <h1 className="text-lg font-semibold">Set up {brand.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Complete the steps to activate your brand.
+          </p>
+        </div>
+
+        {/* Steps */}
+        <nav className="flex-1 px-4">
+          <ul className="space-y-1">
             {STEPS.map((step) => {
               const StepIcon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
-              
+
               return (
-                <div
-                  key={step.id}
-                  className={cn(
-                    "flex items-center gap-2",
-                    isActive ? "text-primary" : isCompleted ? "text-muted-foreground" : "text-muted-foreground/50"
-                  )}
-                >
-                  <div
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Only allow going back to completed steps
+                      if (isCompleted) {
+                        setCurrentStep(step.id);
+                      }
+                    }}
+                    disabled={!isCompleted && !isActive}
                     className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
-                      isActive && "border-primary bg-primary text-primary-foreground",
-                      isCompleted && "border-primary bg-primary/10 text-primary",
-                      !isActive && !isCompleted && "border-muted-foreground/25"
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                      isActive && "bg-accent",
+                      isCompleted && "hover:bg-accent/50 cursor-pointer",
+                      !isActive && !isCompleted && "opacity-50 cursor-not-allowed"
                     )}
                   >
-                    {isCompleted ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <StepIcon className="h-4 w-4" />
-                    )}
-                  </div>
-                  <span className="hidden sm:inline text-sm font-medium">
-                    {step.title}
-                  </span>
-                </div>
+                    <div
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                        isActive && "border-primary bg-primary text-primary-foreground",
+                        isCompleted && "border-primary bg-primary text-primary-foreground",
+                        !isActive && !isCompleted && "border-muted-foreground/30"
+                      )}
+                    >
+                      {isCompleted ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <StepIcon className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn(
+                        "text-sm font-medium truncate",
+                        isActive && "text-foreground",
+                        !isActive && "text-muted-foreground"
+                      )}>
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {step.description}
+                      </p>
+                    </div>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ul>
+        </nav>
+
+        {/* Save & Close Button */}
+        <div className="p-4 border-t">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground"
+            onClick={() => router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "brands"))}
+          >
+            Save & Close
+          </Button>
         </div>
-      </div>
+      </aside>
 
-      {/* Step Content */}
-      <div className="flex-1 container max-w-4xl mx-auto px-4 py-8">
-        {currentStep === 1 && (
-          <ProfileStep
-            brand={brand}
-            isSaving={isSaving}
-            onNext={async (data) => {
-              const success = await handleSaveStep(data, 1);
-              if (success) setCurrentStep(2);
-            }}
-            onBack={() => router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "brands"))}
-          />
-        )}
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto p-8 flex items-center">
+        <div className="w-full max-w-xl mx-auto">
+            {currentStep === 1 && (
+              <ProfileStep
+                brand={brand}
+                isSaving={isSaving}
+                onNext={async (data) => {
+                  const success = await handleSaveStep(data, 1);
+                  if (success) setCurrentStep(2);
+                }}
+                onBack={() => router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "brands"))}
+              />
+            )}
 
-        {currentStep === 2 && (
-          <IdentityStep
-            brand={brand}
-            brandId={brandId}
-            isSaving={isSaving}
-            onNext={async (data) => {
-              const success = await handleSaveStep(data, 2);
-              if (success) setCurrentStep(3);
-            }}
-            onBack={() => setCurrentStep(1)}
-          />
-        )}
+            {currentStep === 2 && (
+              <IdentityStep
+                brand={brand}
+                brandId={brandId}
+                isSaving={isSaving}
+                onNext={async (data) => {
+                  const success = await handleSaveStep(data, 2);
+                  if (success) setCurrentStep(3);
+                }}
+                onBack={() => setCurrentStep(1)}
+              />
+            )}
 
-        {currentStep === 3 && (
-          <SocialStep
-            brand={brand}
-            brandId={brandId}
-            isCompleting={isCompleting}
-            onComplete={handleComplete}
-            onBack={() => setCurrentStep(2)}
-            onBrandRefresh={refresh}
-          />
-        )}
-      </div>
+            {currentStep === 3 && (
+              <SocialStep
+                brand={brand}
+                brandId={brandId}
+                isCompleting={isCompleting}
+                onComplete={handleComplete}
+                onBack={() => setCurrentStep(2)}
+                onBrandRefresh={refresh}
+              />
+            )}
+        </div>
+      </main>
     </div>
   );
 }
@@ -470,19 +474,18 @@ function ProfileStep({ brand, isSaving, onNext, onBack }: ProfileStepProps) {
   }, [nameValue, slugManuallyEdited, form]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Brand Profile</CardTitle>
-        <CardDescription>
+    <div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold tracking-tight">Brand Profile</h2>
+        <p className="text-muted-foreground mt-1">
           Tell us about your brand. This information helps personalize your experience.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onNext)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="name"
+        </p>
+      </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onNext)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Brand Name *</FormLabel>
@@ -614,21 +617,20 @@ function ProfileStep({ brand, isSaving, onNext, onBack }: ProfileStepProps) {
               />
             </div>
 
-            <div className="flex justify-between pt-4">
-              <Button type="button" variant="ghost" onClick={onBack}>
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Continue
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+          <div className="flex justify-between pt-6">
+            <Button type="button" variant="ghost" onClick={onBack}>
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }
 
@@ -847,17 +849,16 @@ function IdentityStep({ brand, brandId, isSaving, onNext, onBack }: IdentityStep
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Brand Identity</CardTitle>
-          <CardDescription>
+      <div>
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold tracking-tight">Brand Identity</h2>
+          <p className="text-muted-foreground mt-1">
             Define your brand's visual identity and voice.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-              {/* Logo Upload */}
+          </p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* Logo Upload */}
               <div className="space-y-2">
                 <Label>Brand Logo</Label>
                 <div className="flex items-center gap-4">
@@ -1029,21 +1030,20 @@ function IdentityStep({ brand, brandId, isSaving, onNext, onBack }: IdentityStep
                 />
               </div>
 
-              <div className="flex justify-between pt-4">
-                <Button type="button" variant="ghost" onClick={onBack}>
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button type="submit" disabled={isSaving || isUploadingLogo}>
-                  {(isSaving || isUploadingLogo) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Continue
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+            <div className="flex justify-between pt-6">
+              <Button type="button" variant="ghost" onClick={onBack}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button type="submit" disabled={isSaving || isUploadingLogo}>
+                {(isSaving || isUploadingLogo) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Continue
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
 
       {/* Logo Crop Dialog */}
       <Dialog
@@ -1137,39 +1137,38 @@ interface SocialStepProps {
 
 function SocialStep({ brand, brandId, isCompleting, onComplete, onBack, onBrandRefresh }: SocialStepProps) {
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Connect Social Accounts</CardTitle>
-          <CardDescription>
-            Connect your social media accounts to start publishing content.
-            You can skip this step and add accounts later.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BrandSocialAccountsPanel brandId={brandId} onBrandRefresh={onBrandRefresh} />
-        </CardContent>
-      </Card>
+    <div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold tracking-tight">Connect Social Accounts</h2>
+        <p className="text-muted-foreground mt-1">
+          Connect your social media accounts to start publishing content.
+          You can skip this step and add accounts later.
+        </p>
+      </div>
 
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Almost there!</AlertTitle>
-        <AlertDescription>
-          Click "Finish Setup" to activate your brand. You can always add more social accounts
-          and customize settings later from the Brand Studio.
-        </AlertDescription>
-      </Alert>
+      <div className="space-y-6">
+        <BrandSocialAccountsPanel brandId={brandId} onBrandRefresh={onBrandRefresh} />
 
-      <div className="flex justify-between pt-4">
-        <Button type="button" variant="ghost" onClick={onBack}>
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <Button onClick={onComplete} disabled={isCompleting}>
-          {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Check className="mr-2 h-4 w-4" />
-          Finish Setup
-        </Button>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Almost there!</AlertTitle>
+          <AlertDescription>
+            Click "Finish Setup" to activate your brand. You can always add more social accounts
+            and customize settings later from the Brand Studio.
+          </AlertDescription>
+        </Alert>
+
+        <div className="flex justify-between pt-2">
+          <Button type="button" variant="ghost" onClick={onBack}>
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <Button onClick={onComplete} disabled={isCompleting}>
+            {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Check className="mr-2 h-4 w-4" />
+            Finish Setup
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1181,47 +1180,51 @@ function SocialStep({ brand, brandId, isCompleting, onComplete, onBack, onBrandR
 
 function WizardSkeleton() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="border-b">
-        <div className="container max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-9 w-20" />
-            <div>
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-64 mt-1" />
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex bg-background">
+      {/* Left Sidebar Skeleton */}
+      <aside className="flex w-72 flex-col border-r bg-background shrink-0">
+        <div className="p-6">
+          <Skeleton className="h-10 w-10 rounded-lg" />
         </div>
-      </div>
-      <div className="border-b">
-        <div className="container max-w-4xl mx-auto px-4 py-4">
-          <Skeleton className="h-2 w-full" />
-          <div className="flex justify-between mt-4">
+        <div className="px-6 pb-6 space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <nav className="flex-1 px-4">
+          <ul className="space-y-1">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Skeleton className="h-8 w-8 rounded-full" />
-                <Skeleton className="h-4 w-16" />
-              </div>
+              <li key={i} className="flex items-center gap-3 px-3 py-2.5">
+                <Skeleton className="h-7 w-7 rounded-full shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
+        </nav>
+        <div className="p-4 border-t">
+          <Skeleton className="h-9 w-full" />
         </div>
-      </div>
-      <div className="flex-1 container max-w-4xl mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
+      </aside>
+
+      {/* Main Content Skeleton */}
+      <main className="flex-1 overflow-auto p-8 flex items-center">
+        <div className="w-full max-w-xl mx-auto">
+          <div className="mb-8 space-y-2">
+            <Skeleton className="h-7 w-40" />
             <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-6">
+          </div>
+          <div className="space-y-6">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-10 w-full" />
               </div>
             ))}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

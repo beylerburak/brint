@@ -1,49 +1,52 @@
 "use client";
 
-/**
- * Studio Page Header
- * 
- * Header component for Studio pages with breadcrumbs and actions.
- */
-
-import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
+import * as React from "react";
 import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import type { BrandDetail } from "@/features/brand/types";
+import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
+import { useStudioPageHeaderContext } from "../context/page-header-context";
+import { RealtimeStatusBadge } from "./realtime-status-badge";
 
-interface StudioPageHeaderProps {
-  brand: BrandDetail;
-  pageTitle?: string;
-}
+/**
+ * Unified page header component for Studio that combines:
+ * - Layout header (sidebar trigger)
+ * - Page content header (title, description, badge, actions)
+ * 
+ * This component reads from StudioPageHeaderContext, which is set by individual pages
+ * using the useStudioPageHeader hook.
+ */
+export function StudioPageHeader() {
+  const { config } = useStudioPageHeaderContext();
 
-export function StudioPageHeader({ brand, pageTitle }: StudioPageHeaderProps) {
+  // Don't render if no config is set
+  if (!config) {
+    return null;
+  }
+
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-4" />
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem className="hidden md:block">
-            <BreadcrumbLink href="#">{brand.name}</BreadcrumbLink>
-          </BreadcrumbItem>
-          {pageTitle && (
-            <>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{pageTitle}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </>
-          )}
-        </BreadcrumbList>
-      </Breadcrumb>
+    <header className="flex shrink-0 flex-col gap-1 border-b bg-background px-4 py-3 transition-[height] ease-linear">
+      {/* Top bar with sidebar trigger */}
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mr-2 data-[orientation=vertical]:h-4"
+        />
+        <div className="flex flex-1 items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">{config.title}</h1>
+            {config.badge}
+          </div>
+          <div className="flex items-center gap-3">
+            {config.actions}
+            <RealtimeStatusBadge />
+          </div>
+        </div>
+      </div>
+      
+      {/* Description row (if provided) */}
+      {config.description && (
+        <p className="text-sm text-muted-foreground">{config.description}</p>
+      )}
     </header>
   );
 }
-

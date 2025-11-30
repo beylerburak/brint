@@ -136,6 +136,7 @@ export async function registerSocialAccountRoutes(app: FastifyInstance) {
           status: account.status,
           lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null,
           avatarMediaId: account.avatarMediaId,
+          avatarUrl: account.avatarUrl,
           platformData: account.platformData,
           createdAt: account.createdAt.toISOString(),
           updatedAt: account.updatedAt.toISOString(),

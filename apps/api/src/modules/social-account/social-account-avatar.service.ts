@@ -86,7 +86,7 @@ export async function saveAvatarFromUrl(
       files.map((file) => storage.putObject(file.key, file.buffer, file.contentType))
     );
 
-    // 5. Create media record
+    // 5. Create media record (isPublic: true for avatars to allow direct CDN access)
     const media = await prisma.media.create({
       data: {
         workspaceId,
@@ -95,6 +95,7 @@ export async function saveAvatarFromUrl(
         originalName: fileName,
         contentType,
         sizeBytes: buffer.byteLength,
+        isPublic: true,
         variants: variants as Prisma.InputJsonValue,
       },
     });

@@ -8,8 +8,7 @@
 import type { SocialAccount, SocialAccountStatus } from "@prisma/client";
 import type { FastifyRequest } from "fastify";
 import { prisma } from "../../lib/prisma.js";
-import { S3StorageService } from "../../lib/storage/s3.storage.service.js";
-import { storageConfig } from "../../config/index.js";
+import { buildPublicUrl } from "../../lib/storage/public-url.js";
 import { socialAccountRepository } from "./social-account.repository.js";
 import {
   encryptSocialCredentials,
@@ -22,8 +21,6 @@ import { logActivity } from "../activity/activity.service.js";
 import * as brandService from "../brand/brand.service.js";
 import * as brandRepository from "../brand/brand.repository.js";
 import { NotFoundError, ConflictError } from "../../lib/http-errors.js";
-
-const storage = new S3StorageService();
 
 // ====================
 // List Operations
@@ -74,6 +71,9 @@ export async function listBrandAccounts(
 
 /**
  * Enrich social accounts with avatar URLs
+ * 
+ * Uses public CDN URLs for media with isPublic: true (our saved avatars).
+ * Falls back to platform CDN URLs from platformData.
  */
 async function enrichWithAvatarUrls(
   accounts: SocialAccount[]
@@ -86,15 +86,7 @@ async function enrichWithAvatarUrls(
   if (mediaIds.length === 0) {
     // No saved avatars, but still check platformData for CDN URLs
     return accounts.map((account) => {
-      let avatarUrl: string | null = null;
-      const platformData = account.platformData as Record<string, unknown> | null;
-      if (platformData) {
-        if (typeof platformData.pictureUrl === 'string') {
-          avatarUrl = platformData.pictureUrl;
-        } else if (typeof platformData.profilePictureUrl === 'string') {
-          avatarUrl = platformData.profilePictureUrl;
-        }
-      }
+      const avatarUrl = extractPlatformAvatarUrl(account);
       return toSocialAccountListItem(account, avatarUrl);
     });
   }
@@ -102,50 +94,57 @@ async function enrichWithAvatarUrls(
   // Fetch media records
   const mediaRecords = await prisma.media.findMany({
     where: { id: { in: mediaIds } },
-    select: { id: true, objectKey: true, variants: true },
+    select: { id: true, objectKey: true, variants: true, isPublic: true },
   });
 
-  // Generate presigned URLs in parallel
+  // Build URL map using public CDN URLs (for isPublic media)
   const mediaUrlMap = new Map<string, string>();
-  await Promise.all(
-    mediaRecords.map(async (media) => {
-      try {
-        // Try to use thumbnail variant if available, otherwise use original
-        const variants = media.variants as Record<string, { key?: string }> | null;
-        const thumbnailKey = variants?.thumbnail?.key || media.objectKey;
-        
-        const url = await storage.getPresignedDownloadUrl(thumbnailKey, {
-          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
-        });
-        mediaUrlMap.set(media.id, url);
-      } catch {
-        // Ignore errors, just don't set the URL
-      }
-    })
-  );
+  for (const media of mediaRecords) {
+    // Try to use thumbnail variant if available, otherwise use original
+    const variants = media.variants as Record<string, { key?: string }> | null;
+    const objectKey = variants?.thumbnail?.key || media.objectKey;
+    
+    // Build public URL (only works if CDN is configured and media is public)
+    const publicUrl = buildPublicUrl(objectKey);
+    if (publicUrl) {
+      mediaUrlMap.set(media.id, publicUrl);
+    }
+  }
 
   // Map accounts with avatar URLs (with platform data fallback)
   return accounts.map((account) => {
-    // Try presigned URL from our S3 first
+    // Try public CDN URL from our S3 first
     let avatarUrl = account.avatarMediaId
       ? mediaUrlMap.get(account.avatarMediaId) ?? null
       : null;
 
     // Fallback to platform's CDN URL if we don't have our own
     if (!avatarUrl) {
-      const platformData = account.platformData as Record<string, unknown> | null;
-      if (platformData) {
-        // Facebook stores as pictureUrl, Instagram as profilePictureUrl
-        if (typeof platformData.pictureUrl === 'string') {
-          avatarUrl = platformData.pictureUrl;
-        } else if (typeof platformData.profilePictureUrl === 'string') {
-          avatarUrl = platformData.profilePictureUrl;
-        }
-      }
+      avatarUrl = extractPlatformAvatarUrl(account);
     }
 
     return toSocialAccountListItem(account, avatarUrl);
   });
+}
+
+/**
+ * Extract avatar URL from platform data
+ */
+function extractPlatformAvatarUrl(account: SocialAccount): string | null {
+  const platformData = account.platformData as Record<string, unknown> | null;
+  if (!platformData) return null;
+
+  // Different platforms store avatar URLs differently
+  if (typeof platformData.pictureUrl === 'string') {
+    return platformData.pictureUrl;
+  }
+  if (typeof platformData.profilePictureUrl === 'string') {
+    return platformData.profilePictureUrl;
+  }
+  if (typeof platformData.avatarUrl === 'string') {
+    return platformData.avatarUrl;
+  }
+  return null;
 }
 
 // ====================

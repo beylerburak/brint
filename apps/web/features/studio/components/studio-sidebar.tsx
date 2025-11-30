@@ -4,12 +4,12 @@
  * Studio Sidebar
  * 
  * Full sidebar component for the Studio layout.
- * Includes brand switcher and navigation items.
+ * Includes brand switcher, quick actions, and navigation items.
  */
 
 import Link from "next/link";
 import { useLocale } from "next-intl";
-import { ArrowLeft, Settings, HelpCircle } from "lucide-react";
+import { ArrowLeft, Settings, HelpCircle, Command, Search } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,8 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/animate-ui/components/radix/sidebar";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { StudioBrandSwitcher } from "./studio-brand-switcher";
 import { StudioNavItems } from "./studio-nav-items";
 import { buildWorkspaceRoute } from "@/features/space/constants";
@@ -49,21 +51,28 @@ export function StudioSidebar({ workspaceSlug, brand }: StudioSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Back to Workspace */}
+        {/* Quick Actions & Search */}
         <SidebarGroup className="pb-0">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Back to Workspace" asChild>
-                <Link href={workspaceHomeUrl}>
-                  <ArrowLeft className="size-4" />
-                  <span>Back to Workspace</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 justify-start gap-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            >
+              <Command className="size-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Quick actions</span>
+              <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            >
+              <Search className="size-4 shrink-0" />
+              <Kbd className="ml-1 group-data-[collapsible=icon]:hidden">/</Kbd>
+            </Button>
+          </div>
         </SidebarGroup>
-
-        <SidebarSeparator />
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -81,6 +90,17 @@ export function StudioSidebar({ workspaceSlug, brand }: StudioSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Back to Workspace" asChild>
+              <Link href={workspaceHomeUrl}>
+                <ArrowLeft className="size-4" />
+                <span>Back to Workspace</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Brand Settings" asChild>
@@ -111,4 +131,3 @@ export function StudioSidebar({ workspaceSlug, brand }: StudioSidebarProps) {
     </Sidebar>
   );
 }
-

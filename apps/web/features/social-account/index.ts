@@ -7,3 +7,6 @@ export * from "./hooks";
 // Types
 export * from "./types";
 
+// Components
+export * from "./components";
+

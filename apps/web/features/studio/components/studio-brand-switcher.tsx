@@ -77,7 +77,9 @@ export function StudioBrandSwitcher({
 
   // Get brand color or default
   const getBrandColor = (brand: BrandSummary | BrandDetail) => {
-    return brand.primaryColor || "hsl(var(--sidebar-primary))";
+    // primaryColor only exists on BrandDetail
+    const color = "primaryColor" in brand ? brand.primaryColor : null;
+    return color || "hsl(var(--sidebar-primary))";
   };
 
   return (
@@ -89,22 +91,22 @@ export function StudioBrandSwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div
-                className="flex aspect-square size-8 items-center justify-center rounded-lg text-white"
-                style={{ backgroundColor: getBrandColor(activeBrand) }}
-              >
-                {activeBrand.logoUrl ? (
-                  <img
-                    src={activeBrand.logoUrl}
-                    alt={activeBrand.name}
-                    className="size-8 object-contain rounded-lg"
-                  />
-                ) : (
+              {activeBrand.logoUrl ? (
+                <img
+                  src={activeBrand.logoUrl}
+                  alt={activeBrand.name}
+                  className="size-8 rounded-lg object-cover"
+                />
+              ) : (
+                <div
+                  className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground"
+                  style={{ backgroundColor: getBrandColor(activeBrand) }}
+                >
                   <span className="text-xs font-semibold">
                     {getBrandInitials(activeBrand.name)}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
                   {activeBrand.name}
@@ -138,22 +140,22 @@ export function StudioBrandSwitcher({
                   onClick={() => handleBrandSelect(brand)}
                   className="gap-2 p-2"
                 >
-                  <div
-                    className="flex size-6 gap-1 items-center justify-center rounded-sm text-white"
-                    style={{ backgroundColor: getBrandColor(brand) }}
-                  >
-                    {brand.logoUrl ? (
-                      <img
-                        src={brand.logoUrl}
-                        alt={brand.name}
-                        className="size-5 rounded-sm object-contain"
-                      />
-                    ) : (
+                  {brand.logoUrl ? (
+                    <img
+                      src={brand.logoUrl}
+                      alt={brand.name}
+                      className="size-6 rounded-sm object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex size-6 items-center justify-center rounded-sm text-sidebar-primary-foreground"
+                      style={{ backgroundColor: getBrandColor(brand) }}
+                    >
                       <span className="text-[10px] font-semibold">
                         {getBrandInitials(brand.name)}
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <span className="truncate flex-1">{brand.name}</span>
                   {brand.slug === activeBrand.slug && (
                     <Check className="size-4 text-primary" />

@@ -176,6 +176,8 @@ export interface BiDataTableProps<TData> {
   defaultShowRowBorders?: boolean;
   /** Hide view settings menu */
   hideViewSettings?: boolean;
+  /** Extra content for command menu (rendered after row borders toggle) */
+  commandMenuExtra?: React.ReactNode;
   /** Custom skeleton row count */
   skeletonRows?: number;
   /** Table className */
@@ -249,6 +251,7 @@ export function BiDataTable<TData>({
   defaultShowVerticalLines = true,
   defaultShowRowBorders = true,
   hideViewSettings = false,
+  commandMenuExtra,
   skeletonRows = 3,
   className,
 }: BiDataTableProps<TData>) {
@@ -884,6 +887,12 @@ export function BiDataTable<TData>({
                     onCheckedChange={setShowRowBorders}
                   />
                 </div>
+                {commandMenuExtra && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {commandMenuExtra}
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

@@ -12,7 +12,9 @@
 
 import { SidebarProvider, SidebarInset } from "@/components/animate-ui/components/radix/sidebar";
 import { StudioSidebar } from "./studio-sidebar";
+import { StudioPageHeader } from "./studio-page-header";
 import { StudioBrandProvider } from "../context/studio-brand-context";
+import { StudioPageHeaderProvider } from "../context/page-header-context";
 import type { BrandDetail } from "@/features/brand/types";
 
 interface StudioLayoutClientProps {
@@ -33,12 +35,16 @@ export function StudioLayoutClient({
       <StudioBrandProvider brand={brand} refreshBrand={refreshBrand}>
         <SidebarProvider className="!min-h-0 h-full">
           <StudioSidebar workspaceSlug={workspaceSlug} brand={brand} />
-          <SidebarInset className="!flex-col h-full overflow-y-auto">
-            {children}
+          <SidebarInset className="!flex-col h-full">
+            <StudioPageHeaderProvider>
+              <StudioPageHeader />
+              <div className="flex-1 overflow-y-auto">
+                {children}
+              </div>
+            </StudioPageHeaderProvider>
           </SidebarInset>
         </SidebarProvider>
       </StudioBrandProvider>
     </div>
   );
 }
-

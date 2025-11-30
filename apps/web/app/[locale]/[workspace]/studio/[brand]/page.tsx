@@ -1,27 +1,40 @@
 "use client";
 
-import { use } from "react";
-import { BrandStudioDetailPage } from "@/features/brand/components/brand-studio-detail-page";
-
 /**
- * Studio Brand Page
+ * Studio Brand Index Page
  * 
  * Route: /[locale]/[workspace]/studio/[brand]
  * 
- * Displays the brand studio for an active brand.
- * Redirects to setup wizard if brand is DRAFT and not onboarded.
+ * Redirects to /home automatically.
  */
+
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
+import { buildWorkspaceRoute } from "@/features/space/constants";
 
 interface PageProps {
   params: Promise<{
     locale: string;
     workspace: string;
-    brand: string; // brandSlug
+    brand: string;
   }>;
 }
 
-export default function StudioBrandPage({ params }: PageProps) {
-  const { brand } = use(params);
-  return <BrandStudioDetailPage brandSlug={brand} />;
-}
+export default function StudioBrandIndexPage({ params }: PageProps) {
+  const { brand: brandSlug, workspace: workspaceSlug } = use(params);
+  const locale = useLocale();
+  const router = useRouter();
 
+  useEffect(() => {
+    const homePath = buildWorkspaceRoute(
+      locale,
+      workspaceSlug,
+      `studio/${brandSlug}/home`
+    );
+    router.replace(homePath);
+  }, [locale, workspaceSlug, brandSlug, router]);
+
+  // Return null while redirecting
+  return null;
+}

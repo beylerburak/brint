@@ -8,7 +8,8 @@
  * Content management page for the brand studio.
  */
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useStudioBrand } from "@/features/studio/hooks";
 import { useStudioPageHeader } from "@/features/studio/context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,18 +18,24 @@ import { Plus, FileText } from "lucide-react";
 
 export default function StudioBrandContentsPage() {
   const { brand } = useStudioBrand();
+  const router = useRouter();
+  const params = useParams();
+
+  const handleNewContent = useCallback(() => {
+    router.push(`/${params.locale}/${params.workspace}/studio/${params.brand}/contents/new`);
+  }, [router, params.locale, params.workspace, params.brand]);
 
   // Set page header config
   const headerConfig = useMemo(() => ({
     title: "Contents",
     description: "Create and manage your brand's content library",
     actions: (
-      <Button>
+      <Button onClick={handleNewContent}>
         <Plus className="mr-2 h-4 w-4" />
         New Content
       </Button>
     ),
-  }), []);
+  }), [handleNewContent]);
   
   useStudioPageHeader(headerConfig);
 
@@ -47,7 +54,7 @@ export default function StudioBrandContentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button>
+          <Button onClick={handleNewContent}>
             <Plus className="mr-2 h-4 w-4" />
             Create your first content
           </Button>

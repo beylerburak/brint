@@ -115,6 +115,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                       slug: { type: "string" },
                       description: { type: ["string", "null"] },
                       industry: { type: ["string", "null"] },
+                      status: { type: "string" },
+                      onboardingStep: { type: "number" },
+                      onboardingCompleted: { type: "boolean" },
                       readinessScore: { type: "number" },
                       profileCompleted: { type: "boolean" },
                       hasAtLeastOneSocialAccount: { type: "boolean" },
@@ -162,6 +165,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
           slug: brand.slug,
           description: brand.description,
           industry: brand.industry,
+          status: brand.status,
+          onboardingStep: brand.onboardingStep,
+          onboardingCompleted: brand.onboardingCompleted,
           readinessScore: brand.readinessScore,
           profileCompleted: brand.profileCompleted,
           hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
@@ -221,6 +227,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                 id: { type: "string" },
                 name: { type: "string" },
                 slug: { type: "string" },
+                status: { type: "string" },
+                onboardingStep: { type: "number" },
+                onboardingCompleted: { type: "boolean" },
                 readinessScore: { type: "number" },
               },
             },
@@ -252,6 +261,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         id: brand.id,
         name: brand.name,
         slug: brand.slug,
+        status: brand.status,
+        onboardingStep: brand.onboardingStep,
+        onboardingCompleted: brand.onboardingCompleted,
         readinessScore: brand.readinessScore,
       },
     });
@@ -297,6 +309,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                 websiteUrl: { type: ["string", "null"] },
                 logoMediaId: { type: ["string", "null"] },
                 logoUrl: { type: ["string", "null"] },
+                status: { type: "string" },
+                onboardingStep: { type: "number" },
+                onboardingCompleted: { type: "boolean" },
                 readinessScore: { type: "number" },
                 profileCompleted: { type: "boolean" },
                 hasAtLeastOneSocialAccount: { type: "boolean" },
@@ -338,6 +353,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         websiteUrl: brand.websiteUrl,
         logoMediaId: brand.logoMediaId,
         logoUrl,
+        status: brand.status,
+        onboardingStep: brand.onboardingStep,
+        onboardingCompleted: brand.onboardingCompleted,
         readinessScore: brand.readinessScore,
         profileCompleted: brand.profileCompleted,
         hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
@@ -391,6 +409,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
                 websiteUrl: { type: ["string", "null"] },
                 logoMediaId: { type: ["string", "null"] },
                 logoUrl: { type: ["string", "null"] },
+                status: { type: "string" },
+                onboardingStep: { type: "number" },
+                onboardingCompleted: { type: "boolean" },
                 readinessScore: { type: "number" },
                 profileCompleted: { type: "boolean" },
                 hasAtLeastOneSocialAccount: { type: "boolean" },
@@ -432,6 +453,9 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         websiteUrl: brand.websiteUrl,
         logoMediaId: brand.logoMediaId,
         logoUrl,
+        status: brand.status,
+        onboardingStep: brand.onboardingStep,
+        onboardingCompleted: brand.onboardingCompleted,
         readinessScore: brand.readinessScore,
         profileCompleted: brand.profileCompleted,
         hasAtLeastOneSocialAccount: brand.hasAtLeastOneSocialAccount,
@@ -589,6 +613,168 @@ export async function registerBrandRoutes(app: FastifyInstance) {
         brandId: brand.id,
         isArchived: brand.isArchived,
       },
+    });
+  });
+
+  // ====================
+  // Onboarding Routes
+  // ====================
+
+  /**
+   * PATCH /v1/brands/:brandId/onboarding
+   * Update brand onboarding step progress
+   */
+  app.patch("/brands/:brandId/onboarding", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_BRAND_UPDATE)],
+    schema: {
+      tags: ["Brands", "Onboarding"],
+      summary: "Update onboarding step",
+      description: "Update brand onboarding step progress during the wizard",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      body: {
+        type: "object",
+        properties: {
+          step: { type: "number", minimum: 0, maximum: 10 },
+          data: {
+            type: "object",
+            properties: {
+              name: { type: "string", minLength: 1, maxLength: 255 },
+              description: { type: ["string", "null"], maxLength: 2000 },
+              industry: { type: ["string", "null"], maxLength: 255 },
+              language: { type: ["string", "null"], maxLength: 10 },
+              timezone: { type: ["string", "null"], maxLength: 100 },
+              toneOfVoice: { type: ["string", "null"], maxLength: 500 },
+              primaryColor: { type: ["string", "null"], maxLength: 20 },
+              secondaryColor: { type: ["string", "null"], maxLength: 20 },
+              websiteUrl: { type: ["string", "null"], maxLength: 2000 },
+              logoMediaId: { type: ["string", "null"], maxLength: 50 },
+            },
+          },
+        },
+        required: ["step"],
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                slug: { type: "string" },
+                status: { type: "string" },
+                onboardingStep: { type: "number" },
+                onboardingCompleted: { type: "boolean" },
+                readinessScore: { type: "number" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const body = request.body as { step: number; data?: Record<string, unknown> };
+
+    const brand = await brandService.updateBrandOnboarding({
+      brandId,
+      workspaceId,
+      input: {
+        step: body.step,
+        data: body.data as any,
+      },
+      userId,
+      request,
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        status: brand.status,
+        onboardingStep: brand.onboardingStep,
+        onboardingCompleted: brand.onboardingCompleted,
+        readinessScore: brand.readinessScore,
+      },
+    });
+  });
+
+  /**
+   * POST /v1/brands/:brandId/complete-onboarding
+   * Complete brand onboarding and activate the brand
+   */
+  app.post("/brands/:brandId/complete-onboarding", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_BRAND_UPDATE)],
+    schema: {
+      tags: ["Brands", "Onboarding"],
+      summary: "Complete onboarding",
+      description: "Complete brand onboarding, setting status to ACTIVE",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                slug: { type: "string" },
+                name: { type: "string" },
+                status: { type: "string" },
+                onboardingCompleted: { type: "boolean" },
+                onboardingStep: { type: "number" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+
+    const result = await brandService.completeBrandOnboarding({
+      brandId,
+      workspaceId,
+      userId,
+      request,
+    });
+
+    return reply.send({
+      success: true,
+      data: result,
     });
   });
 

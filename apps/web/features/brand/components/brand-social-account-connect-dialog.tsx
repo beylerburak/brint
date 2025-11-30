@@ -8,8 +8,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Facebook, Instagram, Youtube, Linkedin, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import {
   getOAuthPlatforms,
@@ -197,7 +194,7 @@ export function BrandSocialAccountConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Connect Social Account</DialogTitle>
           <DialogDescription>
@@ -210,56 +207,42 @@ export function BrandSocialAccountConnectDialog({
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-2 py-2">
             {platforms.map((platform) => (
-              <Card
+              <button
                 key={platform.id}
-                className={`transition-opacity ${!platform.enabled ? "opacity-50" : ""}`}
+                type="button"
+                onClick={() =>
+                  platform.enabled &&
+                  handleConnect(platform.id as "FACEBOOK" | "INSTAGRAM" | "TIKTOK" | "LINKEDIN" | "X" | "PINTEREST" | "YOUTUBE")
+                }
+                disabled={!platform.enabled || connecting !== null}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all ${
+                  !platform.enabled
+                    ? "opacity-50 cursor-not-allowed bg-muted/30"
+                    : connecting === platform.id
+                    ? "opacity-70 cursor-wait"
+                    : "hover:bg-accent hover:border-accent-foreground/20 cursor-pointer"
+                }`}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-lg ${
-                          platform.enabled ? getPlatformColor(platform.id) : "bg-muted"
-                        }`}
-                      >
-                        {getPlatformIcon(platform.id)}
-                      </div>
-                      <div>
-                        <p className="font-medium">{platform.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {platform.supportedAccountTypes
-                            .map((t) => t.replace(/_/g, " ").toLowerCase())
-                            .join(", ")}
-                        </p>
-                      </div>
-                    </div>
-
-                    {platform.enabled ? (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          handleConnect(platform.id as "FACEBOOK" | "INSTAGRAM" | "TIKTOK" | "LINKEDIN" | "X" | "PINTEREST" | "YOUTUBE")
-                        }
-                        disabled={connecting !== null}
-                        className={getPlatformColor(platform.id)}
-                      >
-                        {connecting === platform.id ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Connecting...
-                          </>
-                        ) : (
-                          "Connect"
-                        )}
-                      </Button>
-                    ) : (
-                      <Badge variant="secondary">Coming Soon</Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                <div
+                  className={`p-1.5 rounded-md shrink-0 ${
+                    platform.enabled ? getPlatformColor(platform.id) : "bg-muted"
+                  }`}
+                >
+                  {connecting === platform.id ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    getPlatformIcon(platform.id)
+                  )}
+                </div>
+                <div className="min-w-0 text-left flex-1">
+                  <p className="font-medium text-sm truncate">{platform.name}</p>
+                  {!platform.enabled && (
+                    <p className="text-[10px] text-muted-foreground">Coming soon</p>
+                  )}
+                </div>
+              </button>
             ))}
           </div>
         )}

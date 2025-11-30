@@ -32,6 +32,9 @@ export type ActivityEventType =
   | "brand.social_account_connected"
   | "brand.social_account_disconnected"
   | "brand.publishing_defaults_updated"
+  | "brand.onboarding_step_completed"
+  | "brand.onboarding_completed"
+  | "brand.activated"
   // Social Account events
   | "social_account.connected"
   | "social_account.disconnected"

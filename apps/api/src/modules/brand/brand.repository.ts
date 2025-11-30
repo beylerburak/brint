@@ -6,7 +6,7 @@
  */
 
 import { prisma } from "../../lib/prisma.js";
-import type { Brand, BrandHashtagPreset, Prisma } from "@prisma/client";
+import type { Brand, BrandHashtagPreset, Prisma, BrandStatus } from "@prisma/client";
 
 // ====================
 // Brand Repository
@@ -121,10 +121,15 @@ export interface CreateBrandData {
   secondaryColor?: string | null;
   websiteUrl?: string | null;
   createdBy?: string | null;
+  // Onboarding fields - always start as DRAFT
+  status?: BrandStatus;
+  onboardingStep?: number;
+  onboardingCompleted?: boolean;
 }
 
 /**
  * Create a new brand
+ * Brand always starts as DRAFT status with onboarding not completed
  */
 export async function createBrand(data: CreateBrandData): Promise<Brand> {
   return prisma.brand.create({
@@ -141,6 +146,11 @@ export async function createBrand(data: CreateBrandData): Promise<Brand> {
       secondaryColor: data.secondaryColor ?? null,
       websiteUrl: data.websiteUrl ?? null,
       createdBy: data.createdBy ?? null,
+      // Brand status and onboarding - always start as DRAFT
+      status: "DRAFT",
+      onboardingStep: 0,
+      onboardingCompleted: false,
+      lastActivityAt: new Date(),
       // Wizard / readiness defaults
       profileCompleted: false,
       hasAtLeastOneSocialAccount: false,
@@ -170,6 +180,11 @@ export interface UpdateBrandData {
   readinessScore?: number;
   isArchived?: boolean;
   updatedBy?: string | null;
+  // Onboarding fields
+  status?: BrandStatus;
+  onboardingStep?: number;
+  onboardingCompleted?: boolean;
+  lastActivityAt?: Date;
 }
 
 /**

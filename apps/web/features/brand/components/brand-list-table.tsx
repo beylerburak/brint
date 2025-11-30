@@ -78,7 +78,7 @@ export function BrandListTable({
               <TableCell>
                 <div className="flex flex-col">
                   <Link
-                    href={buildWorkspaceRoute(locale, workspace?.slug || "", `studio/brands/${brand.slug}`)}
+                    href={buildWorkspaceRoute(locale, workspace?.slug || "", `studio/${brand.slug}`)}
                     className="font-medium hover:underline"
                   >
                     {brand.name}
@@ -126,7 +126,7 @@ export function BrandListTable({
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
                       <Link
-                        href={buildWorkspaceRoute(locale, workspace?.slug || "", `studio/brands/${brand.slug}`)}
+                        href={buildWorkspaceRoute(locale, workspace?.slug || "", `studio/${brand.slug}`)}
                         className="flex items-center"
                       >
                         <ExternalLink className="mr-2 h-4 w-4" />

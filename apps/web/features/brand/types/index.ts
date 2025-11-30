@@ -9,6 +9,11 @@
 // ============================================================================
 
 /**
+ * Brand status enum
+ */
+export type BrandStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
+/**
  * Brand summary for list views
  */
 export interface BrandSummary {
@@ -20,6 +25,11 @@ export interface BrandSummary {
   industry?: string | null;
   language?: string | null;
   timezone?: string | null;
+  
+  // Brand status and onboarding
+  status: BrandStatus;
+  onboardingStep: number;
+  onboardingCompleted: boolean;
   
   // Readiness
   profileCompleted: boolean;
@@ -83,6 +93,39 @@ export interface UpdateBrandRequest {
   secondaryColor?: string | null;
   websiteUrl?: string | null;
   logoMediaId?: string | null;
+}
+
+/**
+ * Brand onboarding step update request
+ */
+export interface UpdateBrandOnboardingRequest {
+  step: number;
+  data?: UpdateBrandRequest;
+}
+
+/**
+ * Brand onboarding update response
+ */
+export interface BrandOnboardingResponse {
+  id: string;
+  name: string;
+  slug: string;
+  status: BrandStatus;
+  onboardingStep: number;
+  onboardingCompleted: boolean;
+  readinessScore: number;
+}
+
+/**
+ * Complete onboarding response
+ */
+export interface CompleteBrandOnboardingResponse {
+  id: string;
+  slug: string;
+  name: string;
+  status: BrandStatus;
+  onboardingCompleted: boolean;
+  onboardingStep: number;
 }
 
 // ============================================================================

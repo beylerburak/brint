@@ -100,7 +100,7 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
             {error?.message || "The brand you're looking for doesn't exist."}
           </p>
         </div>
-        <Link href={buildWorkspaceRoute(locale, workspace?.slug || "", "studio/brands")}>
+        <Link href={buildWorkspaceRoute(locale, workspace?.slug || "", "brands")}>
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to brands
@@ -113,7 +113,7 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
   const handleArchive = async () => {
     const success = await archiveBrand();
     if (success) {
-      router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "studio/brands"));
+      router.push(buildWorkspaceRoute(locale, workspace?.slug || "", "brands"));
     }
   };
 
@@ -126,7 +126,7 @@ export function BrandDetailPage({ brandSlug }: BrandDetailPageProps) {
     <div className="flex flex-1 flex-col gap-6 p-4">
       {/* Back link */}
       <Link
-        href={buildWorkspaceRoute(locale, workspace?.slug || "", "studio/brands")}
+        href={buildWorkspaceRoute(locale, workspace?.slug || "", "brands")}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground w-fit"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />

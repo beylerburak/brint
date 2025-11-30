@@ -14,6 +14,8 @@ import type {
   UpdateBrandInput,
   CreateHashtagPresetInput,
   UpdateHashtagPresetInput,
+  UpdateBrandOnboardingInput,
+  CompleteBrandOnboardingResult,
 } from "./brand.types.js";
 import { logActivity } from "../activity/activity.service.js";
 import { BadRequestError, NotFoundError } from "../../lib/http-errors.js";
@@ -407,6 +409,164 @@ export async function archiveBrand(params: ArchiveBrandParams): Promise<Brand> {
   });
 
   return archivedBrand;
+}
+
+// ====================
+// Onboarding Service Functions
+// ====================
+
+export interface UpdateBrandOnboardingParams {
+  brandId: string;
+  workspaceId: string;
+  input: UpdateBrandOnboardingInput;
+  userId: string;
+  request?: FastifyRequest;
+}
+
+/**
+ * Update brand onboarding step
+ * Used during the wizard to save progress
+ */
+export async function updateBrandOnboarding(params: UpdateBrandOnboardingParams): Promise<Brand> {
+  const { brandId, workspaceId, input, userId, request } = params;
+
+  // Get existing brand
+  const brand = await getBrand(brandId, workspaceId);
+
+  // Ensure brand is still in DRAFT status
+  if (brand.status !== "DRAFT") {
+    throw new BadRequestError(
+      "BRAND_NOT_DRAFT",
+      "Brand is not in draft status. Only draft brands can be updated through onboarding."
+    );
+  }
+
+  // Prepare update data
+  const updateData: brandRepository.UpdateBrandData = {
+    onboardingStep: input.step,
+    lastActivityAt: new Date(),
+    updatedBy: userId,
+  };
+
+  // If step data is provided, merge it
+  if (input.data) {
+    Object.assign(updateData, input.data);
+    
+    // Recalculate readiness score
+    const tempBrand = { ...brand, ...input.data };
+    const shouldComplete = shouldMarkProfileComplete(tempBrand as Brand);
+    if (shouldComplete && !brand.profileCompleted) {
+      updateData.profileCompleted = true;
+    }
+    
+    const readinessResult = calculateReadinessScore({
+      ...tempBrand,
+      profileCompleted: updateData.profileCompleted ?? brand.profileCompleted,
+    } as Brand);
+    updateData.readinessScore = readinessResult.score;
+  }
+
+  // Update brand
+  const updatedBrand = await brandRepository.updateBrand(brandId, updateData);
+
+  // Log activity
+  void logActivity({
+    type: "brand.onboarding_step_completed",
+    workspaceId,
+    userId,
+    actorType: "user",
+    source: "api",
+    scopeType: "brand",
+    scopeId: brandId,
+    metadata: {
+      name: updatedBrand.name,
+      step: input.step,
+      previousStep: brand.onboardingStep,
+    },
+    request,
+  });
+
+  return updatedBrand;
+}
+
+export interface CompleteBrandOnboardingParams {
+  brandId: string;
+  workspaceId: string;
+  userId: string;
+  request?: FastifyRequest;
+}
+
+/**
+ * Complete brand onboarding
+ * Sets brand status to ACTIVE and onboardingCompleted to true
+ */
+export async function completeBrandOnboarding(params: CompleteBrandOnboardingParams): Promise<CompleteBrandOnboardingResult> {
+  const { brandId, workspaceId, userId, request } = params;
+
+  // Get existing brand
+  const brand = await getBrand(brandId, workspaceId);
+
+  // Ensure brand is still in DRAFT status
+  if (brand.status !== "DRAFT") {
+    throw new BadRequestError(
+      "BRAND_NOT_DRAFT",
+      "Brand is not in draft status. Only draft brands can complete onboarding."
+    );
+  }
+
+  // Define total onboarding steps (profile, identity, social accounts)
+  const TOTAL_ONBOARDING_STEPS = 3;
+
+  // Update brand to ACTIVE
+  const updatedBrand = await brandRepository.updateBrand(brandId, {
+    status: "ACTIVE",
+    onboardingCompleted: true,
+    onboardingStep: TOTAL_ONBOARDING_STEPS,
+    lastActivityAt: new Date(),
+    updatedBy: userId,
+  });
+
+  // Log onboarding completion
+  void logActivity({
+    type: "brand.onboarding_completed",
+    workspaceId,
+    userId,
+    actorType: "user",
+    source: "api",
+    scopeType: "brand",
+    scopeId: brandId,
+    metadata: {
+      name: updatedBrand.name,
+      readinessScore: updatedBrand.readinessScore,
+    },
+    request,
+  });
+
+  // Log brand activation
+  void logActivity({
+    type: "brand.activated",
+    workspaceId,
+    userId,
+    actorType: "user",
+    source: "api",
+    scopeType: "brand",
+    scopeId: brandId,
+    metadata: {
+      name: updatedBrand.name,
+      previousStatus: "DRAFT",
+      newStatus: "ACTIVE",
+    },
+    request,
+  });
+
+  return {
+    id: updatedBrand.id,
+    slug: updatedBrand.slug,
+    name: updatedBrand.name,
+    status: updatedBrand.status,
+    onboardingCompleted: updatedBrand.onboardingCompleted,
+    onboardingStep: updatedBrand.onboardingStep,
+  };
 }
 
 // ====================

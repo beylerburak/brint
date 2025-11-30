@@ -16,6 +16,9 @@ import type {
   BrandHashtagPreset,
   CreateBrandRequest,
   UpdateBrandRequest,
+  UpdateBrandOnboardingRequest,
+  BrandOnboardingResponse,
+  CompleteBrandOnboardingResponse,
   CreateHashtagPresetRequest,
   UpdateHashtagPresetRequest,
   PaginatedResponse,
@@ -134,6 +137,47 @@ export async function archiveBrand(brandId: string): Promise<void> {
     const errorMessage = (response.details as any)?.error?.message || response.message || "Failed to archive brand";
     throw new Error(errorMessage);
   }
+}
+
+// ============================================================================
+// Onboarding Operations
+// ============================================================================
+
+/**
+ * Update brand onboarding step
+ */
+export async function updateBrandOnboarding(
+  brandId: string,
+  data: UpdateBrandOnboardingRequest
+): Promise<BrandOnboardingResponse> {
+  const response = await httpClient.patch<SingleResponse<BrandOnboardingResponse>>(
+    `/brands/${brandId}/onboarding`,
+    data
+  );
+
+  if (!response.ok) {
+    const errorMessage = (response.details as any)?.error?.message || response.message || "Failed to update onboarding";
+    throw new Error(errorMessage);
+  }
+
+  return response.data.data;
+}
+
+/**
+ * Complete brand onboarding
+ */
+export async function completeBrandOnboarding(brandId: string): Promise<CompleteBrandOnboardingResponse> {
+  const response = await httpClient.post<SingleResponse<CompleteBrandOnboardingResponse>>(
+    `/brands/${brandId}/complete-onboarding`,
+    {}
+  );
+
+  if (!response.ok) {
+    const errorMessage = (response.details as any)?.error?.message || response.message || "Failed to complete onboarding";
+    throw new Error(errorMessage);
+  }
+
+  return response.data.data;
 }
 
 // ============================================================================

@@ -4,7 +4,9 @@
  * Domain-level type definitions for the Brand module.
  */
 
-import type { Brand, BrandHashtagPreset } from "@prisma/client";
+import type { Brand, BrandHashtagPreset, BrandStatus } from "@prisma/client";
+
+export type { BrandStatus } from "@prisma/client";
 
 /**
  * Brand with computed fields
@@ -91,6 +93,26 @@ export interface UpdateBrandInput {
 export interface UpdateBrandReadinessInput {
   profileCompleted?: boolean;
   publishingDefaultsConfigured?: boolean;
+}
+
+/**
+ * Brand onboarding step update input
+ */
+export interface UpdateBrandOnboardingInput {
+  step: number;
+  data?: UpdateBrandInput;
+}
+
+/**
+ * Complete brand onboarding response
+ */
+export interface CompleteBrandOnboardingResult {
+  id: string;
+  slug: string;
+  name: string;
+  status: BrandStatus;
+  onboardingCompleted: boolean;
+  onboardingStep: number;
 }
 
 /**

@@ -4,9 +4,11 @@
  * Workspace Brands List
  * 
  * Displays brands in a table format using the generic BiDataTable component.
+ * Includes a New Brand dialog that creates a draft brand and redirects to setup.
  */
 
 import * as React from "react";
+import { useState, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { 
@@ -20,10 +22,22 @@ import {
   Hash, 
   Type, 
   CircleDot,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -37,9 +51,10 @@ import {
   formatRelativeTime,
   formatFullDate,
 } from "@/components/ui/bi-data-table";
+import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/features/space/context/workspace-context";
 import { useHasPermission, usePagePermissions } from "@/features/permissions/hooks/hooks";
-import { useBrandList } from "../hooks";
+import { useBrandList, useCreateBrand } from "../hooks";
 import { buildWorkspaceRoute } from "@/features/space/constants";
 import type { BrandSummary } from "../types";
 
@@ -80,14 +95,26 @@ function BrandCell({ brand }: { brand: BrandSummary }) {
   );
 }
 
-function BrandStatusBadge({ isArchived }: { isArchived: boolean }) {
-  if (isArchived) {
+function BrandStatusBadge({ brand }: { brand: BrandSummary }) {
+  if (brand.isArchived) {
     return (
       <Badge variant="secondary" className="shrink-0 text-xs">
         Archived
       </Badge>
     );
   }
+  
+  if (brand.status === "DRAFT") {
+    return (
+      <Badge
+        variant="outline"
+        className="shrink-0 text-xs bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800"
+      >
+        Draft
+      </Badge>
+    );
+  }
+  
   return (
     <Badge
       variant="outline"
@@ -157,7 +184,7 @@ function BrandMobileCard({ brand }: { brand: BrandSummary }) {
             <span className="text-xs text-muted-foreground truncate">@{brand.slug}</span>
           </div>
         </div>
-        <BrandStatusBadge isArchived={brand.isArchived} />
+        <BrandStatusBadge brand={brand} />
       </div>
 
       <div className="flex items-center justify-between gap-2 pt-2 border-t">
@@ -180,6 +207,7 @@ export function WorkspaceBrandsList() {
   const locale = useLocale();
   const router = useRouter();
   const t = useTranslations("common");
+  const { toast } = useToast();
   const { workspace } = useWorkspace();
   const { loading: permissionsLoading } = usePagePermissions();
   const canView = useHasPermission("studio:brand.view");
@@ -188,8 +216,12 @@ export function WorkspaceBrandsList() {
   const { brands, loading, error, hasMore, loadMore, refresh } = useBrandList({
     limit: 20,
   });
+  
+  const { createBrand, loading: createLoading } = useCreateBrand();
 
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [newBrandDialogOpen, setNewBrandDialogOpen] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
 
   // Get unique industries from brands for filter options
   const uniqueIndustries = React.useMemo(() => {
@@ -239,10 +271,10 @@ export function WorkspaceBrandsList() {
       label: t("brands.table.status") || "Status", 
       type: "select", 
       icon: <CircleDot className="h-4 w-4" />, 
-      options: ["Active", "Archived"],
-      accessorFn: (row) => row.isArchived ? "Archived" : "Active",
-      cell: (row) => <BrandStatusBadge isArchived={row.isArchived} />,
-      sortValueFn: (row) => row.isArchived ? 1 : 0,
+      options: ["Active", "Draft", "Archived"],
+      accessorFn: (row) => row.isArchived ? "Archived" : row.status === "DRAFT" ? "Draft" : "Active",
+      cell: (row) => <BrandStatusBadge brand={row} />,
+      sortValueFn: (row) => row.isArchived ? 2 : row.status === "DRAFT" ? 1 : 0,
     },
     { 
       id: "created", 
@@ -293,7 +325,66 @@ export function WorkspaceBrandsList() {
     },
   ], []);
 
-  // Permission check
+  // Handle row click - redirect to setup wizard for draft brands
+  // NOTE: All hooks must be defined before any conditional returns
+  const handleRowClick = useCallback((brand: BrandSummary) => {
+    if (!workspace?.slug) return;
+    
+    // If brand is in DRAFT status and onboarding not completed, go to setup wizard
+    if (brand.status === "DRAFT" && !brand.onboardingCompleted) {
+      const setupPath = buildWorkspaceRoute(
+        locale,
+        workspace.slug,
+        `brands/${brand.id}/setup`
+      );
+      router.push(setupPath);
+      return;
+    }
+    
+    // Otherwise go to studio brand page
+    const brandDetailPath = buildWorkspaceRoute(
+      locale,
+      workspace.slug,
+      `studio/${brand.slug}`
+    );
+    router.push(brandDetailPath);
+  }, [locale, workspace?.slug, router]);
+
+  // Handle load more
+  const handleLoadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    await loadMore();
+    setIsLoadingMore(false);
+  }, [isLoadingMore, hasMore, loadMore]);
+
+  // Open new brand dialog
+  const handleOpenNewBrandDialog = useCallback(() => {
+    setNewBrandName("");
+    setNewBrandDialogOpen(true);
+  }, []);
+
+  // Handle new brand creation
+  const handleCreateNewBrand = useCallback(async () => {
+    if (!workspace?.slug || !newBrandName.trim()) return;
+    
+    const result = await createBrand({ name: newBrandName.trim() });
+    
+    if (result) {
+      setNewBrandDialogOpen(false);
+      setNewBrandName("");
+      
+      // Redirect to setup wizard
+      const setupPath = buildWorkspaceRoute(
+        locale,
+        workspace.slug,
+        `brands/${result.id}/setup`
+      );
+      router.push(setupPath);
+    }
+  }, [workspace?.slug, newBrandName, createBrand, locale, router]);
+
+  // Permission check - AFTER all hooks are defined
   if (!permissionsLoading && !canView) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 min-h-[400px]">
@@ -307,32 +398,6 @@ export function WorkspaceBrandsList() {
       </div>
     );
   }
-
-  // Handle row click
-  const handleRowClick = (brand: BrandSummary) => {
-    if (!workspace?.slug) return;
-    const brandDetailPath = buildWorkspaceRoute(
-      locale,
-      workspace.slug,
-      `studio/brands/${brand.slug}`
-    );
-    router.push(brandDetailPath);
-  };
-
-  // Handle load more
-  const handleLoadMore = async () => {
-    if (isLoadingMore || !hasMore) return;
-    setIsLoadingMore(true);
-    await loadMore();
-    setIsLoadingMore(false);
-  };
-
-  // Navigate to create brand
-  const handleCreateBrand = () => {
-    if (!workspace?.slug) return;
-    const createPath = buildWorkspaceRoute(locale, workspace.slug, "studio/brands");
-    router.push(createPath);
-  };
 
   // Error state
   if (error) {
@@ -359,7 +424,7 @@ export function WorkspaceBrandsList() {
         </p>
       </div>
       {canCreate && (
-        <Button onClick={handleCreateBrand}>
+        <Button onClick={handleOpenNewBrandDialog}>
           <Plus className="mr-2 h-4 w-4" />
           {t("brands.createFirst") || "Create your first brand"}
         </Button>
@@ -369,30 +434,80 @@ export function WorkspaceBrandsList() {
 
   // Toolbar right section
   const toolbarRight = canCreate ? (
-    <Button onClick={handleCreateBrand}>
+    <Button onClick={handleOpenNewBrandDialog}>
       <Plus className="mr-2 h-4 w-4" />
       New Brand
     </Button>
   ) : null;
 
   return (
-    <BiDataTable
-      data={brands}
-      columns={columns}
-      getRowId={(brand) => brand.id}
-      onRowClick={handleRowClick}
-      actions={actions}
-      searchPlaceholder="Search brands..."
-      searchableColumns={["name", "industry"]}
-      loading={loading}
-      hasMore={hasMore}
-      onLoadMore={handleLoadMore}
-      isLoadingMore={isLoadingMore}
-      loadMoreLabel={t("loadMore") || "Load more"}
-      loadingLabel={t("loading") || "Loading..."}
-      toolbarRight={toolbarRight}
-      emptyState={emptyState}
-      mobileCard={(brand) => <BrandMobileCard brand={brand} />}
-    />
+    <>
+      <BiDataTable
+        data={brands}
+        columns={columns}
+        getRowId={(brand) => brand.id}
+        onRowClick={handleRowClick}
+        actions={actions}
+        searchPlaceholder="Search brands..."
+        searchableColumns={["name", "industry"]}
+        loading={loading}
+        hasMore={hasMore}
+        onLoadMore={handleLoadMore}
+        isLoadingMore={isLoadingMore}
+        loadMoreLabel={t("loadMore") || "Load more"}
+        loadingLabel={t("loading") || "Loading..."}
+        toolbarRight={toolbarRight}
+        emptyState={emptyState}
+        mobileCard={(brand) => <BrandMobileCard brand={brand} />}
+      />
+
+      {/* New Brand Dialog */}
+      <Dialog open={newBrandDialogOpen} onOpenChange={setNewBrandDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Create New Brand
+            </DialogTitle>
+            <DialogDescription>
+              Enter a name for your brand. You'll set up the rest in the next step.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="brand-name">Brand Name</Label>
+              <Input
+                id="brand-name"
+                placeholder="e.g., Acme Inc."
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newBrandName.trim()) {
+                    handleCreateNewBrand();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setNewBrandDialogOpen(false)}
+              disabled={createLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateNewBrand}
+              disabled={!newBrandName.trim() || createLoading}
+            >
+              {createLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Start Setup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

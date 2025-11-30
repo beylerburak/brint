@@ -34,11 +34,14 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 interface GraphApiResponse {
   id?: string;
   post_id?: string;
+  video_id?: string;
+  upload_url?: string;
   error?: {
     message: string;
     code: number;
     error_subcode?: number;
     fbtrace_id?: string;
+    error_user_msg?: string;
   };
 }
 
@@ -333,7 +336,7 @@ async function publishFacebookStory(
 ): Promise<{ postId: string; permalink: string }> {
   const isVideo = payload.storyType === "VIDEO";
   const mediaId = isVideo ? payload.videoMediaId : payload.imageMediaId;
-  
+
   if (!mediaId) {
     throw new Error(`Story requires ${isVideo ? 'videoMediaId' : 'imageMediaId'} for ${payload.storyType} story`);
   }
@@ -356,97 +359,378 @@ async function publishFacebookStory(
     "Publishing Facebook story"
   );
 
-  // 2. Post story
-  // Facebook Stories API - use photos endpoint with published=false for stories
-  // Note: Requires pages_manage_posts permission
-  const endpoint = `/${pageId}/photos`;
+  if (isVideo) {
+    // Video story - multi-step process
+    return await publishFacebookVideoStory(pageId, mediaUrl, accessToken);
+  } else {
+    // Photo story - single step
+    return await publishFacebookPhotoStory(pageId, mediaUrl, accessToken);
+  }
+}
 
-  // Facebook Stories API parameters - published=false creates a story
-  const storyParams: Record<string, string | boolean> = {
+/**
+ * Publish a PHOTO STORY to Facebook Page
+ */
+async function publishFacebookPhotoStory(
+  pageId: string,
+  mediaUrl: string,
+  accessToken: string
+): Promise<{ postId: string; permalink: string }> {
+  // Use the correct photo_stories endpoint for Facebook Stories
+  const endpoint = `/${pageId}/photo_stories`;
+
+  // First upload the photo as unpublished (required for stories)
+  const uploadParams: Record<string, string | boolean> = {
     url: mediaUrl,
-    published: false, // This creates a story instead of a regular post
+    published: false, // Must be unpublished for story creation
   };
 
-  logger.debug({ endpoint, storyParams }, "Facebook story API request");
+  logger.debug({ endpoint, uploadParams }, "Facebook photo story upload request");
 
-  const postResponse = await graphPost(
+  const uploadResponse = await graphPost(
+    `/${pageId}/photos`,
+    uploadParams,
+    accessToken
+  );
+
+  if (uploadResponse.error || !uploadResponse.id) {
+    logger.error(
+      {
+        endpoint,
+        uploadParams,
+        response: uploadResponse,
+      },
+      "Facebook photo upload failed"
+    );
+    throw new Error(
+      `Failed to upload photo for story: ${uploadResponse.error?.message || "Unknown error"}`
+    );
+  }
+
+  const photoId = uploadResponse.id;
+
+  // Now create the story using photo_stories endpoint
+  const storyParams: Record<string, string | boolean> = {
+    photo_id: photoId,
+  };
+
+  logger.debug({ endpoint, storyParams }, "Facebook photo story publish request");
+
+  const storyResponse = await graphPost(
     endpoint,
     storyParams,
     accessToken
   );
 
-  if (postResponse.error || !postResponse.id) {
-    // Log full response for debugging
+  // Check for Facebook Story API specific response format
+  // Facebook returns {"success":true,"post_id":"..."} for successful story creation
+  if (storyResponse.error || (!storyResponse.id && !storyResponse.post_id && !(storyResponse as any).success)) {
     logger.error(
       {
         endpoint,
         storyParams,
-        response: postResponse,
-        error: postResponse.error,
-        responseKeys: Object.keys(postResponse),
-        errorKeys: postResponse.error ? Object.keys(postResponse.error) : null,
-        hasError: !!postResponse.error,
-        hasId: !!postResponse.id,
+        response: storyResponse,
+        error: storyResponse.error,
       },
-      "Facebook story publish failed - full response analysis"
+      "Facebook photo story publish failed"
     );
 
-    let errorMessage = "An unknown error has occurred";
-
-    if (postResponse.error) {
-      const error = postResponse.error;
-
-      // Handle specific Facebook error codes
-      if (error.code === 1) {
-        errorMessage = "Facebook authentication or permission error. Please check that the Page has 'pages_manage_posts' permission and the token is valid.";
-      } else if (error.code === 200) {
-        errorMessage = "Facebook permissions error. The Page token needs 'pages_manage_posts' permission for story publishing.";
-      } else if (error.code === 10) {
-        errorMessage = "Facebook application request limit reached.";
-      } else if (error.code === 100) {
-        errorMessage = "Facebook parameter error. Please check media URL and page ID.";
-      } else {
-        // Use Facebook's error message if available
-        errorMessage = error.message ||
-                       error.error_user_msg ||
-                       error.error_msg ||
-                       error.error_description ||
-                       `Facebook error (code: ${error.code}): ${JSON.stringify(error)}`;
-      }
-
-      // Add fbtrace_id for debugging if available
-      if (error.fbtrace_id) {
-        errorMessage += ` (Trace ID: ${error.fbtrace_id})`;
-      }
-    } else if (!postResponse.id) {
-      errorMessage = "Facebook API did not return an ID for the story post. This may indicate a permissions or parameter issue.";
-    } else {
-      errorMessage = `Unexpected response structure: ${JSON.stringify(postResponse)}`;
+    let errorMessage = "Failed to create photo story";
+    if (storyResponse.error) {
+      const error = storyResponse.error;
+      errorMessage = error.message ||
+                    error.error_user_msg ||
+                    `Facebook error (code: ${error.code}): ${JSON.stringify(error)}`;
     }
 
-    throw new Error(`Failed to post FB story: ${errorMessage}`);
+    throw new Error(`Failed to post FB photo story: ${errorMessage}`);
   }
 
-  const storyId = postResponse.id;
-  const postId = (postResponse as any).post_id || storyId;
-
-  // 3. Try to get permalink (stories may not have one)
-  let permalink = "";
-  try {
-    const storyDetails = await graphGet(
-      `/${storyId}`,
-      { fields: "permalink_url" },
-      accessToken
-    );
-    permalink = storyDetails.permalink_url || "";
-  } catch {
-    // Stories may not have permalink
-    logger.debug({ storyId }, "Could not get permalink for Facebook story");
-  }
+  // Facebook Story API returns post_id directly for stories
+  const storyId = storyResponse.id || (storyResponse as any).post_id;
+  const postId = (storyResponse as any).post_id || storyId;
 
   return {
     postId,
-    permalink,
+    permalink: "", // Stories typically don't have permalinks
+  };
+}
+
+/**
+ * Publish a VIDEO STORY to Facebook Page
+ * Uses Resumable Upload API for large files (>25MB) for better reliability
+ */
+async function publishFacebookVideoStory(
+  pageId: string,
+  mediaUrl: string,
+  accessToken: string
+): Promise<{ postId: string; permalink: string }> {
+  // Get file info to determine upload method
+  const fileInfo = await getFileInfo(mediaUrl);
+
+  // Use Resumable Upload API for large files (>25MB)
+  if (fileInfo.size > 25 * 1024 * 1024) {
+    return await publishFacebookVideoStoryResumable(pageId, mediaUrl, fileInfo, accessToken);
+  } else {
+    return await publishFacebookVideoStoryStandard(pageId, mediaUrl, accessToken);
+  }
+}
+
+/**
+ * Get file information from URL
+ */
+async function getFileInfo(mediaUrl: string): Promise<{ size: number; type: string; name: string }> {
+  try {
+    const headResponse = await fetch(mediaUrl, { method: 'HEAD' });
+    const contentLength = headResponse.headers.get('content-length');
+    const contentType = headResponse.headers.get('content-type') || 'video/mp4';
+
+    // Extract filename from URL
+    const urlParts = mediaUrl.split('/');
+    const filename = urlParts[urlParts.length - 1].split('?')[0];
+
+    return {
+      size: contentLength ? parseInt(contentLength) : 0,
+      type: contentType,
+      name: filename || 'video.mp4'
+    };
+  } catch (error) {
+    logger.warn({ mediaUrl, error }, "Could not get file info, using defaults");
+    return {
+      size: 0,
+      type: 'video/mp4',
+      name: 'video.mp4'
+    };
+  }
+}
+
+/**
+ * Publish video story using Resumable Upload API (for large files)
+ */
+async function publishFacebookVideoStoryResumable(
+  pageId: string,
+  mediaUrl: string,
+  fileInfo: { size: number; type: string; name: string },
+  accessToken: string
+): Promise<{ postId: string; permalink: string }> {
+  logger.info({ pageId, fileSize: fileInfo.size, fileName: fileInfo.name }, "Using Resumable Upload API for large video story");
+
+  // Get app ID from environment (needed for Resumable Upload API)
+  const appId = env.FACEBOOK_APP_ID;
+  if (!appId) {
+    logger.warn("FACEBOOK_APP_ID not configured, falling back to standard upload");
+    return await publishFacebookVideoStoryStandard(pageId, mediaUrl, accessToken);
+  }
+
+  try {
+    // Step 1: Start upload session
+    const startEndpoint = `/${appId}/uploads`;
+    const startParams: Record<string, string | number> = {
+      file_name: fileInfo.name,
+      file_length: fileInfo.size,
+      file_type: fileInfo.type,
+    };
+
+    logger.debug({ startEndpoint, startParams }, "Facebook resumable upload start");
+
+    const startResponse = await graphPost(
+      startEndpoint,
+      startParams,
+      accessToken
+    );
+
+    if (startResponse.error || !startResponse.id) {
+      throw new Error(`Failed to start resumable upload: ${startResponse.error?.message}`);
+    }
+
+    const uploadSessionId = startResponse.id.replace('upload:', '');
+
+    // Step 2: Upload file
+    const uploadEndpoint = `/upload:${uploadSessionId}`;
+    const fileResponse = await fetch(mediaUrl);
+    const fileBuffer = await fileResponse.arrayBuffer();
+
+    logger.debug({ uploadEndpoint, fileSize: fileBuffer.byteLength }, "Facebook resumable upload file");
+
+    const uploadResponse = await fetch(`${GRAPH_API_BASE}${uploadEndpoint}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `OAuth ${accessToken}`,
+        'file_offset': '0',
+      },
+      body: fileBuffer,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.text();
+      throw new Error(`Resumable upload failed: HTTP ${uploadResponse.status} - ${errorData}`);
+    }
+
+    const uploadData = await uploadResponse.json();
+    if (uploadData.error) {
+      throw new Error(`Resumable upload error: ${uploadData.error.message}`);
+    }
+
+    const fileHandle = uploadData.h;
+    if (!fileHandle) {
+      throw new Error('No file handle received from resumable upload');
+    }
+
+    // Step 3: Create story using file handle
+    const storyEndpoint = `/${pageId}/video_stories`;
+    const storyParams: Record<string, string> = {
+      upload_phase: 'finish',
+      video_file_chunk: fileHandle, // Use file handle instead of video_id
+    };
+
+    logger.debug({ storyEndpoint, storyParams }, "Facebook video story create with file handle");
+
+    const storyResponse = await graphPost(
+      storyEndpoint,
+      storyParams,
+      accessToken
+    );
+
+    // Check for Facebook Video Story API specific response format
+    if (storyResponse.error || (!storyResponse.id && !storyResponse.post_id && !(storyResponse as any).success)) {
+      logger.error(
+        {
+          storyEndpoint,
+          storyParams,
+          response: storyResponse,
+        },
+        "Facebook video story with file handle failed"
+      );
+      throw new Error(
+        `Failed to create video story with file handle: ${storyResponse.error?.message || "Unknown error"}`
+      );
+    }
+
+    // Facebook Video Story API may return different response formats
+    const storyId = storyResponse.id || (storyResponse as any).post_id;
+    const postId = (storyResponse as any).post_id || storyId;
+
+    logger.info({ postId, fileHandle }, "Facebook video story published with resumable upload");
+
+    return {
+      postId,
+      permalink: "", // Stories typically don't have permalinks
+    };
+
+  } catch (error) {
+    logger.warn({ error: error instanceof Error ? error.message : String(error) }, "Resumable upload failed, falling back to standard method");
+    return await publishFacebookVideoStoryStandard(pageId, mediaUrl, accessToken);
+  }
+}
+
+/**
+ * Publish video story using standard Pages API method (for smaller files)
+ */
+async function publishFacebookVideoStoryStandard(
+  pageId: string,
+  mediaUrl: string,
+  accessToken: string
+): Promise<{ postId: string; permalink: string }> {
+  // Video stories require a multi-step process: start -> upload -> finish
+  const endpoint = `/${pageId}/video_stories`;
+
+  // Step 1: Start upload
+  const startParams: Record<string, string> = {
+    upload_phase: "start",
+  };
+
+  logger.debug({ endpoint, startParams }, "Facebook video story start upload");
+
+  const startResponse = await graphPost(
+    endpoint,
+    startParams,
+    accessToken
+  );
+
+  if (startResponse.error || !startResponse.video_id) {
+    logger.error(
+      {
+        endpoint,
+        startParams,
+        response: startResponse,
+      },
+      "Facebook video story start failed"
+    );
+    throw new Error(
+      `Failed to start video story upload: ${startResponse.error?.message || "Unknown error"}`
+    );
+  }
+
+  const videoId = startResponse.video_id;
+  const uploadUrl = startResponse.upload_url;
+
+  if (!uploadUrl) {
+    throw new Error("Facebook did not provide upload URL for video story");
+  }
+
+  // Step 2: Upload video to the provided URL
+  // Add access token as query parameter (required by Facebook)
+  const uploadUrlWithToken = `${uploadUrl}${uploadUrl.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(accessToken)}`;
+
+  logger.debug({ uploadUrl: uploadUrlWithToken, videoId }, "Facebook video story upload to URL");
+
+  const uploadResponse = await fetch(uploadUrlWithToken, {
+    method: "POST",
+    headers: {
+      "file_url": mediaUrl,
+    },
+  });
+
+  if (!uploadResponse.ok) {
+    const uploadData = await uploadResponse.text();
+    logger.error(
+      {
+        uploadUrl,
+        videoId,
+        status: uploadResponse.status,
+        response: uploadData,
+      },
+      "Facebook video story upload failed"
+    );
+    throw new Error(`Failed to upload video to Facebook: HTTP ${uploadResponse.status}`);
+  }
+
+  // Step 3: Finish upload
+  const finishParams: Record<string, string | boolean> = {
+    upload_phase: "finish",
+    video_id: videoId,
+  };
+
+  logger.debug({ endpoint, finishParams }, "Facebook video story finish upload");
+
+  const finishResponse = await graphPost(
+    endpoint,
+    finishParams,
+    accessToken
+  );
+
+  // Check for Facebook Video Story API specific response format
+  if (finishResponse.error || (!finishResponse.id && !finishResponse.post_id && !(finishResponse as any).success)) {
+    logger.error(
+      {
+        endpoint,
+        finishParams,
+        response: finishResponse,
+      },
+      "Facebook video story finish failed"
+    );
+    throw new Error(
+      `Failed to finish video story: ${finishResponse.error?.message || "Unknown error"}`
+    );
+  }
+
+  // Facebook Video Story API may return different response formats
+  const storyId = finishResponse.id || (finishResponse as any).post_id;
+  const postId = (finishResponse as any).post_id || storyId;
+
+  return {
+    postId,
+    permalink: "", // Stories typically don't have permalinks
   };
 }
 
@@ -684,7 +968,7 @@ export const facebookPublishWorker = createWorker<PublishJobData>(
   processFacebookPublishJob,
   {
     concurrency: 3,
-  }
+  } as any
 );
 
 // Handle worker-level failures

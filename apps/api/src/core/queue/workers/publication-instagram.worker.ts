@@ -445,32 +445,137 @@ async function publishInstagramStory(
 
   const containerId = containerResponse.id;
 
-  // 3. Wait for processing if video
-  if (isVideo) {
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+  // 3. Wait for processing and check status (for both images and videos)
+  // Instagram needs time for media processing - wait until status is FINISHED
+  logger.info({ containerId, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Waiting for story media processing (this may take several minutes)");
+
+  let containerAttempts = 0;
+  const maxContainerAttempts = isVideo ? 60 : 40; // Videos: 60 attempts (~5 min), Images: 40 attempts (~2 min)
+  let lastStatus = "UNKNOWN";
+
+  while (containerAttempts < maxContainerAttempts) {
+    try {
+      const statusResponse = await graphGet(
+        `/${containerId}?fields=status_code,status`,
+        {},
+        accessToken
+      );
+
+      lastStatus = statusResponse.status_code || statusResponse.status || "UNKNOWN";
+      logger.debug({ containerId, status: lastStatus, attempt: containerAttempts + 1, maxContainerAttempts, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Story processing status check");
+
+      // Check if processing is complete
+      if (lastStatus === "FINISHED" || lastStatus === "PUBLISHED") {
+        logger.info({ containerId, attempts: containerAttempts + 1, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Story processing completed");
+        break;
+      }
+
+      // Check for error states
+      if (lastStatus === "ERROR" || lastStatus === "FAILED") {
+        throw new Error(`${isVideo ? 'Video' : 'Image'} processing failed with status: ${lastStatus}`);
+      }
+
+      // Still processing - wait before next check
+      if (lastStatus === "IN_PROGRESS" || lastStatus === "PROCESSING" || lastStatus === "PENDING" || lastStatus === "UNKNOWN") {
+        const waitTime = containerAttempts < 5 ? 3000 : containerAttempts < 15 ? 5000 : containerAttempts < 30 ? 10000 : 15000; // Progressive wait times
+        logger.debug({ containerId, status: lastStatus, waitTime, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Media still processing, waiting...");
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+
+    } catch (statusError) {
+      logger.warn({ containerId, statusError: statusError.message, attempts: containerAttempts + 1, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Status check failed, continuing to wait");
+      // Continue waiting even if status check fails
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+
+    containerAttempts++;
   }
 
-  // 4. Publish container
+  if (lastStatus !== "FINISHED" && lastStatus !== "PUBLISHED") {
+    logger.warn({ containerId, lastStatus, containerAttempts, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Media processing did not complete within timeout, proceeding anyway");
+  }
+
+  // 4. Publish the story container (following the working approach from the old code)
+  logger.info({ containerId }, "Publishing Instagram story");
+
   const publishResponse = await graphPost(
     `/${igUserId}/media_publish`,
     { creation_id: containerId },
     accessToken
   );
 
+  logger.debug({ publishResponse }, "Instagram story publish response");
+
   if (publishResponse.error || !publishResponse.id) {
+    logger.error({
+      containerId,
+      publishResponse,
+      error: publishResponse.error,
+    }, "Instagram story publish failed");
+
     throw new Error(
       `Failed to publish story: ${publishResponse.error?.message || "Unknown error"}`
     );
   }
 
   const storyMediaId = publishResponse.id;
+  logger.info({ storyMediaId, containerId }, "Instagram story published successfully");
 
-  // 5. Get permalink (stories may not always have permalink)
-  const mediaDetails = await graphGet(
-    `/${storyMediaId}`,
-    { fields: "permalink" },
-    accessToken
-  );
+  // 5. Try to get permalink (may not be available for stories)
+  let permalink = "";
+  try {
+    const mediaDetails = await graphGet(
+      `/${storyMediaId}?fields=permalink`,
+      {},
+      accessToken
+    );
+    permalink = mediaDetails.permalink || "";
+  } catch (permalinkError) {
+    logger.debug({ storyMediaId, permalinkError: permalinkError.message }, "Could not get story permalink");
+  }
+
+  return {
+    containerId,
+    mediaId: storyMediaId,
+    permalink,
+  };
+
+  // 5. Wait for media processing and check status
+  logger.info({ storyMediaId }, "Waiting for Instagram story media processing");
+
+  let mediaDetails;
+  let mediaAttempts = 0;
+  const maxMediaAttempts = 10; // Max 10 attempts (50 seconds total)
+
+  while (mediaAttempts < maxMediaAttempts) {
+    try {
+      mediaDetails = await graphGet(
+        `/${storyMediaId}`,
+        { fields: "status_code,permalink" },
+        accessToken
+      );
+
+      // Check if media is ready
+      if (mediaDetails.status_code === "FINISHED") {
+        logger.info({ storyMediaId, mediaAttempts }, "Instagram story media ready");
+        break;
+      } else if (mediaDetails.status_code === "ERROR") {
+        throw new Error(`Instagram media processing failed: ${mediaDetails.status_code}`);
+      } else {
+        logger.debug({ storyMediaId, status: mediaDetails.status_code, mediaAttempts }, "Instagram story media still processing");
+      }
+    } catch (error) {
+      logger.warn({ storyMediaId, mediaAttempts, error: error.message }, "Failed to check Instagram story media status");
+    }
+
+    // Wait 5 seconds before next attempt
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    mediaAttempts++;
+  }
+
+  if (!mediaDetails || mediaDetails.status_code !== "FINISHED") {
+    throw new Error(`Instagram story media processing did not complete within ${maxMediaAttempts * 5} seconds`);
+  }
 
   return {
     containerId,

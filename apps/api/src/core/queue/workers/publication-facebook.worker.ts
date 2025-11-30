@@ -18,105 +18,15 @@ import { S3StorageService } from "../../../lib/storage/s3.storage.service.js";
 import { captureException, isSentryInitialized } from "../../observability/sentry.js";
 import type { PublishJobData, FacebookCredentials, FacebookPlatformData } from "../../../modules/publication/publication.types.js";
 import type { FacebookPublicationPayload } from "@brint/core-validation";
+import {
+  graphPost,
+  graphGet,
+  verifyFacebookPostPublished,
+  extractGraphApiErrorMessage,
+  GRAPH_API_BASE,
+  type GraphApiResponse,
+} from "./graph-api.utils.js";
 import { env } from "../../../config/env.js";
-
-// ====================
-// Graph API Configuration
-// ====================
-
-const GRAPH_API_VERSION = env.GRAPH_API_VERSION || "v24.0";
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-
-// ====================
-// Types
-// ====================
-
-interface GraphApiResponse {
-  id?: string;
-  post_id?: string;
-  video_id?: string;
-  upload_url?: string;
-  error?: {
-    message: string;
-    code: number;
-    error_subcode?: number;
-    fbtrace_id?: string;
-    error_user_msg?: string;
-  };
-}
-
-interface PostResponse extends GraphApiResponse {
-  permalink_url?: string;
-}
-
-// ====================
-// Graph API Helpers
-// ====================
-
-/**
- * Make a POST request to Graph API
- */
-async function graphPost(
-  endpoint: string,
-  params: Record<string, string | boolean | number>,
-  accessToken: string
-): Promise<GraphApiResponse> {
-  const url = `${GRAPH_API_BASE}${endpoint}`;
-
-  const body = new URLSearchParams();
-  body.append("access_token", accessToken);
-  for (const [key, value] of Object.entries(params)) {
-    body.append(key, String(value));
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
-
-  const data = await response.json();
-
-  // Check for HTTP errors - Facebook returns errors as JSON with error field
-  if (!response.ok) {
-    logger.warn(
-      { endpoint, status: response.status, response: data },
-      "Facebook Graph API HTTP error"
-    );
-  }
-
-  return data;
-}
-
-/**
- * Make a GET request to Graph API
- */
-async function graphGet(
-  endpoint: string,
-  params: Record<string, string>,
-  accessToken: string
-): Promise<PostResponse> {
-  const url = new URL(`${GRAPH_API_BASE}${endpoint}`);
-  url.searchParams.append("access_token", accessToken);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.append(key, value);
-  }
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-
-  // Check for HTTP errors
-  if (!response.ok) {
-    logger.warn(
-      { endpoint, status: response.status, response: data },
-      "Facebook Graph API GET HTTP error"
-    );
-  }
-
-  return data;
-}
 
 // S3 storage service for presigned URLs
 const s3Storage = new S3StorageService();
@@ -186,23 +96,39 @@ async function publishFacebookPhoto(
 
   if (postResponse.error || !postResponse.id) {
     throw new Error(
-      `Failed to post FB photo: ${postResponse.error?.message || "Unknown error"}`
+      `Failed to post FB photo: ${extractGraphApiErrorMessage(postResponse.error)}`
     );
   }
 
   const photoId = postResponse.id;
   const postId = postResponse.post_id || photoId;
 
-  // 3. Get permalink
-  const photoDetails = await graphGet(
-    `/${photoId}`,
-    { fields: "link" },
-    accessToken
-  );
+  // 3. Verify post was published and get permalink
+  logger.info({ postId }, "Verifying Facebook photo was published");
+  const verification = await verifyFacebookPostPublished(postId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Facebook photo was not successfully published or is not accessible");
+  }
+
+  // Get permalink if not from verification
+  let permalink = verification.permalink || "";
+  if (!permalink) {
+    try {
+      const photoDetails = await graphGet(
+        `/${photoId}`,
+        { fields: "link,permalink_url" },
+        accessToken
+      );
+      permalink = photoDetails.permalink_url || (photoDetails as any).link || "";
+    } catch (error) {
+      logger.warn({ photoId, error }, "Failed to get photo permalink");
+    }
+  }
 
   return {
     postId,
-    permalink: photoDetails.permalink_url || (photoDetails as any).link || "",
+    permalink,
   };
 }
 
@@ -249,22 +175,38 @@ async function publishFacebookVideo(
 
   if (postResponse.error || !postResponse.id) {
     throw new Error(
-      `Failed to post FB video: ${postResponse.error?.message || "Unknown error"}`
+      `Failed to post FB video: ${extractGraphApiErrorMessage(postResponse.error)}`
     );
   }
 
   const videoId = postResponse.id;
 
-  // 3. Get permalink
-  const videoDetails = await graphGet(
-    `/${videoId}`,
-    { fields: "permalink_url" },
-    accessToken
-  );
+  // 3. Verify post was published and get permalink
+  logger.info({ videoId }, "Verifying Facebook video was published");
+  const verification = await verifyFacebookPostPublished(videoId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Facebook video was not successfully published or is not accessible");
+  }
+
+  // Get permalink if not from verification
+  let permalink = verification.permalink || "";
+  if (!permalink) {
+    try {
+      const videoDetails = await graphGet(
+        `/${videoId}`,
+        { fields: "permalink_url" },
+        accessToken
+      );
+      permalink = videoDetails.permalink_url || "";
+    } catch (error) {
+      logger.warn({ videoId, error }, "Failed to get video permalink");
+    }
+  }
 
   return {
     postId: videoId,
-    permalink: videoDetails.permalink_url || "",
+    permalink,
   };
 }
 
@@ -293,22 +235,38 @@ async function publishFacebookLink(
 
   if (postResponse.error || !postResponse.id) {
     throw new Error(
-      `Failed to post FB link: ${postResponse.error?.message || "Unknown error"}`
+      `Failed to post FB link: ${extractGraphApiErrorMessage(postResponse.error)}`
     );
   }
 
   const postId = postResponse.id;
 
-  // 2. Get permalink
-  const postDetails = await graphGet(
-    `/${postId}`,
-    { fields: "permalink_url" },
-    accessToken
-  );
+  // 2. Verify post was published and get permalink
+  logger.info({ postId }, "Verifying Facebook link post was published");
+  const verification = await verifyFacebookPostPublished(postId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Facebook link post was not successfully published or is not accessible");
+  }
+
+  // Get permalink if not from verification
+  let permalink = verification.permalink || "";
+  if (!permalink) {
+    try {
+      const postDetails = await graphGet(
+        `/${postId}`,
+        { fields: "permalink_url" },
+        accessToken
+      );
+      permalink = postDetails.permalink_url || "";
+    } catch (error) {
+      logger.warn({ postId, error }, "Failed to get link post permalink");
+    }
+  }
 
   return {
     postId,
-    permalink: postDetails.permalink_url || "",
+    permalink,
   };
 }
 
@@ -402,9 +360,9 @@ async function publishFacebookPhotoStory(
       },
       "Facebook photo upload failed"
     );
-    throw new Error(
-      `Failed to upload photo for story: ${uploadResponse.error?.message || "Unknown error"}`
-    );
+      throw new Error(
+        `Failed to upload photo for story: ${extractGraphApiErrorMessage(uploadResponse.error)}`
+      );
   }
 
   const photoId = uploadResponse.id;
@@ -540,7 +498,7 @@ async function publishFacebookVideoStoryResumable(
     );
 
     if (startResponse.error || !startResponse.id) {
-      throw new Error(`Failed to start resumable upload: ${startResponse.error?.message}`);
+      throw new Error(`Failed to start resumable upload: ${extractGraphApiErrorMessage(startResponse.error)}`);
     }
 
     const uploadSessionId = startResponse.id.replace('upload:', '');
@@ -602,7 +560,7 @@ async function publishFacebookVideoStoryResumable(
         "Facebook video story with file handle failed"
       );
       throw new Error(
-        `Failed to create video story with file handle: ${storyResponse.error?.message || "Unknown error"}`
+        `Failed to create video story with file handle: ${extractGraphApiErrorMessage(storyResponse.error)}`
       );
     }
 
@@ -657,7 +615,7 @@ async function publishFacebookVideoStoryStandard(
       "Facebook video story start failed"
     );
     throw new Error(
-      `Failed to start video story upload: ${startResponse.error?.message || "Unknown error"}`
+      `Failed to start video story upload: ${extractGraphApiErrorMessage(startResponse.error)}`
     );
   }
 
@@ -720,7 +678,7 @@ async function publishFacebookVideoStoryStandard(
       "Facebook video story finish failed"
     );
     throw new Error(
-      `Failed to finish video story: ${finishResponse.error?.message || "Unknown error"}`
+      `Failed to finish video story: ${extractGraphApiErrorMessage(finishResponse.error)}`
     );
   }
 

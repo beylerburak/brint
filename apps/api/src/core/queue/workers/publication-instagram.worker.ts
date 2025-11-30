@@ -18,81 +18,15 @@ import { S3StorageService } from "../../../lib/storage/s3.storage.service.js";
 import { captureException, isSentryInitialized } from "../../observability/sentry.js";
 import type { PublishJobData, InstagramCredentials, InstagramPlatformData } from "../../../modules/publication/publication.types.js";
 import type { InstagramPublicationPayload } from "@brint/core-validation";
-import { env } from "../../../config/env.js";
-
-// ====================
-// Graph API Configuration
-// ====================
-
-const GRAPH_API_VERSION = env.GRAPH_API_VERSION || "v24.0";
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-
-// ====================
-// Types
-// ====================
-
-interface GraphApiResponse {
-  id?: string;
-  error?: {
-    message: string;
-    code: number;
-    error_subcode?: number;
-    fbtrace_id?: string;
-  };
-}
-
-interface MediaResponse extends GraphApiResponse {
-  permalink?: string;
-}
-
-// ====================
-// Graph API Helpers
-// ====================
-
-/**
- * Make a POST request to Graph API
- */
-async function graphPost(
-  endpoint: string,
-  params: Record<string, string | boolean | number>,
-  accessToken: string
-): Promise<GraphApiResponse> {
-  const url = `${GRAPH_API_BASE}${endpoint}`;
-  
-  const body = new URLSearchParams();
-  body.append("access_token", accessToken);
-  for (const [key, value] of Object.entries(params)) {
-    body.append(key, String(value));
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
-
-  return response.json() as Promise<GraphApiResponse>;
-}
-
-/**
- * Make a GET request to Graph API
- */
-async function graphGet(
-  endpoint: string,
-  params: Record<string, string>,
-  accessToken: string
-): Promise<MediaResponse> {
-  const url = new URL(`${GRAPH_API_BASE}${endpoint}`);
-  url.searchParams.append("access_token", accessToken);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.append(key, value);
-  }
-
-  const response = await fetch(url.toString());
-  return response.json() as Promise<MediaResponse>;
-}
+import {
+  graphPost,
+  graphGet,
+  waitForStatus,
+  verifyInstagramPostPublished,
+  extractGraphApiErrorMessage,
+  type GraphApiResponse,
+  type MediaResponse,
+} from "./graph-api.utils.js";
 
 // S3 storage service for presigned URLs
 const s3Storage = new S3StorageService();
@@ -171,7 +105,7 @@ async function publishInstagramImage(
 
   if (containerResponse.error || !containerResponse.id) {
     throw new Error(
-      `Failed to create IG media container: ${containerResponse.error?.message || "Unknown error"}`
+      `Failed to create IG media container: ${extractGraphApiErrorMessage(containerResponse.error)}`
     );
   }
 
@@ -186,23 +120,40 @@ async function publishInstagramImage(
 
   if (publishResponse.error || !publishResponse.id) {
     throw new Error(
-      `Failed to publish IG media: ${publishResponse.error?.message || "Unknown error"}`
+      `Failed to publish IG media: ${extractGraphApiErrorMessage(publishResponse.error)}`
     );
   }
 
   const mediaId = publishResponse.id;
 
-  // 4. Get permalink
-  const mediaDetails = await graphGet(
-    `/${mediaId}`,
-    { fields: "permalink" },
-    accessToken
-  );
+  // 4. Get permalink and verify post was published
+  let permalink = "";
+  try {
+    const mediaDetails = await graphGet(
+      `/${mediaId}`,
+      { fields: "permalink" },
+      accessToken
+    );
+    permalink = mediaDetails.permalink || "";
+  } catch (error) {
+    logger.warn({ mediaId, error }, "Failed to get image permalink, will verify separately");
+  }
+
+  // 5. Verify post was actually published
+  logger.info({ mediaId }, "Verifying Instagram image was published");
+  const verification = await verifyInstagramPostPublished(mediaId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Instagram image was not successfully published or is not accessible");
+  }
+
+  // Use verified permalink if available
+  permalink = verification.permalink || permalink;
 
   return {
     containerId,
     mediaId,
-    permalink: mediaDetails.permalink || "",
+    permalink,
   };
 }
 
@@ -242,7 +193,7 @@ async function publishInstagramCarousel(
 
     if (childResponse.error || !childResponse.id) {
       throw new Error(
-        `Failed to create carousel child: ${childResponse.error?.message || "Unknown error"}`
+        `Failed to create carousel child: ${extractGraphApiErrorMessage(childResponse.error)}`
       );
     }
 
@@ -270,7 +221,7 @@ async function publishInstagramCarousel(
 
   if (containerResponse.error || !containerResponse.id) {
     throw new Error(
-      `Failed to create carousel container: ${containerResponse.error?.message || "Unknown error"}`
+      `Failed to create carousel container: ${extractGraphApiErrorMessage(containerResponse.error)}`
     );
   }
 
@@ -285,23 +236,40 @@ async function publishInstagramCarousel(
 
   if (publishResponse.error || !publishResponse.id) {
     throw new Error(
-      `Failed to publish carousel: ${publishResponse.error?.message || "Unknown error"}`
+      `Failed to publish carousel: ${extractGraphApiErrorMessage(publishResponse.error)}`
     );
   }
 
   const mediaId = publishResponse.id;
 
-  // 4. Get permalink
-  const mediaDetails = await graphGet(
-    `/${mediaId}`,
-    { fields: "permalink" },
-    accessToken
-  );
+  // 4. Get permalink and verify post was published
+  let permalink = "";
+  try {
+    const mediaDetails = await graphGet(
+      `/${mediaId}`,
+      { fields: "permalink" },
+      accessToken
+    );
+    permalink = mediaDetails.permalink || "";
+  } catch (error) {
+    logger.warn({ mediaId, error }, "Failed to get carousel permalink, will verify separately");
+  }
+
+  // 5. Verify post was actually published
+  logger.info({ mediaId }, "Verifying Instagram carousel was published");
+  const verification = await verifyInstagramPostPublished(mediaId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Instagram carousel was not successfully published or is not accessible");
+  }
+
+  // Use verified permalink if available
+  permalink = verification.permalink || permalink;
 
   return {
     containerId,
     mediaId,
-    permalink: mediaDetails.permalink || "",
+    permalink,
   };
 }
 
@@ -347,15 +315,42 @@ async function publishInstagramReel(
 
   if (containerResponse.error || !containerResponse.id) {
     throw new Error(
-      `Failed to create reel container: ${containerResponse.error?.message || "Unknown error"}`
+      `Failed to create reel container: ${extractGraphApiErrorMessage(containerResponse.error)}`
     );
   }
 
   const containerId = containerResponse.id;
 
-  // 3. Wait for video processing (reels need time to process)
-  // In production, you might want to poll the container status
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  // 3. Wait for container processing (reels need significant time to process)
+  logger.info({ containerId }, "Waiting for Instagram reel container processing (this may take several minutes)");
+
+  try {
+    await waitForStatus(
+      containerId,
+      async () => {
+        const statusResponse = await graphGet(
+          `/${containerId}`,
+          { fields: "status_code,status" },
+          accessToken
+        );
+        return {
+          status_code: statusResponse.status_code,
+          status: statusResponse.status,
+          error: statusResponse.error,
+        };
+      },
+      ["FINISHED", "PUBLISHED", "FINISHED_PROCESSING"],
+      ["ERROR", "FAILED", "EXPIRED"],
+      {
+        maxAttempts: 60,
+        initialWaitMs: 3000,
+        maxWaitMs: 15000,
+        context: { contentType: "REEL", stage: "container" },
+      }
+    );
+  } catch (error) {
+    throw new Error(`Instagram reel container processing failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   // 4. Publish container
   const publishResponse = await graphPost(
@@ -366,23 +361,40 @@ async function publishInstagramReel(
 
   if (publishResponse.error || !publishResponse.id) {
     throw new Error(
-      `Failed to publish reel: ${publishResponse.error?.message || "Unknown error"}`
+      `Failed to publish reel: ${extractGraphApiErrorMessage(publishResponse.error)}`
     );
   }
 
   const mediaId = publishResponse.id;
 
-  // 5. Get permalink
-  const mediaDetails = await graphGet(
-    `/${mediaId}`,
-    { fields: "permalink" },
-    accessToken
-  );
+  // 5. Get permalink and verify post was published
+  let mediaDetails: MediaResponse;
+  try {
+    mediaDetails = await graphGet(
+      `/${mediaId}`,
+      { fields: "permalink,status_code" },
+      accessToken
+    );
+  } catch (error) {
+    logger.warn({ mediaId, error }, "Failed to get reel details, will verify separately");
+    mediaDetails = {} as MediaResponse;
+  }
+
+  // 6. Verify post was actually published
+  logger.info({ mediaId }, "Verifying Instagram reel was published");
+  const verification = await verifyInstagramPostPublished(mediaId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Instagram reel was not successfully published or is not accessible");
+  }
+
+  // Use verified permalink if available
+  const permalink = verification.permalink || mediaDetails.permalink || "";
 
   return {
     containerId,
     mediaId,
-    permalink: mediaDetails.permalink || "",
+    permalink,
   };
 }
 
@@ -439,7 +451,7 @@ async function publishInstagramStory(
 
   if (containerResponse.error || !containerResponse.id) {
     throw new Error(
-      `Failed to create story container: ${containerResponse.error?.message || "Unknown error"}`
+      `Failed to create story container: ${extractGraphApiErrorMessage(containerResponse.error)}`
     );
   }
 
@@ -447,52 +459,39 @@ async function publishInstagramStory(
 
   // 3. Wait for processing and check status (for both images and videos)
   // Instagram needs time for media processing - wait until status is FINISHED
-  logger.info({ containerId, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Waiting for story media processing (this may take several minutes)");
+  const mediaType = isVideo ? 'VIDEO' : 'IMAGE';
+  logger.info({ containerId, mediaType }, "Waiting for story media processing (this may take several minutes)");
 
-  let containerAttempts = 0;
-  const maxContainerAttempts = isVideo ? 60 : 40; // Videos: 60 attempts (~5 min), Images: 40 attempts (~2 min)
-  let lastStatus = "UNKNOWN";
-
-  while (containerAttempts < maxContainerAttempts) {
-    try {
-      const statusResponse = await graphGet(
-        `/${containerId}?fields=status_code,status`,
-        {},
-        accessToken
-      );
-
-      lastStatus = statusResponse.status_code || statusResponse.status || "UNKNOWN";
-      logger.debug({ containerId, status: lastStatus, attempt: containerAttempts + 1, maxContainerAttempts, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Story processing status check");
-
-      // Check if processing is complete
-      if (lastStatus === "FINISHED" || lastStatus === "PUBLISHED") {
-        logger.info({ containerId, attempts: containerAttempts + 1, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Story processing completed");
-        break;
+  try {
+    await waitForStatus(
+      containerId,
+      async () => {
+        const statusResponse = await graphGet(
+          `/${containerId}`,
+          { fields: "status_code,status" },
+          accessToken
+        );
+        return {
+          status_code: statusResponse.status_code,
+          status: statusResponse.status,
+          error: statusResponse.error,
+        };
+      },
+      ["FINISHED", "PUBLISHED"],
+      ["ERROR", "FAILED"],
+      {
+        maxAttempts: isVideo ? 60 : 40,
+        initialWaitMs: 3000,
+        maxWaitMs: 15000,
+        context: { contentType: "STORY", mediaType },
       }
-
-      // Check for error states
-      if (lastStatus === "ERROR" || lastStatus === "FAILED") {
-        throw new Error(`${isVideo ? 'Video' : 'Image'} processing failed with status: ${lastStatus}`);
-      }
-
-      // Still processing - wait before next check
-      if (lastStatus === "IN_PROGRESS" || lastStatus === "PROCESSING" || lastStatus === "PENDING" || lastStatus === "UNKNOWN") {
-        const waitTime = containerAttempts < 5 ? 3000 : containerAttempts < 15 ? 5000 : containerAttempts < 30 ? 10000 : 15000; // Progressive wait times
-        logger.debug({ containerId, status: lastStatus, waitTime, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Media still processing, waiting...");
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-      }
-
-    } catch (statusError) {
-      logger.warn({ containerId, statusError: statusError.message, attempts: containerAttempts + 1, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Status check failed, continuing to wait");
-      // Continue waiting even if status check fails
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-    }
-
-    containerAttempts++;
-  }
-
-  if (lastStatus !== "FINISHED" && lastStatus !== "PUBLISHED") {
-    logger.warn({ containerId, lastStatus, containerAttempts, mediaType: isVideo ? 'VIDEO' : 'IMAGE' }, "Media processing did not complete within timeout, proceeding anyway");
+    );
+  } catch (error) {
+    logger.warn(
+      { containerId, error: error instanceof Error ? error.message : String(error), mediaType },
+      "Story processing did not complete within timeout, proceeding anyway"
+    );
+    // Continue - stories can sometimes succeed even if status check times out
   }
 
   // 4. Publish the story container (following the working approach from the old code)
@@ -514,73 +513,27 @@ async function publishInstagramStory(
     }, "Instagram story publish failed");
 
     throw new Error(
-      `Failed to publish story: ${publishResponse.error?.message || "Unknown error"}`
+      `Failed to publish story: ${extractGraphApiErrorMessage(publishResponse.error)}`
     );
   }
 
   const storyMediaId = publishResponse.id;
   logger.info({ storyMediaId, containerId }, "Instagram story published successfully");
 
-  // 5. Try to get permalink (may not be available for stories)
-  let permalink = "";
-  try {
-    const mediaDetails = await graphGet(
-      `/${storyMediaId}?fields=permalink`,
-      {},
-      accessToken
-    );
-    permalink = mediaDetails.permalink || "";
-  } catch (permalinkError) {
-    logger.debug({ storyMediaId, permalinkError: permalinkError.message }, "Could not get story permalink");
-  }
+  // 5. Stories cannot be verified via Graph API GET requests
+  // Instagram Stories are temporary content (24h) and Graph API doesn't support
+  // querying them directly. We trust the publish response which already confirmed success.
+  // If publish_response.id exists, the story was successfully published.
+  
+  logger.info(
+    { storyMediaId, containerId },
+    "Instagram story published (verification skipped - Stories cannot be queried via Graph API)"
+  );
 
   return {
     containerId,
     mediaId: storyMediaId,
-    permalink,
-  };
-
-  // 5. Wait for media processing and check status
-  logger.info({ storyMediaId }, "Waiting for Instagram story media processing");
-
-  let mediaDetails;
-  let mediaAttempts = 0;
-  const maxMediaAttempts = 10; // Max 10 attempts (50 seconds total)
-
-  while (mediaAttempts < maxMediaAttempts) {
-    try {
-      mediaDetails = await graphGet(
-        `/${storyMediaId}`,
-        { fields: "status_code,permalink" },
-        accessToken
-      );
-
-      // Check if media is ready
-      if (mediaDetails.status_code === "FINISHED") {
-        logger.info({ storyMediaId, mediaAttempts }, "Instagram story media ready");
-        break;
-      } else if (mediaDetails.status_code === "ERROR") {
-        throw new Error(`Instagram media processing failed: ${mediaDetails.status_code}`);
-      } else {
-        logger.debug({ storyMediaId, status: mediaDetails.status_code, mediaAttempts }, "Instagram story media still processing");
-      }
-    } catch (error) {
-      logger.warn({ storyMediaId, mediaAttempts, error: error.message }, "Failed to check Instagram story media status");
-    }
-
-    // Wait 5 seconds before next attempt
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    mediaAttempts++;
-  }
-
-  if (!mediaDetails || mediaDetails.status_code !== "FINISHED") {
-    throw new Error(`Instagram story media processing did not complete within ${maxMediaAttempts * 5} seconds`);
-  }
-
-  return {
-    containerId,
-    mediaId: storyMediaId,
-    permalink: mediaDetails.permalink || "",
+    permalink: "", // Stories typically don't have permalinks
   };
 }
 
@@ -819,7 +772,7 @@ export const instagramPublishWorker = createWorker<PublishJobData>(
   processInstagramPublishJob,
   {
     concurrency: 3, // Process up to 3 jobs concurrently
-  }
+  } as any
 );
 
 // Handle worker-level failures

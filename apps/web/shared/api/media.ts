@@ -128,6 +128,7 @@ export async function finalizeUpload(payload: {
   originalName: string;
   contentType?: string;
   assetType?: "avatar" | "content-image" | "content-video";
+  isPublic?: boolean;
 }): Promise<FinalizeUploadResponse> {
   const response = await httpClient.post<{ success: boolean; data: FinalizeUploadResponse }>(
     "/media/finalize",

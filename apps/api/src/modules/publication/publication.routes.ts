@@ -9,11 +9,12 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { requirePermission } from "../../core/auth/require-permission.js";
 import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
 import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
-import { validateBody, validateParams } from "../../lib/validation.js";
+import { validateBody, validateParams, validateQuery } from "../../lib/validation.js";
 import {
   createInstagramPublicationSchema,
   createFacebookPublicationSchema,
   brandParamsSchema,
+  cursorPaginationQuerySchema,
 } from "@brint/core-validation";
 import { publicationService } from "./publication.service.js";
 
@@ -51,10 +52,10 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
    */
   app.post("/brands/:brandId/publications/instagram", {
     preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
-    schema: {
+      schema: {
       tags: ["Publications", "Instagram"],
       summary: "Schedule Instagram publication",
-      description: "Schedule a new publication to Instagram (IMAGE, CAROUSEL, or REEL)",
+      description: "Schedule a new publication to Instagram (IMAGE, CAROUSEL, REEL, or STORY)",
       params: {
         type: "object",
         properties: {
@@ -70,12 +71,13 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
           clientRequestId: { type: "string", description: "Client-provided idempotency key" },
           payload: {
             type: "object",
-            description: "Instagram-specific payload (IMAGE, CAROUSEL, or REEL)",
+            description: "Instagram-specific payload (IMAGE, CAROUSEL, REEL, or STORY)",
             properties: {
-              contentType: { type: "string", enum: ["IMAGE", "CAROUSEL", "REEL"] },
+              contentType: { type: "string", enum: ["IMAGE", "CAROUSEL", "REEL", "STORY"] },
               caption: { type: "string" },
               imageMediaId: { type: "string" },
               videoMediaId: { type: "string" },
+              storyType: { type: "string", enum: ["IMAGE", "VIDEO"] },
               items: { type: "array" },
             },
             required: ["contentType"],
@@ -142,10 +144,10 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
    */
   app.post("/brands/:brandId/publications/facebook", {
     preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
-    schema: {
+      schema: {
       tags: ["Publications", "Facebook"],
       summary: "Schedule Facebook publication",
-      description: "Schedule a new publication to Facebook (PHOTO, VIDEO, or LINK)",
+      description: "Schedule a new publication to Facebook (PHOTO, VIDEO, LINK, or STORY)",
       params: {
         type: "object",
         properties: {
@@ -161,13 +163,14 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
           clientRequestId: { type: "string", description: "Client-provided idempotency key" },
           payload: {
             type: "object",
-            description: "Facebook-specific payload (PHOTO, VIDEO, or LINK)",
+            description: "Facebook-specific payload (PHOTO, VIDEO, LINK, or STORY)",
             properties: {
-              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK"] },
+              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK", "STORY"] },
               message: { type: "string" },
               imageMediaId: { type: "string" },
               videoMediaId: { type: "string" },
               linkUrl: { type: "string" },
+              storyType: { type: "string", enum: ["IMAGE", "VIDEO"] },
             },
             required: ["contentType"],
           },
@@ -291,13 +294,13 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { brandId } = validateParams(brandParamsSchema, request.params);
     const workspaceId = requireWorkspaceMatch(request);
-    const query = request.query as { limit?: string; cursor?: string };
+    const { limit, cursor } = validateQuery(cursorPaginationQuerySchema, request.query);
 
     const result = await publicationService.listBrandPublications({
       workspaceId,
       brandId,
-      limit: query.limit ? parseInt(query.limit, 10) : undefined,
-      cursor: query.cursor,
+      limit,
+      cursor,
     });
 
     return reply.send({

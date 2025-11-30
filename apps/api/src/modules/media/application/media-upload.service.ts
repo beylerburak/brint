@@ -12,6 +12,7 @@ export type FinalizeUploadInput = {
   originalName: string;
   contentType?: string;
   assetType?: AssetType;
+  isPublic?: boolean;
 };
 
 export class MediaUploadService {
@@ -24,6 +25,7 @@ export class MediaUploadService {
       brandId,
       originalName,
       assetType = 'content-image',
+      isPublic = false,
     } = input;
 
     // 0) Workspace ID'yi bul (slug ise lookup yap)
@@ -116,7 +118,7 @@ export class MediaUploadService {
           contentType,
           sizeBytes,
           variants,
-          isPublic: false,
+          isPublic,
         },
       });
     } catch (error: any) {

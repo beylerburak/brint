@@ -59,7 +59,7 @@ async function graphPost(
   accessToken: string
 ): Promise<GraphApiResponse> {
   const url = `${GRAPH_API_BASE}${endpoint}`;
-  
+
   const body = new URLSearchParams();
   body.append("access_token", accessToken);
   for (const [key, value] of Object.entries(params)) {
@@ -74,7 +74,17 @@ async function graphPost(
     body: body.toString(),
   });
 
-  return response.json() as Promise<GraphApiResponse>;
+  const data = await response.json();
+
+  // Check for HTTP errors - Facebook returns errors as JSON with error field
+  if (!response.ok) {
+    logger.warn(
+      { endpoint, status: response.status, response: data },
+      "Facebook Graph API HTTP error"
+    );
+  }
+
+  return data;
 }
 
 /**
@@ -92,7 +102,17 @@ async function graphGet(
   }
 
   const response = await fetch(url.toString());
-  return response.json() as Promise<PostResponse>;
+  const data = await response.json();
+
+  // Check for HTTP errors
+  if (!response.ok) {
+    logger.warn(
+      { endpoint, status: response.status, response: data },
+      "Facebook Graph API GET HTTP error"
+    );
+  }
+
+  return data;
 }
 
 // S3 storage service for presigned URLs
@@ -321,14 +341,33 @@ async function publishFacebookStory(
   // 1. Get media URL
   const mediaUrl = await getMediaPublicUrl(mediaId);
   if (!mediaUrl) {
+    logger.error({ mediaId, storyType: payload.storyType }, "Cannot get public URL for story media");
     throw new Error(`Cannot get public URL for story media: ${mediaId}`);
   }
 
+  // 2. Validate media URL is accessible (Facebook requires HTTPS URLs)
+  if (!mediaUrl.startsWith('https://')) {
+    logger.error({ mediaUrl, mediaId }, "Media URL must be HTTPS for Facebook Stories");
+    throw new Error(`Media URL must be HTTPS for Facebook Stories: ${mediaUrl}`);
+  }
+
+  logger.info(
+    { pageId, storyType: payload.storyType, mediaId, mediaUrl },
+    "Publishing Facebook story"
+  );
+
   // 2. Post story
-  const endpoint = isVideo ? `/${pageId}/video_stories` : `/${pageId}/photo_stories`;
-  const storyParams: Record<string, string | boolean> = isVideo
-    ? { file_url: mediaUrl, published: true }
-    : { url: mediaUrl, published: true };
+  // Facebook Stories API - use photos endpoint with published=false for stories
+  // Note: Requires pages_manage_posts permission
+  const endpoint = `/${pageId}/photos`;
+
+  // Facebook Stories API parameters - published=false creates a story
+  const storyParams: Record<string, string | boolean> = {
+    url: mediaUrl,
+    published: false, // This creates a story instead of a regular post
+  };
+
+  logger.debug({ endpoint, storyParams }, "Facebook story API request");
 
   const postResponse = await graphPost(
     endpoint,
@@ -337,9 +376,55 @@ async function publishFacebookStory(
   );
 
   if (postResponse.error || !postResponse.id) {
-    throw new Error(
-      `Failed to post FB story: ${postResponse.error?.message || "Unknown error"}`
+    // Log full response for debugging
+    logger.error(
+      {
+        endpoint,
+        storyParams,
+        response: postResponse,
+        error: postResponse.error,
+        responseKeys: Object.keys(postResponse),
+        errorKeys: postResponse.error ? Object.keys(postResponse.error) : null,
+        hasError: !!postResponse.error,
+        hasId: !!postResponse.id,
+      },
+      "Facebook story publish failed - full response analysis"
     );
+
+    let errorMessage = "An unknown error has occurred";
+
+    if (postResponse.error) {
+      const error = postResponse.error;
+
+      // Handle specific Facebook error codes
+      if (error.code === 1) {
+        errorMessage = "Facebook authentication or permission error. Please check that the Page has 'pages_manage_posts' permission and the token is valid.";
+      } else if (error.code === 200) {
+        errorMessage = "Facebook permissions error. The Page token needs 'pages_manage_posts' permission for story publishing.";
+      } else if (error.code === 10) {
+        errorMessage = "Facebook application request limit reached.";
+      } else if (error.code === 100) {
+        errorMessage = "Facebook parameter error. Please check media URL and page ID.";
+      } else {
+        // Use Facebook's error message if available
+        errorMessage = error.message ||
+                       error.error_user_msg ||
+                       error.error_msg ||
+                       error.error_description ||
+                       `Facebook error (code: ${error.code}): ${JSON.stringify(error)}`;
+      }
+
+      // Add fbtrace_id for debugging if available
+      if (error.fbtrace_id) {
+        errorMessage += ` (Trace ID: ${error.fbtrace_id})`;
+      }
+    } else if (!postResponse.id) {
+      errorMessage = "Facebook API did not return an ID for the story post. This may indicate a permissions or parameter issue.";
+    } else {
+      errorMessage = `Unexpected response structure: ${JSON.stringify(postResponse)}`;
+    }
+
+    throw new Error(`Failed to post FB story: ${errorMessage}`);
   }
 
   const storyId = postResponse.id;

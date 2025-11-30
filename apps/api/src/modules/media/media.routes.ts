@@ -172,10 +172,11 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
           originalName: { type: 'string' },
           contentType: { type: 'string' },
           assetType: { type: 'string', enum: ['avatar', 'content-image', 'content-video'], description: 'Asset type for variants and processing; defaults to content-image' },
+          isPublic: { type: 'boolean', description: 'Whether the media should be publicly accessible; defaults to false' },
         },
       },
     },
-  }, async (request: FastifyRequest<{ Body: { objectKey: string; workspaceId: string; brandId?: string; originalName: string; contentType?: string; assetType?: 'avatar' | 'content-image' | 'content-video' } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<{ Body: { objectKey: string; workspaceId: string; brandId?: string; originalName: string; contentType?: string; assetType?: 'avatar' | 'content-image' | 'content-video'; isPublic?: boolean } }>, reply: FastifyReply) => {
     try {
       const { media, variants } = await mediaUploadService.finalizeUpload({
         objectKey: request.body.objectKey,
@@ -184,6 +185,7 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         originalName: request.body.originalName,
         contentType: request.body.contentType,
         assetType: request.body.assetType,
+        isPublic: request.body.isPublic,
       });
 
       return reply.send({ success: true, data: { media, variants } });

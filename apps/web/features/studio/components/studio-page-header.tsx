@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
-import { useStudioPageHeaderContext } from "../context/page-header-context";
+import { useStudioPageHeaderConfig } from "../context/page-header-context";
 import { RealtimeStatusBadge } from "./realtime-status-badge";
 
 /**
@@ -15,7 +15,7 @@ import { RealtimeStatusBadge } from "./realtime-status-badge";
  * using the useStudioPageHeader hook.
  */
 export function StudioPageHeader() {
-  const { config } = useStudioPageHeaderContext();
+  const config = useStudioPageHeaderConfig();
 
   // Don't render if no config is set
   if (!config) {

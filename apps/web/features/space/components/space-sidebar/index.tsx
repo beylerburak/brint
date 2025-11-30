@@ -104,8 +104,8 @@ export const SpaceSidebar = () => {
         </SidebarGroup>
 
         <SidebarGroup className="gap-1">
-          <div className="flex items-center gap- px-0">
-            <SidebarGroupLabel className="uppercase text-muted-foreground/80 text-xs">Platform</SidebarGroupLabel>
+          <div className="flex items-center px-0">
+            <SidebarGroupLabel className="uppercase text-muted-foreground/80 text-xs">Operations</SidebarGroupLabel>
             <div className="flex-1 h-px bg-border" />
           </div>
           <SidebarMenu>

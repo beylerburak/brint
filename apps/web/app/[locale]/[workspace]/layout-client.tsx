@@ -93,7 +93,7 @@ export function WorkspaceLayoutClient({
       <SidebarProvider>
         <SpaceSidebar />
         <SidebarInset>
-          <SpaceHeaderAlt workspace={workspace} />
+          {/* <SpaceHeaderAlt workspace={workspace} /> */}
           <div className="flex flex-1 flex-col">
             {children}
           </div>

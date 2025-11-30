@@ -5,8 +5,10 @@ import { redis } from './lib/redis.js';
 import { createServer } from './core/http/server.js';
 // Initialize Sentry before anything else
 import { initSentry } from './core/observability/sentry.js';
-// Bootstrap email queue worker
+// Bootstrap queue workers
 import './core/queue/email.queue.js';
+import './core/queue/workers/publication-instagram.worker.js';
+import './core/queue/workers/publication-facebook.worker.js';
 
 // Initialize Sentry
 initSentry();

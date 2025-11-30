@@ -281,3 +281,257 @@ export const socialAccountListQuerySchema = cursorPaginationQuerySchema.extend({
   status: socialAccountStatusSchema.optional(),
   includeRemoved: z.boolean().optional(),
 });
+
+// ======================
+// Publication Validation Schemas
+// ======================
+
+/**
+ * Media ID schema - references our internal Media table
+ */
+export const mediaIdSchema = z.string().min(1, 'validation.mediaId.required');
+
+/**
+ * ISO datetime string schema
+ */
+export const isoDateTimeSchema = z.string().datetime('validation.dateTime.invalid');
+
+// --------------------
+// Instagram Publication Schemas
+// --------------------
+
+/**
+ * Instagram content type enum
+ */
+export const instagramContentTypeEnum = z.enum(['IMAGE', 'CAROUSEL', 'REEL', 'STORY']);
+
+export type InstagramContentType = z.infer<typeof instagramContentTypeEnum>;
+
+/**
+ * Instagram user tag schema (for tagging users in posts)
+ */
+const instagramUserTagSchema = z.object({
+  igUserId: z.string().min(1, 'validation.instagram.userTag.igUserId.required'),
+  x: z.number().min(0).max(1, 'validation.instagram.userTag.x.range'),
+  y: z.number().min(0).max(1, 'validation.instagram.userTag.y.range'),
+});
+
+/**
+ * Instagram payload base - common fields for all IG content types
+ */
+const instagramPayloadBase = z.object({
+  contentType: instagramContentTypeEnum,
+  caption: z.string().max(2200, 'validation.instagram.caption.max').optional(),
+  disableComments: z.boolean().optional(),
+  disableLikes: z.boolean().optional(),
+});
+
+/**
+ * Instagram IMAGE payload
+ */
+const instagramImagePayload = instagramPayloadBase.extend({
+  contentType: z.literal('IMAGE'),
+  imageMediaId: mediaIdSchema,
+  altText: z.string().max(1000, 'validation.instagram.altText.max').optional(),
+  locationId: z.string().optional(),
+  userTags: z.array(instagramUserTagSchema).optional(),
+});
+
+/**
+ * Instagram CAROUSEL item schema
+ */
+const instagramCarouselItemSchema = z.object({
+  mediaId: mediaIdSchema,
+  type: z.enum(['IMAGE', 'VIDEO']),
+  altText: z.string().max(1000, 'validation.instagram.altText.max').optional(),
+});
+
+/**
+ * Instagram CAROUSEL payload
+ */
+const instagramCarouselPayload = instagramPayloadBase.extend({
+  contentType: z.literal('CAROUSEL'),
+  items: z.array(instagramCarouselItemSchema)
+    .min(2, 'validation.instagram.carousel.items.min')
+    .max(10, 'validation.instagram.carousel.items.max'),
+  locationId: z.string().optional(),
+});
+
+/**
+ * Instagram REEL payload
+ */
+const instagramReelPayload = instagramPayloadBase.extend({
+  contentType: z.literal('REEL'),
+  videoMediaId: mediaIdSchema,
+  coverMediaId: mediaIdSchema.optional(),
+  shareToFeed: z.boolean().default(true),
+  thumbOffsetSeconds: z.number().int().min(0).max(60).optional(),
+  audioRename: z.string().max(255).optional(),
+});
+
+/**
+ * Instagram STORY payload
+ * Stories can be image or video, disappear after 24 hours
+ * Graph API: POST /{ig-user-id}/media with media_type=STORIES
+ */
+const instagramStoryPayload = z.object({
+  contentType: z.literal('STORY'),
+  storyType: z.enum(['IMAGE', 'VIDEO']),
+  imageMediaId: mediaIdSchema.optional(),
+  videoMediaId: mediaIdSchema.optional(),
+}).superRefine((data, ctx) => {
+  if (data.storyType === 'IMAGE' && !data.imageMediaId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'validation.instagram.story.imageMediaIdRequired',
+      path: ['imageMediaId'],
+    });
+  }
+  if (data.storyType === 'VIDEO' && !data.videoMediaId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'validation.instagram.story.videoMediaIdRequired',
+      path: ['videoMediaId'],
+    });
+  }
+});
+
+/**
+ * Instagram publication payload - union of all content types
+ * Note: Using regular union because STORY needs custom validation
+ */
+export const instagramPublicationPayloadSchema = z.union([
+  instagramImagePayload,
+  instagramCarouselPayload,
+  instagramReelPayload,
+  instagramStoryPayload,
+]);
+
+export type InstagramPublicationPayload = z.infer<typeof instagramPublicationPayloadSchema>;
+
+// --------------------
+// Facebook Publication Schemas
+// --------------------
+
+/**
+ * Facebook content type enum
+ */
+export const facebookContentTypeEnum = z.enum(['PHOTO', 'VIDEO', 'LINK', 'STORY']);
+
+export type FacebookContentType = z.infer<typeof facebookContentTypeEnum>;
+
+/**
+ * Facebook payload base - common fields for all FB content types
+ */
+const facebookPayloadBase = z.object({
+  contentType: facebookContentTypeEnum,
+  message: z.string().max(63206, 'validation.facebook.message.max').optional(),
+});
+
+/**
+ * Facebook PHOTO payload
+ */
+const facebookPhotoPayload = facebookPayloadBase.extend({
+  contentType: z.literal('PHOTO'),
+  imageMediaId: mediaIdSchema,
+  altText: z.string().max(1000, 'validation.facebook.altText.max').optional(),
+});
+
+/**
+ * Facebook VIDEO payload
+ */
+const facebookVideoPayload = facebookPayloadBase.extend({
+  contentType: z.literal('VIDEO'),
+  videoMediaId: mediaIdSchema,
+  title: z.string().max(255, 'validation.facebook.video.title.max').optional(),
+  thumbMediaId: mediaIdSchema.optional(),
+});
+
+/**
+ * Facebook LINK payload
+ */
+const facebookLinkPayload = facebookPayloadBase.extend({
+  contentType: z.literal('LINK'),
+  linkUrl: z.string().url('validation.facebook.link.url.invalid'),
+});
+
+/**
+ * Facebook STORY payload
+ * Facebook Page Stories - image or video
+ * Graph API: POST /{page-id}/photo_stories or /{page-id}/video_stories
+ */
+const facebookStoryPayload = z.object({
+  contentType: z.literal('STORY'),
+  storyType: z.enum(['IMAGE', 'VIDEO']),
+  imageMediaId: mediaIdSchema.optional(),
+  videoMediaId: mediaIdSchema.optional(),
+}).superRefine((data, ctx) => {
+  if (data.storyType === 'IMAGE' && !data.imageMediaId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'validation.facebook.story.imageMediaIdRequired',
+      path: ['imageMediaId'],
+    });
+  }
+  if (data.storyType === 'VIDEO' && !data.videoMediaId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'validation.facebook.story.videoMediaIdRequired',
+      path: ['videoMediaId'],
+    });
+  }
+});
+
+/**
+ * Facebook publication payload - union of all content types
+ * Note: Using regular union because STORY needs custom validation
+ */
+export const facebookPublicationPayloadSchema = z.union([
+  facebookPhotoPayload,
+  facebookVideoPayload,
+  facebookLinkPayload,
+  facebookStoryPayload,
+]);
+
+export type FacebookPublicationPayload = z.infer<typeof facebookPublicationPayloadSchema>;
+
+// --------------------
+// Create Publication Request Schemas
+// --------------------
+
+/**
+ * Create Instagram publication request body schema
+ * Used for POST /v1/brands/:brandId/publications/instagram
+ */
+export const createInstagramPublicationSchema = z.object({
+  socialAccountId: cuidSchema,
+  publishAt: isoDateTimeSchema.optional(),
+  clientRequestId: z.string().max(64).optional(),
+  payload: instagramPublicationPayloadSchema,
+});
+
+export type CreateInstagramPublicationInput = z.infer<typeof createInstagramPublicationSchema>;
+
+/**
+ * Create Facebook publication request body schema
+ * Used for POST /v1/brands/:brandId/publications/facebook
+ */
+export const createFacebookPublicationSchema = z.object({
+  socialAccountId: cuidSchema,
+  publishAt: isoDateTimeSchema.optional(),
+  clientRequestId: z.string().max(64).optional(),
+  payload: facebookPublicationPayloadSchema,
+});
+
+export type CreateFacebookPublicationInput = z.infer<typeof createFacebookPublicationSchema>;
+
+/**
+ * Publication params schema
+ * Used for validating route parameters like :brandId and :publicationId
+ */
+export const publicationParamsSchema = z.object({
+  brandId: cuidSchema,
+  publicationId: cuidSchema.optional(),
+});
+
+export type PublicationParamsInput = z.infer<typeof publicationParamsSchema>;

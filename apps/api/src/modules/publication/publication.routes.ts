@@ -1,0 +1,410 @@
+/**
+ * Publication Routes
+ * 
+ * Fastify route definitions for Publication domain.
+ * Provides endpoints for Instagram and Facebook publishing.
+ */
+
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { requirePermission } from "../../core/auth/require-permission.js";
+import { PERMISSIONS } from "../../core/auth/permissions.registry.js";
+import { BadRequestError, ForbiddenError } from "../../lib/http-errors.js";
+import { validateBody, validateParams } from "../../lib/validation.js";
+import {
+  createInstagramPublicationSchema,
+  createFacebookPublicationSchema,
+  brandParamsSchema,
+} from "@brint/core-validation";
+import { publicationService } from "./publication.service.js";
+
+/**
+ * Validates workspace header matches route param
+ */
+function requireWorkspaceMatch(
+  request: FastifyRequest,
+  workspaceIdFromParam?: string
+): string {
+  const headerWorkspaceId = request.auth?.workspaceId;
+
+  if (!headerWorkspaceId) {
+    throw new BadRequestError("WORKSPACE_ID_REQUIRED", "X-Workspace-Id header is required");
+  }
+
+  if (workspaceIdFromParam && headerWorkspaceId !== workspaceIdFromParam) {
+    throw new ForbiddenError("WORKSPACE_MISMATCH", {
+      headerWorkspaceId,
+      paramWorkspaceId: workspaceIdFromParam,
+    });
+  }
+
+  return headerWorkspaceId;
+}
+
+export async function registerPublicationRoutes(app: FastifyInstance) {
+  // ====================
+  // Instagram Publication Endpoint
+  // ====================
+
+  /**
+   * POST /v1/brands/:brandId/publications/instagram
+   * Schedule an Instagram publication
+   */
+  app.post("/brands/:brandId/publications/instagram", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
+    schema: {
+      tags: ["Publications", "Instagram"],
+      summary: "Schedule Instagram publication",
+      description: "Schedule a new publication to Instagram (IMAGE, CAROUSEL, or REEL)",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      body: {
+        type: "object",
+        properties: {
+          socialAccountId: { type: "string", description: "ID of the Instagram social account to publish from" },
+          publishAt: { type: "string", format: "date-time", description: "ISO datetime for scheduled publish (optional, immediate if not provided)" },
+          clientRequestId: { type: "string", description: "Client-provided idempotency key" },
+          payload: {
+            type: "object",
+            description: "Instagram-specific payload (IMAGE, CAROUSEL, or REEL)",
+            properties: {
+              contentType: { type: "string", enum: ["IMAGE", "CAROUSEL", "REEL"] },
+              caption: { type: "string" },
+              imageMediaId: { type: "string" },
+              videoMediaId: { type: "string" },
+              items: { type: "array" },
+            },
+            required: ["contentType"],
+          },
+        },
+        required: ["socialAccountId", "payload"],
+      },
+      response: {
+        201: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                status: { type: "string" },
+                scheduledAt: { type: ["string", "null"] },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    const body = validateBody(createInstagramPublicationSchema, request);
+
+    const publication = await publicationService.scheduleInstagramPublication({
+      workspaceId,
+      brandId,
+      socialAccountId: body.socialAccountId,
+      publishAt: body.publishAt ? new Date(body.publishAt) : undefined,
+      payload: body.payload,
+      actorUserId: userId,
+      clientRequestId: body.clientRequestId,
+    }, request);
+
+    return reply.status(201).send({
+      success: true,
+      data: {
+        id: publication.id,
+        status: publication.status,
+        scheduledAt: publication.scheduledAt?.toISOString() ?? null,
+      },
+    });
+  });
+
+  // ====================
+  // Facebook Publication Endpoint
+  // ====================
+
+  /**
+   * POST /v1/brands/:brandId/publications/facebook
+   * Schedule a Facebook publication
+   */
+  app.post("/brands/:brandId/publications/facebook", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
+    schema: {
+      tags: ["Publications", "Facebook"],
+      summary: "Schedule Facebook publication",
+      description: "Schedule a new publication to Facebook (PHOTO, VIDEO, or LINK)",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      body: {
+        type: "object",
+        properties: {
+          socialAccountId: { type: "string", description: "ID of the Facebook Page social account to publish from" },
+          publishAt: { type: "string", format: "date-time", description: "ISO datetime for scheduled publish (optional, immediate if not provided)" },
+          clientRequestId: { type: "string", description: "Client-provided idempotency key" },
+          payload: {
+            type: "object",
+            description: "Facebook-specific payload (PHOTO, VIDEO, or LINK)",
+            properties: {
+              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK"] },
+              message: { type: "string" },
+              imageMediaId: { type: "string" },
+              videoMediaId: { type: "string" },
+              linkUrl: { type: "string" },
+            },
+            required: ["contentType"],
+          },
+        },
+        required: ["socialAccountId", "payload"],
+      },
+      response: {
+        201: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                status: { type: "string" },
+                scheduledAt: { type: ["string", "null"] },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    const body = validateBody(createFacebookPublicationSchema, request);
+
+    const publication = await publicationService.scheduleFacebookPublication({
+      workspaceId,
+      brandId,
+      socialAccountId: body.socialAccountId,
+      publishAt: body.publishAt ? new Date(body.publishAt) : undefined,
+      payload: body.payload,
+      actorUserId: userId,
+      clientRequestId: body.clientRequestId,
+    }, request);
+
+    return reply.status(201).send({
+      success: true,
+      data: {
+        id: publication.id,
+        status: publication.status,
+        scheduledAt: publication.scheduledAt?.toISOString() ?? null,
+      },
+    });
+  });
+
+  // ====================
+  // List Publications Endpoint
+  // ====================
+
+  /**
+   * GET /v1/brands/:brandId/publications
+   * List publications for a brand
+   */
+  app.get("/brands/:brandId/publications", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_VIEW)],
+    schema: {
+      tags: ["Publications"],
+      summary: "List publications",
+      description: "Get a paginated list of publications for a brand",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      querystring: {
+        type: "object",
+        properties: {
+          limit: { type: "number", minimum: 1, maximum: 100 },
+          cursor: { type: "string" },
+        },
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      platform: { type: "string" },
+                      contentType: { type: "string" },
+                      status: { type: "string" },
+                      caption: { type: ["string", "null"] },
+                      scheduledAt: { type: ["string", "null"] },
+                      publishedAt: { type: ["string", "null"] },
+                      failedAt: { type: ["string", "null"] },
+                      permalink: { type: ["string", "null"] },
+                      externalPostId: { type: ["string", "null"] },
+                      createdAt: { type: "string" },
+                      updatedAt: { type: "string" },
+                    },
+                  },
+                },
+                nextCursor: { type: ["string", "null"] },
+              },
+              required: ["items", "nextCursor"],
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const workspaceId = requireWorkspaceMatch(request);
+    const query = request.query as { limit?: string; cursor?: string };
+
+    const result = await publicationService.listBrandPublications({
+      workspaceId,
+      brandId,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+      cursor: query.cursor,
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        items: result.items.map((item) => ({
+          id: item.id,
+          platform: item.platform,
+          contentType: item.contentType,
+          status: item.status,
+          caption: item.caption,
+          scheduledAt: item.scheduledAt?.toISOString() ?? null,
+          publishedAt: item.publishedAt?.toISOString() ?? null,
+          failedAt: item.failedAt?.toISOString() ?? null,
+          permalink: item.permalink,
+          externalPostId: item.externalPostId,
+          createdAt: item.createdAt.toISOString(),
+          updatedAt: item.updatedAt.toISOString(),
+        })),
+        nextCursor: result.nextCursor,
+      },
+    });
+  });
+
+  // ====================
+  // Get Publication Endpoint
+  // ====================
+
+  /**
+   * GET /v1/brands/:brandId/publications/:publicationId
+   * Get a single publication
+   */
+  app.get("/brands/:brandId/publications/:publicationId", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_VIEW)],
+    schema: {
+      tags: ["Publications"],
+      summary: "Get publication details",
+      description: "Get detailed information about a specific publication",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+          publicationId: { type: "string" },
+        },
+        required: ["brandId", "publicationId"],
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                workspaceId: { type: "string" },
+                brandId: { type: "string" },
+                socialAccountId: { type: ["string", "null"] },
+                platform: { type: "string" },
+                contentType: { type: "string" },
+                status: { type: "string" },
+                caption: { type: ["string", "null"] },
+                scheduledAt: { type: ["string", "null"] },
+                publishedAt: { type: ["string", "null"] },
+                failedAt: { type: ["string", "null"] },
+                permalink: { type: ["string", "null"] },
+                externalPostId: { type: ["string", "null"] },
+                createdAt: { type: "string" },
+                updatedAt: { type: "string" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const { publicationId } = request.params as { publicationId: string };
+    const workspaceId = requireWorkspaceMatch(request);
+
+    const publication = await publicationService.getPublication(
+      publicationId,
+      workspaceId,
+      brandId
+    );
+
+    return reply.send({
+      success: true,
+      data: {
+        id: publication.id,
+        workspaceId: publication.workspaceId,
+        brandId: publication.brandId,
+        socialAccountId: publication.socialAccountId,
+        platform: publication.platform,
+        contentType: publication.contentType,
+        status: publication.status,
+        caption: publication.caption,
+        scheduledAt: publication.scheduledAt?.toISOString() ?? null,
+        publishedAt: publication.publishedAt?.toISOString() ?? null,
+        failedAt: publication.failedAt?.toISOString() ?? null,
+        permalink: publication.permalink,
+        externalPostId: publication.externalPostId,
+        createdAt: publication.createdAt.toISOString(),
+        updatedAt: publication.updatedAt.toISOString(),
+      },
+    });
+  });
+}
+

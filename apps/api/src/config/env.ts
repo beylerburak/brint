@@ -88,6 +88,8 @@ const envSchema = z.object({
   YOUTUBE_CLIENT_ID: z.string().optional(),
   YOUTUBE_CLIENT_SECRET: z.string().optional(),
   YOUTUBE_REDIRECT_URI: z.string().url().optional(),
+  // Graph API version for Facebook/Instagram publishing
+  GRAPH_API_VERSION: z.string().default('v24.0'),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -189,6 +191,8 @@ export const env = {
   YOUTUBE_CLIENT_ID: rawEnv.YOUTUBE_CLIENT_ID,
   YOUTUBE_CLIENT_SECRET: rawEnv.YOUTUBE_CLIENT_SECRET,
   YOUTUBE_REDIRECT_URI: rawEnv.YOUTUBE_REDIRECT_URI,
+  // Graph API version
+  GRAPH_API_VERSION: rawEnv.GRAPH_API_VERSION,
 } as const;
 
 export type Env = typeof env;

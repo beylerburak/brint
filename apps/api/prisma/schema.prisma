@@ -265,6 +265,9 @@ enum PublicationContentType {
   reel
   story
   carousel
+  image
+  video
+  link
 }
 
 enum PublicationStatus {
@@ -325,8 +328,9 @@ model SocialAccount {
   /// Example: pageName, igBusinessAccountId, avatarUrl, etc.
   platformData Json?
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand        Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  publications Publication[]
 
   @@unique([workspaceId, platform, externalId])
   @@index([workspaceId, brandId])
@@ -387,29 +391,39 @@ model Content {
 }
 
 model Publication {
-  id             String                 @id @default(cuid())
-  workspaceId    String
-  brandId        String
-  contentId      String
-  platform       PublicationPlatform
-  contentType    PublicationContentType
-  scheduledAt    DateTime?
-  publishedAt    DateTime?
-  status         PublicationStatus
-  settings       Json // JSONB: platform/type-specific payload
-  error          Json? // JSONB: error details
-  externalPostId String?
-  jobId          String?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id                   String                 @id @default(cuid())
+  workspaceId          String
+  brandId              String
+  contentId            String?                // Optional - null for direct social publishing
+  socialAccountId      String?                // Which social account to publish to
+  platform             PublicationPlatform
+  contentType          PublicationContentType
+  scheduledAt          DateTime?
+  publishedAt          DateTime?
+  failedAt             DateTime?
+  status               PublicationStatus
+  caption              String?                // Unified caption/message field
+  permalink            String?                // Platform's URL for the published post
+  settings             Json                   // JSONB: platform/type-specific payload (legacy)
+  payloadJson          Json?                  // JSONB: our structured payload for publishing
+  error                Json?                  // JSONB: error details (legacy)
+  providerResponseJson Json?                  // JSONB: full provider response
+  externalPostId       String?                // Provider's post ID (ig media id, fb post id)
+  jobId                String?                // BullMQ job ID
+  clientRequestId      String?                // Client-provided idempotency key
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  content       Content?       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, brandId])
   @@index([contentId])
-  @@index([status, scheduledAt]) // Worker query: WHERE status='scheduled' AND scheduledAt<=now()
+  @@index([socialAccountId])
+  @@index([status, scheduledAt])
+  @@index([status, scheduledAt, platform])
   @@map("publications")
 }
 

@@ -101,12 +101,16 @@ export const oauthConfig = {
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     userInfoUrl: 'https://api.linkedin.com/v2/userinfo',
     organizationsUrl: 'https://api.linkedin.com/v2/organizationAcls',
-    // LinkedIn scopes for pages
+    organizationDetailsUrl: 'https://api.linkedin.com/v2/organizations',
+    // LinkedIn scopes for pages (personal and organization)
+    // r_organization_admin or rw_organization_admin is required for organizationAcls endpoint
     scopes: [
       'openid',
       'profile',
       'email',
       'w_member_social',
+      'w_organization_social',
+      'r_organization_admin', // Required to access organizationAcls endpoint
     ] as const,
     enabled: !!env.LINKEDIN_CLIENT_ID && !!env.LINKEDIN_CLIENT_SECRET && !!env.LINKEDIN_REDIRECT_URI,
   },

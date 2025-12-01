@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
-import * as React from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -12,20 +12,23 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  PreviewLinkCard,
+  PreviewLinkCardTrigger,
+  PreviewLinkCardContent,
+} from "@/components/animate-ui/components/radix/preview-link-card";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ExternalLink } from "lucide-react";
 import { useStudioPageHeader } from "@/features/studio/context";
 import { useStudioBrand } from "@/features/studio/hooks";
 import { useSocialAccounts } from "@/features/social-account/hooks";
@@ -47,6 +50,9 @@ import {
   Film,
   Send,
   X,
+  ChevronDown,
+  Calendar,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/shared/utils";
 import {
@@ -119,10 +125,52 @@ export function ContentCreatePage() {
   const [scheduleForLater, setScheduleForLater] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+  const [isSchedulePopoverOpen, setIsSchedulePopoverOpen] = useState(false);
+  const [scheduleStep, setScheduleStep] = useState<"select" | "datetime">("select");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    scheduledDate ? new Date(scheduledDate) : undefined
+  );
   const [internalTags, setInternalTags] = useState<string[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [mediaConfig, setMediaConfig] = useState<MediaConfig | null>(null);
+
+  // Router for navigation
+  const router = useRouter();
+
+  // Function to navigate back to the referring page
+  const navigateBackToReferrer = useCallback(() => {
+    const referrer = document.referrer;
+    const currentUrl = window.location.href;
+
+    // Check if coming from calendar page
+    if (referrer.includes('/calendar')) {
+      router.push(`/${workspace?.slug}/studio/${brand?.slug}/calendar`);
+      return;
+    }
+
+    // Check if coming from content list page
+    if (referrer.includes('/contents') || referrer.includes('/studio/') && referrer.includes('/contents')) {
+      router.push(`/${workspace?.slug}/studio/${brand?.slug}/contents`);
+      return;
+    }
+
+    // Default: go to content list
+    router.push(`/${workspace?.slug}/studio/${brand?.slug}/contents`);
+  }, [router, workspace?.slug, brand?.slug]);
   const [isPublishing, setIsPublishing] = useState(false);
+  // Format selected date and time for display
+  const formattedScheduleText = useMemo(() => {
+    if (scheduledDate && scheduledTime) {
+      const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      return dateTime.toLocaleString('tr-TR', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    return 'Schedule';
+  }, [scheduledDate, scheduledTime]);
 
   // Fetch social accounts for this brand
   const { accounts } = useSocialAccounts({
@@ -131,7 +179,7 @@ export function ContentCreatePage() {
   });
 
   // Load media config
-  React.useEffect(() => {
+  useEffect(() => {
     getMediaConfig().then(setMediaConfig).catch(console.error);
   }, []);
 
@@ -276,7 +324,7 @@ export function ContentCreatePage() {
   };
 
   // Cleanup blob URLs on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       selectedMedia.forEach((media) => {
         URL.revokeObjectURL(media.previewUrl);
@@ -306,6 +354,7 @@ export function ContentCreatePage() {
       selectedAccounts.has(account.id)
     );
   }, [filteredAccounts, selectedAccounts]);
+
 
   // Get unique platforms from selected accounts
   const selectedPlatforms = useMemo(() => {
@@ -573,7 +622,11 @@ export function ContentCreatePage() {
           title: "İşleme alındı",
           description: `${successful} hesap${successful > 1 ? "" : ""} için yayınlama işlemi başlatıldı${failed > 0 ? ` (${failed} hesap için başarısız)` : ""}`,
         });
-        // TODO: Navigate to content list or show success page
+
+        // Navigate back to the referring page after a short delay
+        setTimeout(() => {
+          navigateBackToReferrer();
+        }, 2000);
       } else {
         toast({
           title: "Hata",
@@ -590,6 +643,12 @@ export function ContentCreatePage() {
       });
     } finally {
       setIsPublishing(false);
+      // Reset scheduling state after publish
+      setScheduleForLater(false);
+      setScheduledDate("");
+      setScheduledTime("");
+      setSelectedDate(undefined);
+      setIsSchedulePopoverOpen(false);
     }
   }, [
     workspaceReady,
@@ -609,6 +668,41 @@ export function ContentCreatePage() {
     toast,
   ]);
 
+  // Handle publish now / schedule
+  const handlePublishNow = useCallback(() => {
+    if (scheduledDate && scheduledTime) {
+      // Schedule mode - validate date and time
+      const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      if (isNaN(dateTime.getTime())) {
+        toast({
+          title: "Error",
+          description: "Invalid date or time selected",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const now = new Date();
+      if (dateTime <= now) {
+        toast({
+          title: "Error",
+          description: "Scheduled time must be in the future",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setScheduleForLater(true);
+    } else {
+      // Publish now mode
+      setScheduleForLater(false);
+      setScheduledDate("");
+      setScheduledTime("");
+    }
+    handlePublish();
+  }, [scheduledDate, scheduledTime, handlePublish, toast]);
+
+
   // Set page header config (after handlePublish is defined)
   // Must include handlePublish in deps - it changes when selectedContentType/accounts change
   const headerConfig = useMemo(
@@ -624,14 +718,104 @@ export function ContentCreatePage() {
           <Button variant="outline" size="sm">
             Taslak Kaydet
           </Button>
-          <Button size="sm" onClick={handlePublish} disabled={isPublishing}>
-            {isPublishing ? "Publishing..." : "Publish Now"}
-            <Send className="ml-2 h-4 w-4" />
-          </Button>
+          <ButtonGroup>
+            <Popover open={isSchedulePopoverOpen} onOpenChange={setIsSchedulePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPublishing}
+                >
+                  {formattedScheduleText}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="p-4">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium">Select Date</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Choose when to publish this content
+                      </p>
+                    </div>
+
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        setSelectedDate(date);
+                        if (date) {
+                          setScheduledDate(date.toISOString().split('T')[0]);
+                          // Auto-set time to 10:00 if not already set
+                          if (!scheduledTime) {
+                            setScheduledTime("10:00");
+                          }
+                        }
+                      }}
+                      disabled={(date) => date < new Date()}
+                      className="rounded-md border"
+                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-time">Time</Label>
+                      <Input
+                        id="schedule-time"
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {scheduledDate && scheduledTime && (
+                      <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950/20 rounded px-3 py-2">
+                        <span>📅</span>
+                        <span>
+                          Will publish on {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString('tr-TR', {
+                            month: 'short',
+                            day: 'numeric',
+                            weekday: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    )}
+
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsSchedulePopoverOpen(false)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsSchedulePopoverOpen(false)}
+                        className="flex-1"
+                      >
+                        Tamam
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              size="sm"
+              onClick={handlePublishNow}
+              disabled={isPublishing}
+            >
+              {isPublishing ? "Publishing..." : (scheduledDate && scheduledTime ? "Schedule" : "Publish Now")}
+            </Button>
+          </ButtonGroup>
         </div>
       ),
     }),
-    [isPublishing, handlePublish]
+    [isPublishing, handlePublish, handlePublishNow, isSchedulePopoverOpen, selectedDate, scheduledDate, scheduledTime, formattedScheduleText]
   );
 
   useStudioPageHeader(headerConfig);
@@ -676,149 +860,163 @@ export function ContentCreatePage() {
                     </div>
                   </div>
 
-                  {/* Account Selection Dropdown */}
+                  {/* Account Selection - Avatar List */}
                   <div className="space-y-2">
-                    <Label>Select which accounts to publish to</Label>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                    <div className="flex items-center justify-between">
+                      <Label>Select which accounts to publish to</Label>
+                      {filteredAccounts.length > 0 && (
                         <Button
-                          variant="outline"
-                          className="w-full justify-start h-auto min-h-10 px-3 py-2"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto py-1 text-xs"
+                          onClick={() => {
+                            if (selectedAccountsList.length === filteredAccounts.length) {
+                              setSelectedAccounts(new Set());
+                            } else {
+                              setSelectedAccounts(
+                                new Set(filteredAccounts.map((a) => a.id))
+                              );
+                            }
+                          }}
                         >
-                          {selectedAccountsList.length === 0 ? (
-                            <span className="text-muted-foreground">
-                              Select accounts...
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Platform icons stack */}
-                              <div className="flex items-center -space-x-2">
-                                {selectedAccountsList.slice(0, 3).map((account) => (
-                                  <div
-                                    key={account.id}
-                                    className="relative z-10 rounded-full ring-2 ring-background"
-                                  >
-                                    <SocialPlatformIcon
-                                      platform={account.platform}
-                                      size={20}
-                                      className="rounded-full"
-                                    />
-                                  </div>
-                                ))}
-                                {selectedAccountsList.length > 3 && (
-                                  <div className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-medium ring-2 ring-background">
-                                    +{selectedAccountsList.length - 3}
-                                  </div>
-                                )}
-                              </div>
-                              {/* Account names */}
-                              <span className="text-sm">
-                                {selectedAccountsList
-                                  .slice(0, 2)
-                                  .map((a) => a.displayName || a.username)
-                                  .join(", ")}
-                                {selectedAccountsList.length > 2 &&
-                                  ` ve ${selectedAccountsList.length - 2} diğeri`}
-                              </span>
-                            </div>
-                          )}
+                          {selectedAccountsList.length === filteredAccounts.length
+                            ? "Deselect all"
+                            : "Select all"}
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-full min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-[300px] overflow-y-auto">
-                        {filteredAccounts.length === 0 ? (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                            No accounts available
-                          </div>
-                        ) : (
-                          <>
-                            <DropdownMenuCheckboxItem
-                              checked={
-                                selectedAccountsList.length ===
-                                filteredAccounts.length &&
-                                filteredAccounts.length > 0
-                              }
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedAccounts(
-                                    new Set(filteredAccounts.map((a) => a.id))
-                                  );
-                                } else {
-                                  setSelectedAccounts(new Set());
-                                }
+                      )}
+                    </div>
+                    {filteredAccounts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed p-6 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No accounts available
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-nowrap gap-2 overflow-x-auto">
+                        {filteredAccounts.map((account) => {
+                          const platformId = mapSocialPlatformToPlatformId(account.platform);
+                          const mapping = platformId && selectedContentType
+                            ? getPlatformMapping(selectedContentType, platformId)
+                            : null;
+                          const isSelected = selectedAccounts.has(account.id);
+
+                          // Get account initials for fallback
+                          const getAccountInitials = (acc: typeof account): string => {
+                            if (acc.displayName) {
+                              return acc.displayName
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2);
+                            }
+                            if (acc.username) {
+                              return acc.username.slice(0, 2).toUpperCase();
+                            }
+                            return "AC";
+                          };
+
+                          const platformInfo = PLATFORM_INFO[account.platform];
+
+                          const avatarElement = (
+                            <div
+                              className={cn(
+                                "relative rounded-full border-2 cursor-pointer transition-all",
+                                isSelected 
+                                  ? "border-primary ring-2 ring-primary/20" 
+                                  : "border-background hover:border-primary/50"
+                              )}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleAccount(account.id);
                               }}
                             >
-                              Select all
-                            </DropdownMenuCheckboxItem>
-                            {filteredAccounts.map((account) => {
-                              const platformId = mapSocialPlatformToPlatformId(account.platform);
-                              const mapping = platformId && selectedContentType
-                                ? getPlatformMapping(selectedContentType, platformId)
-                                : null;
-                              const platformTypeLabel = platformId && selectedContentType
-                                ? getPlatformTypeLabel(selectedContentType, platformId)
-                                : null;
+                              <Avatar className="h-10 w-10">
+                                {account.avatarUrl && (
+                                  <AvatarImage
+                                    src={account.avatarUrl}
+                                    alt={account.displayName || account.username || "Account"}
+                                  />
+                                )}
+                                <AvatarFallback>
+                                  {getAccountInitials(account)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {/* Platform icon at bottom right of avatar */}
+                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-background border-2 border-background flex items-center justify-center">
+                                <SocialPlatformIcon
+                                  platform={account.platform}
+                                  size={16}
+                                  className="opacity-100"
+                                />
+                              </div>
+                              {/* Selection check icon */}
+                              {isSelected && (
+                                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground border-2 border-background">
+                                  <CheckIcon className="h-3 w-3" />
+                                </div>
+                              )}
+                            </div>
+                          );
 
-                              // Format platform type label for display
-                              const formatPlatformTypeLabel = (label: string | null): string => {
-                                if (!label) return "";
-                                return label
-                                  .split("_")
-                                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                                  .join(" ");
-                              };
-
-                              return (
-                                <TooltipProvider key={account.id}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="w-full">
-                                        <DropdownMenuCheckboxItem
-                                          checked={selectedAccounts.has(account.id)}
-                                          onCheckedChange={() => {
-                                            toggleAccount(account.id);
-                                          }}
-                                          className="w-full"
-                                        >
-                                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                                            <SocialPlatformIcon
-                                              platform={account.platform}
-                                              size={16}
-                                            />
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                              <span className="truncate">
-                                                {account.displayName || account.username}
-                                              </span>
-                                              {account.username && (
-                                                <span className="text-xs text-muted-foreground truncate">
-                                                  @{account.username}
-                                                </span>
-                                              )}
-                                              {platformTypeLabel && (
-                                                <Badge
-                                                  variant="outline"
-                                                  className="text-xs h-5 px-1.5 font-normal shrink-0"
-                                                >
-                                                  {formatPlatformTypeLabel(platformTypeLabel)}
-                                                </Badge>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </DropdownMenuCheckboxItem>
-                                      </div>
-                                    </TooltipTrigger>
-                                    {mapping?.notes && (
-                                      <TooltipContent side="right" className="max-w-xs">
-                                        <p className="text-sm">{mapping.notes}</p>
-                                      </TooltipContent>
+                          return (
+                            <PreviewLinkCard key={account.id}>
+                              <PreviewLinkCardTrigger
+                                href={account.profileUrl || undefined}
+                                className="no-underline hover:no-underline inline-block"
+                              >
+                                {avatarElement}
+                              </PreviewLinkCardTrigger>
+                              <PreviewLinkCardContent>
+                                {/* Profile header with avatar */}
+                                <div className="flex items-center gap-3 p-4 border-b">
+                                  <Avatar className="h-12 w-12 shrink-0">
+                                    {account.avatarUrl && (
+                                      <AvatarImage
+                                        src={account.avatarUrl}
+                                        alt={account.displayName || account.username || ""}
+                                      />
                                     )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            })}
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                                    <AvatarFallback className="bg-muted text-sm">
+                                      {getAccountInitials(account)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-semibold truncate">
+                                      {account.displayName || account.username || "Unknown"}
+                                    </span>
+                                    {account.username && (
+                                      <span className="text-sm text-muted-foreground truncate">
+                                        @{account.username}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Platform info */}
+                                <div className="p-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <SocialPlatformIcon platform={account.platform} size={20} />
+                                    <span className="text-sm text-muted-foreground">
+                                      {platformInfo?.name || account.platform}
+                                    </span>
+                                  </div>
+                                  {account.profileUrl && (
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                                {/* Mapping notes if available */}
+                                {mapping?.notes && (
+                                  <div className="px-3 pb-3">
+                                    <p className="text-xs text-muted-foreground">{mapping.notes}</p>
+                                  </div>
+                                )}
+                              </PreviewLinkCardContent>
+                            </PreviewLinkCard>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Content Details */}
@@ -1059,8 +1257,8 @@ export function ContentCreatePage() {
                     </div>
                   )}
 
-                  {/* Scheduling Box */}
-                  <div className="space-y-3">
+                  {/* Scheduling Box - Commented out, moved to header button group */}
+                  {/* <div className="space-y-3">
                     <div
                       role="button"
                       tabIndex={0}
@@ -1111,7 +1309,34 @@ export function ContentCreatePage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div> */}
+                  
+                  {/* Schedule Date/Time - Show when scheduleForLater is true */}
+                  {scheduleForLater && (
+                    <div className="space-y-3">
+                      <Label>Schedule Date & Time</Label>
+                      <div className="grid grid-cols-2 gap-3 rounded-xl border p-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="date">Date</Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            value={scheduledDate}
+                            onChange={(e) => setScheduledDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="time">Time</Label>
+                          <Input
+                            id="time"
+                            type="time"
+                            value={scheduledTime}
+                            onChange={(e) => setScheduledTime(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Internal Tags / Notes */}
                   <div className="space-y-2">

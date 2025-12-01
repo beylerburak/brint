@@ -204,6 +204,7 @@ export function ConnectSocialAccountDialog({
   const [oauthSession, setOauthSession] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const popupRef = React.useRef<Window | null>(null);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -214,6 +215,11 @@ export function ConnectSocialAccountDialog({
       setSelectedAccount(null);
       setOauthSession(null);
       setError(null);
+      // Close popup if still open
+      if (popupRef.current && !popupRef.current.closed) {
+        popupRef.current.close();
+      }
+      popupRef.current = null;
     }
   }, [open]);
 
@@ -252,11 +258,25 @@ export function ConnectSocialAccountDialog({
           variant: "destructive",
         });
       }
+
+      // Handle successful account connection from OAuth select page
+      if (event.data?.type === "OAUTH_SUCCESS") {
+        // Account was successfully connected in the popup
+        // Close popup if still open
+        if (popupRef.current && !popupRef.current.closed) {
+          popupRef.current.close();
+        }
+        // Close dialog and refresh
+        onSuccess?.();
+        onOpenChange(false);
+        // Refresh the page to show the new account
+        window.location.reload();
+      }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [toast]);
+  }, [toast, onSuccess, onOpenChange]);
 
   // Handle platform selection
   const handleSelectPlatform = useCallback(async (platform: OAuthPlatform) => {
@@ -284,12 +304,17 @@ export function ConnectSocialAccountDialog({
         throw new Error("Popup blocked. Please allow popups for this site.");
       }
 
+      // Store popup reference
+      popupRef.current = popup;
+
       // Poll for popup close
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed);
+          popupRef.current = null;
           setLoading(false);
           // If we're still in oauth-redirect step and no accounts, go back
+          // Note: If OAUTH_SUCCESS message was received, the dialog will be closed by the message handler
           if (step === "oauth-redirect" && accounts.length === 0) {
             setStep("select-platform");
           }

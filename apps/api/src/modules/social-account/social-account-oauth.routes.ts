@@ -40,10 +40,66 @@ import {
   generateLinkedInAuthUrl,
   exchangeLinkedInCode,
   getLinkedInUserInfo,
+  getLinkedInOrganizationAcls,
+  getLinkedInOrganizations,
   isLinkedInOAuthEnabled,
   extractMemberIdFromUrn,
+  extractOrganizationIdFromUrn,
   type LinkedInUserInfo,
+  type LinkedInOrganizationAcl,
+  type LinkedInOrganization,
 } from './linkedin-oauth.service.js';
+
+/**
+ * Get download URL from LinkedIn digital media asset URN
+ * This is a helper function to convert URN to actual image URL
+ */
+async function getLinkedInDigitalMediaAssetUrl(
+  accessToken: string,
+  assetUrn: string
+): Promise<string | null> {
+  if (!assetUrn.startsWith('urn:li:digitalmediaAsset:')) {
+    return null;
+  }
+
+  try {
+    // Extract asset ID from URN
+    const assetId = assetUrn.replace('urn:li:digitalmediaAsset:', '');
+    const digitalMediaAssetsUrl = 'https://api.linkedin.com/v2/digitalMediaAssets';
+    const assetUrl = `${digitalMediaAssetsUrl}/${assetId}?projection=(downloadUrl)`;
+    
+    logger.debug({ assetId, assetUrl }, 'Fetching LinkedIn digital media asset URL');
+
+    const assetResponse = await fetch(assetUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+    });
+
+    if (!assetResponse.ok) {
+      const errorText = await assetResponse.text();
+      logger.warn({ 
+        status: assetResponse.status, 
+        error: errorText,
+        assetId 
+      }, 'Failed to fetch LinkedIn digital media asset URL');
+      return null;
+    }
+
+    const assetData = await assetResponse.json() as { downloadUrl?: string };
+    if (assetData.downloadUrl) {
+      logger.debug({ assetId, downloadUrl: assetData.downloadUrl }, 'LinkedIn digital media asset URL fetched');
+      return assetData.downloadUrl;
+    }
+    
+    return null;
+  } catch (err) {
+    logger.warn({ error: err, assetUrn }, 'Error fetching LinkedIn digital media asset URL');
+    return null;
+  }
+}
 import {
   generateXAuthUrl,
   exchangeXCode,
@@ -524,8 +580,44 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
       // Exchange code for token
       const tokenResponse = await exchangeLinkedInCode(code);
 
-      // Get user info
+      // Log token scopes to verify w_organization_social is included
+      logger.info({ 
+        scopes: tokenResponse.scope,
+        hasOrganizationScope: tokenResponse.scope?.includes('w_organization_social') || false
+      }, 'LinkedIn OAuth token received');
+
+      // Get user info (personal profile)
       const userInfo = await getLinkedInUserInfo(tokenResponse.access_token);
+
+      // Get organization ACLs and organizations
+      let organizationAcls: LinkedInOrganizationAcl[] = [];
+      let organizations: LinkedInOrganization[] = [];
+      
+      try {
+        logger.debug('Fetching LinkedIn organization ACLs...');
+        organizationAcls = await getLinkedInOrganizationAcls(tokenResponse.access_token);
+        logger.info({ aclCount: organizationAcls.length }, 'LinkedIn organization ACLs fetched');
+        
+        if (organizationAcls.length > 0) {
+          // Extract organization URNs from ACLs
+          const organizationUrns = organizationAcls.map(acl => acl.organization);
+          logger.debug({ orgUrns: organizationUrns }, 'Fetching LinkedIn organization details...');
+          
+          // Fetch organization details
+          organizations = await getLinkedInOrganizations(tokenResponse.access_token, organizationUrns);
+          logger.info({ orgCount: organizations.length }, 'LinkedIn organizations fetched');
+        } else {
+          logger.warn('No LinkedIn organization ACLs found - user may not have organization access or no organizations available');
+        }
+      } catch (err: any) {
+        // Log detailed error but don't fail the OAuth flow - user might not have organization access
+        logger.error({ 
+          error: err,
+          message: err?.message,
+          status: err?.status,
+          scopes: tokenResponse.scope
+        }, 'Failed to fetch LinkedIn organizations, continuing with personal profile only');
+      }
 
       // Store LinkedIn account data temporarily in Redis for selection/confirmation
       const selectionKey = `oauth:linkedin:selection:${state}`;
@@ -533,6 +625,8 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
         stateData,
         tokenResponse,
         userInfo,
+        organizationAcls,
+        organizations,
       };
 
       await redis.set(selectionKey, JSON.stringify(selectionData), 'EX', 600);
@@ -1146,13 +1240,17 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
       });
     }
 
-    // Add LinkedIn Page (personal profile for now, company pages require additional API calls)
+    // Add LinkedIn Pages (personal profile and organizations)
     if (stateData.platform === 'LINKEDIN') {
       const linkedinData = selectionData as {
         stateData: OAuthStateData;
         tokenResponse: { access_token: string; expires_in: number; refresh_token?: string };
         userInfo: LinkedInUserInfo;
+        organizationAcls?: LinkedInOrganizationAcl[];
+        organizations?: LinkedInOrganization[];
       };
+      
+      // Add personal profile
       const memberId = extractMemberIdFromUrn(linkedinData.userInfo.sub);
       accounts.push({
         type: 'linkedin_page',
@@ -1161,6 +1259,60 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
         username: linkedinData.userInfo.email,
         profilePictureUrl: linkedinData.userInfo.picture,
       });
+
+      // Add organization pages
+      if (linkedinData.organizations && linkedinData.organizations.length > 0) {
+        // Get access token for digital media asset API calls
+        const accessToken = linkedinData.tokenResponse.access_token;
+        
+        for (const org of linkedinData.organizations) {
+          const orgId = org.id.toString();
+          // Get logo URL if available
+          // Try multiple formats for logo URL
+          let logoUrl: string | undefined;
+          
+          // Try cropped logo first (most common)
+          if (org.logoV2?.['cropped~']?.elements?.[0]?.identifiers?.[0]?.identifier) {
+            logoUrl = org.logoV2['cropped~'].elements[0].identifiers[0].identifier;
+          }
+          // Try original playableStreams
+          else if (org.logoV2?.['original~']?.playableStreams?.[0]?.playableStream?.[0]?.downloadUrl) {
+            logoUrl = org.logoV2['original~'].playableStreams[0].playableStream[0].downloadUrl;
+          }
+          // Try direct original field
+          else if (org.logoV2?.original) {
+            logoUrl = org.logoV2.original;
+          }
+          
+          // If logoUrl is a URN, convert it to actual URL
+          if (logoUrl && logoUrl.startsWith('urn:li:digitalmediaAsset:')) {
+            logger.debug({ orgId, logoUrn: logoUrl }, 'Converting LinkedIn logo URN to URL');
+            const actualUrl = await getLinkedInDigitalMediaAssetUrl(accessToken, logoUrl);
+            if (actualUrl) {
+              logoUrl = actualUrl;
+              logger.debug({ orgId, logoUrl }, 'LinkedIn logo URN converted to URL');
+            } else {
+              logger.warn({ orgId, logoUrn: logoUrl }, 'Failed to convert LinkedIn logo URN to URL');
+            }
+          }
+          
+          logger.debug({ orgId, logoUrl, logoV2: org.logoV2 }, 'LinkedIn organization logo extraction');
+          
+          // Get organization name (prefer localized name)
+          const orgName = org.name?.localized?.[`${org.name.preferredLocale.language}_${org.name.preferredLocale.country}`] 
+            || org.name?.localized?.[Object.keys(org.name.localized)[0]]
+            || `Organization ${orgId}`;
+
+          accounts.push({
+            type: 'linkedin_page',
+            id: orgId,
+            name: orgName,
+            username: org.vanityName || orgId,
+            profilePictureUrl: logoUrl,
+            category: 'Organization',
+          });
+        }
+      }
     }
 
     // Add X Account
@@ -1619,7 +1771,7 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
         });
       }
     } else if (accountType === 'linkedin_page') {
-      // LinkedIn Page (personal profile)
+      // LinkedIn Page (personal profile or organization)
       if (!isLinkedInSession) {
         throw new BadRequestError('INVALID_SESSION', 'Invalid session for LinkedIn account');
       }
@@ -1628,14 +1780,75 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
         stateData: OAuthStateData;
         tokenResponse: { access_token: string; expires_in: number; refresh_token?: string };
         userInfo: LinkedInUserInfo;
+        organizationAcls?: LinkedInOrganizationAcl[];
+        organizations?: LinkedInOrganization[];
       };
 
       const { tokenResponse, userInfo } = linkedinData;
       const memberId = extractMemberIdFromUrn(userInfo.sub);
 
-      // Verify account ID matches
-      if (memberId !== accountId) {
+      // Check if accountId is personal profile or organization
+      let isOrganization = false;
+      let selectedOrg: LinkedInOrganization | undefined;
+      
+      if (linkedinData.organizations) {
+        selectedOrg = linkedinData.organizations.find(org => org.id.toString() === accountId);
+        if (selectedOrg) {
+          isOrganization = true;
+        }
+      }
+
+      // Verify account ID matches (either personal or organization)
+      if (!isOrganization && memberId !== accountId) {
         throw new NotFoundError('ACCOUNT_NOT_FOUND', 'Selected LinkedIn account not found');
+      }
+      if (isOrganization && !selectedOrg) {
+        throw new NotFoundError('ACCOUNT_NOT_FOUND', 'Selected LinkedIn organization not found');
+      }
+
+      // Determine external ID and display info
+      const externalId = isOrganization ? selectedOrg!.id.toString() : memberId;
+      let displayName: string;
+      let username: string | null;
+      let profileUrl: string;
+      let profilePictureUrl: string | undefined;
+      let platformData: Record<string, any>;
+
+      if (isOrganization && selectedOrg) {
+        // Organization account
+        displayName = selectedOrg.name?.localized?.[`${selectedOrg.name.preferredLocale.language}_${selectedOrg.name.preferredLocale.country}`] 
+          || selectedOrg.name?.localized?.[Object.keys(selectedOrg.name.localized)[0]]
+          || `Organization ${externalId}`;
+        username = selectedOrg.vanityName || externalId;
+        profileUrl = selectedOrg.vanityName 
+          ? `https://linkedin.com/company/${selectedOrg.vanityName}`
+          : `https://linkedin.com/company/${externalId}`;
+        
+        // Get logo URL if available
+        if (selectedOrg.logoV2?.['cropped~']?.elements?.[0]?.identifiers?.[0]?.identifier) {
+          profilePictureUrl = selectedOrg.logoV2['cropped~'].elements[0].identifiers[0].identifier;
+        } else if (selectedOrg.logoV2?.original) {
+          profilePictureUrl = selectedOrg.logoV2.original;
+        }
+
+        platformData = {
+          profilePictureUrl,
+          website: selectedOrg.website?.url,
+          isOrganization: true,
+        };
+      } else {
+        // Personal profile
+        displayName = userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim() || 'LinkedIn User';
+        username = userInfo.email || null;
+        profileUrl = `https://linkedin.com/in/${memberId}`;
+        profilePictureUrl = userInfo.picture;
+        platformData = {
+          profilePictureUrl: userInfo.picture,
+          email: userInfo.email,
+          emailVerified: userInfo.email_verified,
+          locale: userInfo.locale,
+          isOrganization: false,
+        };
       }
 
       // Check if already exists (any status including REMOVED)
@@ -1643,7 +1856,7 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
         where: {
           workspaceId,
           platform: 'LINKEDIN_PAGE',
-          externalId: memberId,
+          externalId,
         },
       });
 
@@ -1655,10 +1868,9 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
           accessToken: tokenResponse.access_token,
           refreshToken: tokenResponse.refresh_token,
           expiresAt,
+          organizationId: isOrganization ? externalId : undefined,
         },
       });
-
-      const displayName = userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim() || 'LinkedIn User';
 
       if (existing) {
         if (existing.status === 'ACTIVE') {
@@ -1671,16 +1883,11 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
           data: {
             brandId,
             displayName,
-            username: userInfo.email || null,
-            profileUrl: `https://linkedin.com/in/${memberId}`,
+            username,
+            profileUrl,
             status: 'ACTIVE',
             credentialsEncrypted,
-            platformData: {
-              profilePictureUrl: userInfo.picture,
-              email: userInfo.email,
-              emailVerified: userInfo.email_verified,
-              locale: userInfo.locale,
-            },
+            platformData,
           },
         });
       } else {
@@ -1690,26 +1897,21 @@ export async function registerSocialAccountOAuthRoutes(app: FastifyInstance): Pr
             workspaceId: workspaceId!,
             brandId,
             platform: 'LINKEDIN_PAGE',
-            externalId: memberId,
+            externalId,
             displayName,
-            username: userInfo.email || null,
-            profileUrl: `https://linkedin.com/in/${memberId}`,
+            username,
+            profileUrl,
             status: 'ACTIVE',
             credentialsEncrypted,
-            platformData: {
-              profilePictureUrl: userInfo.picture,
-              email: userInfo.email,
-              emailVerified: userInfo.email_verified,
-              locale: userInfo.locale,
-            },
+            platformData,
           },
         });
       }
 
       // Save avatar from LinkedIn (fire-and-forget, don't block response)
-      if (userInfo.picture) {
+      if (profilePictureUrl) {
         void saveAvatarFromUrl({
-          imageUrl: userInfo.picture,
+          imageUrl: profilePictureUrl,
           workspaceId: workspaceId!,
           brandId,
           socialAccountId: socialAccount.id,

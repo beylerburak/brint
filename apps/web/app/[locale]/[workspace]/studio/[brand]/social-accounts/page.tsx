@@ -258,8 +258,7 @@ export default function StudioBrandSocialAccountsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Mutations
-  const { disconnectAccount, deleteAccount, loading: mutationLoading } = useSocialAccountMutations({
-    brandId: brand.id,
+  const { disconnectSocialAccount: disconnectAccount, deleteSocialAccount: deleteAccount } = useSocialAccountMutations(brand.id, {
     onSuccess: () => {
       refresh();
       refreshBrand();
@@ -349,32 +348,41 @@ export default function StudioBrandSocialAccountsPage() {
           window.open(account.profileUrl, "_blank");
         }
       },
+      disabled: (account) => !account.profileUrl,
     },
     {
       label: "Disconnect",
       icon: <Unplug className="mr-2 h-4 w-4" />,
       onClick: async (account) => {
-        if (account.status === "ACTIVE") {
+        try {
           await disconnectAccount(account.id);
           toast({
             title: "Account disconnected",
             description: `${account.displayName || account.username} has been disconnected.`,
           });
+        } catch (error) {
+          // Error is already handled by the mutation hook
         }
       },
+      disabled: (account) => account.status !== "ACTIVE",
     },
     {
       label: "Remove",
       icon: <Trash2 className="mr-2 h-4 w-4" />,
       onClick: async (account) => {
-        await deleteAccount(account.id);
-        toast({
-          title: "Account removed",
-          description: `${account.displayName || account.username} has been removed.`,
-        });
+        try {
+          await deleteAccount(account.id);
+          toast({
+            title: "Account removed",
+            description: `${account.displayName || account.username} has been removed.`,
+          });
+        } catch (error) {
+          // Error is already handled by the mutation hook
+        }
       },
       destructive: true,
       separator: true,
+      disabled: (account) => account.status === "REMOVED",
     },
   ], [disconnectAccount, deleteAccount, toast]);
 

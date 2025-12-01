@@ -2,16 +2,17 @@
 
 /**
  * OAuth Error Page
- * 
+ *
  * Displayed when OAuth flow fails.
  */
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { AlertCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function OAuthErrorPage() {
+function OAuthErrorPageContent() {
   const searchParams = useSearchParams();
   
   const error = searchParams.get("error") || "unknown_error";
@@ -53,6 +54,21 @@ export default function OAuthErrorPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function OAuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OAuthErrorPageContent />
+    </Suspense>
   );
 }
 

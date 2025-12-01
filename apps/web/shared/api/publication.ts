@@ -121,6 +121,34 @@ export interface CreatePublicationResponse {
   data: PublicationResponse;
 }
 
+// ======================
+// List Publications Types
+// ======================
+
+export interface PublicationListItem {
+  id: string;
+  platform: string;
+  contentType: string;
+  status: string;
+  caption: string | null;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  failedAt: string | null;
+  permalink: string | null;
+  externalPostId: string | null;
+  socialAccountId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListPublicationsResponse {
+  success: boolean;
+  data: {
+    items: PublicationListItem[];
+    nextCursor: string | null;
+  };
+}
+
 // API error response structure
 interface ApiErrorResponse {
   success: false;
@@ -197,5 +225,34 @@ export async function createFacebookPublication(
   }
 
   return response.data.data;
+}
+
+/**
+ * List publications for a brand
+ */
+export async function listPublications(
+  brandId: string,
+  options?: {
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<ListPublicationsResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit) params.append('limit', options.limit.toString());
+  if (options?.cursor) params.append('cursor', options.cursor);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+
+  const response = await httpClient.get<ListPublicationsResponse>(
+    `/brands/${brandId}/publications${query}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(response.details, "Failed to list publications")
+    );
+  }
+
+  return response.data;
 }
 

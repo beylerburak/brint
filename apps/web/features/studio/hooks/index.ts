@@ -2,5 +2,5 @@
  * Studio Hooks
  */
 
-export { useStudioBrand } from "./use-studio-brand";
+export { useStudioBrand, useCalendarPublications } from "./use-studio-brand";
 

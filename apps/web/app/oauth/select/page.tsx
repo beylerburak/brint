@@ -2,11 +2,11 @@
 
 /**
  * OAuth Account Selection Page
- * 
+ *
  * After successful OAuth, user selects which account to connect to their brand.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, AlertCircle, Check, Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ function getPlatformName(platform: string | null): string {
   }
 }
 
-export default function OAuthSelectPage() {
+function OAuthSelectPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -282,6 +282,21 @@ export default function OAuthSelectPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function OAuthSelectPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OAuthSelectPageContent />
+    </Suspense>
   );
 }
 

@@ -125,6 +125,8 @@ export interface BiDataTableAction<TData> {
   destructive?: boolean;
   /** Whether to show separator before this action */
   separator?: boolean;
+  /** Whether action is disabled (function receives row data) */
+  disabled?: boolean | ((row: TData) => boolean);
 }
 
 export interface ActiveFilter {
@@ -1016,21 +1018,32 @@ export function BiDataTable<TData>({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        {actions.map((action, index) => (
-                          <React.Fragment key={action.label}>
-                            {action.separator && index > 0 && <DropdownMenuSeparator />}
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                action.onClick(row);
-                              }}
-                              className={action.destructive ? "text-destructive focus:text-destructive" : ""}
-                            >
-                              {action.icon}
-                              {action.label}
-                            </DropdownMenuItem>
-                          </React.Fragment>
-                        ))}
+                        {actions.map((action, index) => {
+                          const isDisabled = typeof action.disabled === 'function' 
+                            ? action.disabled(row) 
+                            : action.disabled ?? false;
+                          
+                          return (
+                            <React.Fragment key={action.label}>
+                              {action.separator && index > 0 && <DropdownMenuSeparator />}
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  if (isDisabled) {
+                                    e.preventDefault();
+                                    return;
+                                  }
+                                  e.stopPropagation();
+                                  action.onClick(row);
+                                }}
+                                disabled={isDisabled}
+                                className={action.destructive ? "text-destructive focus:text-destructive" : ""}
+                              >
+                                {action.icon}
+                                {action.label}
+                              </DropdownMenuItem>
+                            </React.Fragment>
+                          );
+                        })}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1520,21 +1533,32 @@ function DefaultMobileCard<TData>({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              {actions.map((action, index) => (
-                <React.Fragment key={action.label}>
-                  {action.separator && index > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      action.onClick(row);
-                    }}
-                    className={action.destructive ? "text-destructive focus:text-destructive" : ""}
-                  >
-                    {action.icon}
-                    {action.label}
-                  </DropdownMenuItem>
-                </React.Fragment>
-              ))}
+              {actions.map((action, index) => {
+                const isDisabled = typeof action.disabled === 'function' 
+                  ? action.disabled(row) 
+                  : action.disabled ?? false;
+                
+                return (
+                  <React.Fragment key={action.label}>
+                    {action.separator && index > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        if (isDisabled) {
+                          e.preventDefault();
+                          return;
+                        }
+                        e.stopPropagation();
+                        action.onClick(row);
+                      }}
+                      disabled={isDisabled}
+                      className={action.destructive ? "text-destructive focus:text-destructive" : ""}
+                    >
+                      {action.icon}
+                      {action.label}
+                    </DropdownMenuItem>
+                  </React.Fragment>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

@@ -147,7 +147,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
       schema: {
       tags: ["Publications", "Facebook"],
       summary: "Schedule Facebook publication",
-      description: "Schedule a new publication to Facebook (PHOTO, VIDEO, LINK, or STORY)",
+      description: "Schedule a new publication to Facebook (PHOTO, VIDEO, LINK, STORY, or CAROUSEL)",
       params: {
         type: "object",
         properties: {
@@ -163,14 +163,15 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
           clientRequestId: { type: "string", description: "Client-provided idempotency key" },
           payload: {
             type: "object",
-            description: "Facebook-specific payload (PHOTO, VIDEO, LINK, or STORY)",
+            description: "Facebook-specific payload (PHOTO, VIDEO, LINK, STORY, or CAROUSEL)",
             properties: {
-              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK", "STORY"] },
+              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK", "STORY", "CAROUSEL"] },
               message: { type: "string" },
               imageMediaId: { type: "string" },
               videoMediaId: { type: "string" },
               linkUrl: { type: "string" },
               storyType: { type: "string", enum: ["IMAGE", "VIDEO"] },
+              items: { type: "array" },
             },
             required: ["contentType"],
           },

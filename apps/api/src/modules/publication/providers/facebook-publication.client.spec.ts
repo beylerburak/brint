@@ -84,7 +84,8 @@ describe("Facebook Publication Client", () => {
             );
 
             // 2. Check feed post - MUST use graphPost with stringified attached_media array
-            expect(graphApiUtils.graphPost).toHaveBeenCalledWith(
+            expect(graphApiUtils.graphPost).toHaveBeenNthCalledWith(
+                3,
                 `/${mockPageId}/feed`,
                 {
                     published: true,

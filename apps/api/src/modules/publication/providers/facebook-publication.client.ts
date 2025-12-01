@@ -223,6 +223,8 @@ async function publishCarousel(
     payload: FacebookPublicationPayload & { contentType: "CAROUSEL" },
     accessToken: string
 ): Promise<FacebookPublishResult> {
+    logger.info({ pageId, payload }, "DEBUG: publishCarousel function called with payload");
+
     // Type assertion for carousel payload with items
     const carouselPayload = payload as FacebookPublicationPayload & {
         contentType: "CAROUSEL";
@@ -232,10 +234,11 @@ async function publishCarousel(
 
     logger.info(
         { pageId, itemCount: carouselPayload.items?.length, items: carouselPayload.items },
-        "Starting Facebook carousel publish"
+        "Starting Facebook carousel publish - DEBUG: Entering carousel function"
     );
 
     if (!carouselPayload.items || carouselPayload.items.length === 0) {
+        logger.error({ pageId, payload }, "Carousel payload validation failed - no items");
         throw new Error("Carousel payload must contain at least one item");
     }
 
@@ -243,6 +246,8 @@ async function publishCarousel(
     const photoIds: string[] = [];
 
     for (const item of carouselPayload.items) {
+        logger.info({ pageId, itemType: item.type, mediaId: item.mediaId }, "DEBUG: Processing carousel item");
+
         // Only support IMAGE items for Facebook carousel (videos not supported in carousel)
         if (item.type !== "IMAGE") {
             logger.warn(
@@ -252,10 +257,14 @@ async function publishCarousel(
             continue;
         }
 
+        logger.info({ pageId, mediaId: item.mediaId }, "DEBUG: Getting media URL for carousel item");
         const imageUrl = await getMediaPublicUrl(item.mediaId);
         if (!imageUrl) {
+            logger.error({ pageId, mediaId: item.mediaId }, "DEBUG: Cannot get public URL for carousel item");
             throw new Error(`Cannot get public URL for carousel item: ${item.mediaId}`);
         }
+
+        logger.info({ pageId, mediaId: item.mediaId, imageUrl }, "DEBUG: Uploading unpublished photo for carousel");
 
         // Upload photo as unpublished (required for carousel)
         const uploadParams: Record<string, string | boolean> = {
@@ -263,13 +272,13 @@ async function publishCarousel(
             published: false, // Must be unpublished for carousel
         };
 
-        logger.debug({ pageId, mediaId: item.mediaId }, "Uploading unpublished photo for carousel");
-
         const uploadResponse = await graphPost(
             `/${pageId}/photos`,
             uploadParams,
             accessToken
         );
+
+        logger.info({ pageId, mediaId: item.mediaId, response: uploadResponse }, "DEBUG: Upload response received");
 
         if (uploadResponse.error || !uploadResponse.id) {
             const errorMessage = extractGraphApiErrorMessage(uploadResponse.error);
@@ -284,20 +293,20 @@ async function publishCarousel(
         }
 
         photoIds.push(uploadResponse.id);
-        logger.debug({ pageId, photoId: uploadResponse.id, totalUploaded: photoIds.length }, "Photo uploaded successfully for carousel");
+        logger.info({ pageId, photoId: uploadResponse.id, totalUploaded: photoIds.length }, "DEBUG: Photo uploaded successfully for carousel");
     }
 
-    logger.info({ pageId, totalPhotos: photoIds.length, photoIds }, "All photos uploaded for carousel");
+    logger.info({ pageId, totalPhotos: photoIds.length, photoIds }, "DEBUG: All photos uploaded for carousel");
 
     if (photoIds.length === 0) {
+        logger.error({ pageId }, "DEBUG: No valid photos uploaded for carousel");
         throw new Error("No valid photos uploaded for carousel");
     }
 
     // Always use carousel format (even for single photo) - Facebook handles it correctly
 
     // 2. Create carousel post using /feed endpoint with attached_media
-    // Use graphPost (x-www-form-urlencoded) but pass attached_media as a stringified array of objects
-    // This is a common pattern that works better than indexed keys or pure JSON in some contexts
+    // Use graphPost with attached_media as stringified array (matches working n8n workflow)
     const feedParams: Record<string, string | boolean> = {
         published: true, // Explicitly set published to true
     };
@@ -306,12 +315,12 @@ async function publishCarousel(
         feedParams.message = carouselPayload.message;
     }
 
-    // Create array of objects and stringify the whole array
+    // Create array of objects and stringify the whole array (matches n8n workflow behavior)
     const attachedMedia = photoIds.map(photoId => ({
         media_fbid: photoId
     }));
 
-    // Pass as a single stringified JSON array
+    // Pass as a single stringified JSON array (matches n8n workflow)
     feedParams.attached_media = JSON.stringify(attachedMedia);
 
     logger.info(
@@ -319,9 +328,10 @@ async function publishCarousel(
             pageId,
             photoCount: photoIds.length,
             photoIds,
+            attachedMedia,
             feedParams,
         },
-        "Creating Facebook carousel post via /feed with attached_media stringified array"
+        "DEBUG: Creating Facebook carousel post via /feed with attached_media stringified array"
     );
 
     const feedResponse = await graphPost(
@@ -329,6 +339,8 @@ async function publishCarousel(
         feedParams,
         accessToken
     );
+
+    logger.info({ pageId, feedResponse }, "DEBUG: Feed post response received");
 
     if (feedResponse.error || !feedResponse.id) {
         const errorMessage = extractGraphApiErrorMessage(feedResponse.error);

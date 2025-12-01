@@ -80,6 +80,8 @@ export function mapFacebookContentTypeToDb(
   switch (contentType) {
     case "PHOTO":
       return "image";
+    case "CAROUSEL":
+      return "carousel";
     case "VIDEO":
       return "video";
     case "LINK":

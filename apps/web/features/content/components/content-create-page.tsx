@@ -358,12 +358,12 @@ export function ContentCreatePage() {
     }
   };
 
-  const mapContentTypeToFacebook = (contentType: AppContentType): "PHOTO" | "VIDEO" | "LINK" | "STORY" => {
+  const mapContentTypeToFacebook = (contentType: AppContentType): "PHOTO" | "VIDEO" | "LINK" | "STORY" | "CAROUSEL" => {
     switch (contentType) {
       case "single_post":
         return "PHOTO";
       case "carousel":
-        return "PHOTO"; // Facebook carousel is still PHOTO with multiple images
+        return "CAROUSEL"; // Facebook carousel needs CAROUSEL content type
       case "vertical_video":
         return "VIDEO";
       case "story":
@@ -537,12 +537,22 @@ export function ContentCreatePage() {
                 } else {
                   payload.imageMediaId = mediaIds[0];
                 }
-              } else if (facebookContentType === "VIDEO") {
-                payload.videoMediaId = mediaIds[0];
-              } else {
-                // PHOTO or LINK content type
-                payload.imageMediaId = mediaIds[0];
-              }
+    } else if (facebookContentType === "VIDEO") {
+      payload.videoMediaId = mediaIds[0];
+    } else if (facebookContentType === "CAROUSEL") {
+      // Carousel items need mediaId and type (matching backend schema)
+      payload.items = mediaIds.map((mediaId) => {
+        const mediaItem = selectedMedia.find((m) => m.mediaId === mediaId);
+        const isVideo = mediaItem?.file.type.startsWith("video/");
+        return {
+          mediaId,
+          type: isVideo ? "VIDEO" : "IMAGE",
+        };
+      });
+    } else {
+      // PHOTO or LINK content type
+      payload.imageMediaId = mediaIds[0];
+    }
             }
 
             return createFacebookPublication(brand.id, {

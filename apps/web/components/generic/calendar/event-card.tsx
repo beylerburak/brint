@@ -51,13 +51,15 @@ export function EventCard({
         "bg-muted hover:bg-muted/80 rounded-md cursor-pointer transition-all duration-200",
         // Desktop: full layout
         "hidden md:flex items-start gap-2",
+        // Fixed width to prevent overflow outside cell
+        "w-full max-w-full overflow-hidden",
         compact ? "p-1.5 text-xs" : "p-2 text-sm"
       )}
     >
       <StatusIcon />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <div className={cn("font-medium truncate flex-1", compact && "text-xs")}>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 max-w-full">
+          <div className={cn("font-medium truncate flex-1 min-w-0", compact && "text-xs")}>
             {event.title}
           </div>
           {event.platform && (

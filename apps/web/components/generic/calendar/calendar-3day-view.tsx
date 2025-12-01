@@ -10,6 +10,7 @@ interface Calendar3DayViewProps {
   date: Date;
   events: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
+  onDayClick?: (date: Date) => void;
   loading?: boolean;
   showAllEvents?: boolean;
 }
@@ -22,6 +23,7 @@ export function Calendar3DayView({
   date,
   events,
   onEventClick,
+  onDayClick,
   loading = false,
   showAllEvents = false,
 }: Calendar3DayViewProps) {
@@ -113,12 +115,18 @@ export function Calendar3DayView({
               <div className="text-sm font-medium mb-1">
                 {format(day, "EEEE")}
               </div>
-              <div className={cn(
-                "text-lg font-bold rounded-full w-8 h-8 flex items-center justify-center mx-auto",
-                isToday(day) && "bg-primary text-primary-foreground"
-              )}>
+              <button
+                type="button"
+                onClick={() => onDayClick?.(day)}
+                className={cn(
+                  "text-lg font-bold rounded-full w-8 h-8 flex items-center justify-center mx-auto transition-colors",
+                  isToday(day) && "bg-primary text-primary-foreground",
+                  !isToday(day) && "hover:bg-muted-foreground/20 cursor-pointer"
+                )}
+                title={`${format(day, "d MMMM")} tarihinde içerik oluştur`}
+              >
                 {format(day, "d")}
-              </div>
+              </button>
             </div>
           ))}
         </div>
@@ -150,11 +158,11 @@ export function Calendar3DayView({
                   return (
                     <div
                       key={day.toISOString()}
-                      className="bg-background border-b border-border/50 p-1"
+                      className="bg-background border-b border-border/50 p-1 overflow-hidden"
                       style={{ minHeight: HOUR_HEIGHT }}
                     >
                       {visibleEvents.map((event) => (
-                        <div key={event.id} className="mb-0.5">
+                        <div key={event.id} className="mb-0.5 max-w-full overflow-hidden">
                           <EventCard
                             event={event}
                             onClick={() => onEventClick?.(event)}

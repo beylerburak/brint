@@ -10,6 +10,7 @@ interface CalendarMonthViewProps {
   date: Date;
   events: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
+  onDayClick?: (date: Date) => void;
   loading?: boolean;
   showAllEvents?: boolean;
 }
@@ -20,6 +21,7 @@ export function CalendarMonthView({
   date,
   events,
   onEventClick,
+  onDayClick,
   loading = false,
   showAllEvents = false,
 }: CalendarMonthViewProps) {
@@ -116,12 +118,18 @@ export function CalendarMonthView({
                 !isCurrentMonth && "bg-muted/30 text-muted-foreground"
               )}
             >
-              <div className={cn(
-                "text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center rounded-full mx-auto",
-                isDayToday && "bg-primary text-primary-foreground font-bold"
-              )}>
+              <button
+                type="button"
+                onClick={() => onDayClick?.(day)}
+                className={cn(
+                  "text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center rounded-full mx-auto transition-colors",
+                  isDayToday && "bg-primary text-primary-foreground font-bold",
+                  !isDayToday && "hover:bg-muted cursor-pointer"
+                )}
+                title={`${format(day, "d MMMM")} tarihinde içerik oluştur`}
+              >
                 {format(day, "d")}
-              </div>
+              </button>
 
               {/* Events */}
               <div className="space-y-1">

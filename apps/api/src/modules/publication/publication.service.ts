@@ -307,6 +307,257 @@ export async function scheduleFacebookPublication(
 }
 
 // ====================
+// Draft Operations
+// ====================
+
+/**
+ * Create a draft Instagram publication
+ * 
+ * Flow:
+ * 1. Validate workspace/brand/socialAccount
+ * 2. Verify platform is INSTAGRAM_BUSINESS
+ * 3. Create Publication record with status DRAFT
+ * 4. Do NOT enqueue job (drafts are not published)
+ * 5. Log activity event
+ */
+export async function createDraftInstagramPublication(
+  input: CreateInstagramPublicationInput,
+  request?: FastifyRequest
+): Promise<Publication> {
+  const {
+    workspaceId,
+    brandId,
+    socialAccountId,
+    payload,
+    actorUserId,
+    clientRequestId,
+  } = input;
+
+  // 1. Validate brand exists and belongs to workspace
+  const brand = await brandService.getBrand(brandId, workspaceId);
+
+  // 2. Get and validate social account
+  const socialAccount = await socialAccountRepository.findByIdAndWorkspace(
+    socialAccountId,
+    workspaceId
+  );
+
+  if (!socialAccount) {
+    throw new NotFoundError(
+      "SOCIAL_ACCOUNT_NOT_FOUND",
+      "Social account not found",
+      { socialAccountId }
+    );
+  }
+
+  if (socialAccount.brandId !== brandId) {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_BRAND_MISMATCH",
+      "Social account does not belong to this brand",
+      { socialAccountId, brandId }
+    );
+  }
+
+  // 3. Verify platform is Instagram
+  const publishPlatform = mapSocialPlatformToPublishPlatform(socialAccount.platform);
+  if (publishPlatform !== "INSTAGRAM") {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_PLATFORM_MISMATCH",
+      `Expected Instagram social account, got ${socialAccount.platform}`,
+      { expectedPlatform: "INSTAGRAM", actualPlatform: socialAccount.platform }
+    );
+  }
+
+  if (socialAccount.status !== "ACTIVE") {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_NOT_ACTIVE",
+      "Social account is not active",
+      { status: socialAccount.status }
+    );
+  }
+
+  // 4. Check for idempotency (clientRequestId)
+  if (clientRequestId) {
+    const existing = await publicationRepository.getPublicationByClientRequestId(
+      workspaceId,
+      brandId,
+      clientRequestId
+    );
+    if (existing) {
+      // Return existing publication (idempotent)
+      return existing;
+    }
+  }
+
+  // 5. Map content type
+  const contentType = mapInstagramContentTypeToDb(payload.contentType);
+  const platform = mapPublishPlatformToDbPlatform("INSTAGRAM");
+
+  // 6. Extract caption (STORY payloads don't have caption)
+  const caption = "caption" in payload ? (payload.caption ?? null) : null;
+
+  // 7. Create draft publication (no scheduledAt, status is draft)
+  const publication = await publicationRepository.createPublication({
+    workspaceId,
+    brandId,
+    socialAccountId,
+    platform,
+    contentType,
+    status: "draft",
+    scheduledAt: null, // Drafts don't have scheduled time
+    caption,
+    payloadJson: payload,
+    clientRequestId: clientRequestId ?? null,
+  });
+
+  // 8. Do NOT enqueue job - drafts are not published automatically
+
+  // 9. Log activity
+  void logActivity({
+    type: "publication.draft_created",
+    workspaceId,
+    userId: actorUserId,
+    actorType: "user",
+    source: "api",
+    scopeType: "publication",
+    scopeId: publication.id,
+    metadata: {
+      publicationId: publication.id,
+      platform: "instagram",
+      contentType: payload.contentType,
+      socialAccountId,
+      brandName: brand.name,
+    },
+    request,
+  });
+
+  return publication;
+}
+
+/**
+ * Create a draft Facebook publication
+ * 
+ * Flow:
+ * 1. Validate workspace/brand/socialAccount
+ * 2. Verify platform is FACEBOOK_PAGE
+ * 3. Create Publication record with status DRAFT
+ * 4. Do NOT enqueue job (drafts are not published)
+ * 5. Log activity event
+ */
+export async function createDraftFacebookPublication(
+  input: CreateFacebookPublicationInput,
+  request?: FastifyRequest
+): Promise<Publication> {
+  const {
+    workspaceId,
+    brandId,
+    socialAccountId,
+    payload,
+    actorUserId,
+    clientRequestId,
+  } = input;
+
+  // 1. Validate brand exists and belongs to workspace
+  const brand = await brandService.getBrand(brandId, workspaceId);
+
+  // 2. Get and validate social account
+  const socialAccount = await socialAccountRepository.findByIdAndWorkspace(
+    socialAccountId,
+    workspaceId
+  );
+
+  if (!socialAccount) {
+    throw new NotFoundError(
+      "SOCIAL_ACCOUNT_NOT_FOUND",
+      "Social account not found",
+      { socialAccountId }
+    );
+  }
+
+  if (socialAccount.brandId !== brandId) {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_BRAND_MISMATCH",
+      "Social account does not belong to this brand",
+      { socialAccountId, brandId }
+    );
+  }
+
+  // 3. Verify platform is Facebook
+  const publishPlatform = mapSocialPlatformToPublishPlatform(socialAccount.platform);
+  if (publishPlatform !== "FACEBOOK") {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_PLATFORM_MISMATCH",
+      `Expected Facebook social account, got ${socialAccount.platform}`,
+      { expectedPlatform: "FACEBOOK", actualPlatform: socialAccount.platform }
+    );
+  }
+
+  if (socialAccount.status !== "ACTIVE") {
+    throw new BadRequestError(
+      "SOCIAL_ACCOUNT_NOT_ACTIVE",
+      "Social account is not active",
+      { status: socialAccount.status }
+    );
+  }
+
+  // 4. Check for idempotency (clientRequestId)
+  if (clientRequestId) {
+    const existing = await publicationRepository.getPublicationByClientRequestId(
+      workspaceId,
+      brandId,
+      clientRequestId
+    );
+    if (existing) {
+      return existing;
+    }
+  }
+
+  // 5. Map content type
+  const contentType = mapFacebookContentTypeToDb(payload.contentType);
+  const platform = mapPublishPlatformToDbPlatform("FACEBOOK");
+
+  // 6. Extract message as caption (STORY payloads don't have message)
+  const caption = "message" in payload ? (payload.message ?? null) : null;
+
+  // 7. Create draft publication (no scheduledAt, status is draft)
+  const publication = await publicationRepository.createPublication({
+    workspaceId,
+    brandId,
+    socialAccountId,
+    platform,
+    contentType,
+    status: "draft",
+    scheduledAt: null, // Drafts don't have scheduled time
+    caption,
+    payloadJson: payload,
+    clientRequestId: clientRequestId ?? null,
+  });
+
+  // 8. Do NOT enqueue job - drafts are not published automatically
+
+  // 9. Log activity
+  void logActivity({
+    type: "publication.draft_created",
+    workspaceId,
+    userId: actorUserId,
+    actorType: "user",
+    source: "api",
+    scopeType: "publication",
+    scopeId: publication.id,
+    metadata: {
+      publicationId: publication.id,
+      platform: "facebook",
+      contentType: payload.contentType,
+      socialAccountId,
+      brandName: brand.name,
+    },
+    request,
+  });
+
+  return publication;
+}
+
+// ====================
 // List Operations
 // ====================
 
@@ -392,6 +643,8 @@ export async function getPublication(
 export const publicationService = {
   scheduleInstagramPublication,
   scheduleFacebookPublication,
+  createDraftInstagramPublication,
+  createDraftFacebookPublication,
   listBrandPublications,
   getPublication,
 };

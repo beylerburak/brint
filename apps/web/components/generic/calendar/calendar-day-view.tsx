@@ -10,6 +10,7 @@ interface CalendarDayViewProps {
   date: Date;
   events: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
+  onDayClick?: (date: Date) => void;
   loading?: boolean;
   showAllEvents?: boolean;
 }
@@ -22,6 +23,7 @@ export function CalendarDayView({
   date,
   events,
   onEventClick,
+  onDayClick,
   loading = false,
   showAllEvents = false,
 }: CalendarDayViewProps) {
@@ -95,13 +97,18 @@ export function CalendarDayView({
   return (
     <div className="flex-1 p-4">
       <div className="mb-4">
-        <h3 className={cn(
-          "text-lg font-semibold",
-          isToday(date) && "text-primary"
-        )}>
+        <button
+          type="button"
+          onClick={() => onDayClick?.(date)}
+          className={cn(
+            "text-lg font-semibold hover:underline cursor-pointer",
+            isToday(date) && "text-primary"
+          )}
+          title={`${format(date, "d MMMM")} tarihinde içerik oluştur`}
+        >
           {format(date, "EEEE, MMMM d, yyyy")}
           {isToday(date) && <span className="ml-2 text-sm font-normal opacity-70">(Today)</span>}
-        </h3>
+        </button>
       </div>
 
       <div className="bg-border rounded-lg overflow-hidden">
@@ -128,11 +135,11 @@ export function CalendarDayView({
 
                 {/* Day cell for this hour */}
                 <div
-                  className="bg-background border-b border-border/50 p-2"
+                  className="bg-background border-b border-border/50 p-2 overflow-hidden"
                   style={{ minHeight: HOUR_HEIGHT }}
                 >
                   {visibleEvents.map((event) => (
-                    <div key={event.id} className="mb-1">
+                    <div key={event.id} className="mb-1 max-w-full overflow-hidden">
                       <EventCard
                         event={event}
                         onClick={() => onEventClick?.(event)}

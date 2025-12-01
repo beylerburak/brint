@@ -2,16 +2,19 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, Users, X } from "lucide-react";
+import { Calendar, Clock, CheckCircle, XCircle, Loader, FileText, Ban, ExternalLink, Edit, Trash2 } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SocialPlatformIcon } from "@/features/brand/components/social-platform-icon";
 import { CalendarEvent } from "./index";
 
 interface EventModalProps {
@@ -37,11 +40,11 @@ export function EventModal({
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
     if (hours === 0) {
-      return `${minutes} minutes`;
+      return `${minutes} dakika`;
     } else if (minutes === 0) {
-      return `${hours} hour${hours > 1 ? 's' : ''}`;
+      return `${hours} saat`;
     } else {
-      return `${hours}h ${minutes}m`;
+      return `${hours}s ${minutes}d`;
     }
   }, [event.start, event.end]);
 
@@ -49,103 +52,173 @@ export function EventModal({
     return event.start.toDateString() !== event.end.toDateString();
   }, [event.start, event.end]);
 
+  // Get status info
+  const getStatusInfo = () => {
+    switch (event.status) {
+      case "published":
+        return { label: "Yayınlandı", icon: CheckCircle, color: "text-green-500", bgColor: "bg-green-500/10" };
+      case "scheduled":
+        return { label: "Planlandı", icon: Clock, color: "text-blue-500", bgColor: "bg-blue-500/10" };
+      case "failed":
+        return { label: "Başarısız", icon: XCircle, color: "text-red-500", bgColor: "bg-red-500/10" };
+      case "publishing":
+        return { label: "Yayınlanıyor", icon: Loader, color: "text-yellow-500", bgColor: "bg-yellow-500/10" };
+      case "draft":
+        return { label: "Taslak", icon: FileText, color: "text-gray-500", bgColor: "bg-gray-500/10" };
+      case "cancelled":
+        return { label: "İptal edildi", icon: Ban, color: "text-orange-500", bgColor: "bg-orange-500/10" };
+      default:
+        return { label: "Bilinmiyor", icon: CheckCircle, color: "text-gray-500", bgColor: "bg-gray-500/10" };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
+  const StatusIcon = statusInfo.icon;
+
+  // Get platform display info
+  const getPlatformName = () => {
+    switch (event.platform) {
+      case "instagram": return "Instagram";
+      case "facebook": return "Facebook";
+      case "x": return "X (Twitter)";
+      case "tiktok": return "TikTok";
+      case "youtube": return "YouTube";
+      case "linkedin": return "LinkedIn";
+      case "pinterest": return "Pinterest";
+      default: return event.platform || "Bilinmiyor";
+    }
+  };
+
+  const mapPlatformToSocialPlatform = () => {
+    switch (event.platform) {
+      case "instagram": return "INSTAGRAM_BUSINESS";
+      case "facebook": return "FACEBOOK_PAGE";
+      case "x": return "X_ACCOUNT";
+      case "tiktok": return "TIKTOK_ACCOUNT";
+      case "youtube": return "YOUTUBE_CHANNEL";
+      case "linkedin": return "LINKEDIN_PAGE";
+      case "pinterest": return "PINTEREST_ACCOUNT";
+      default: return "INSTAGRAM_BUSINESS";
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-semibold">
-                {event.title}
-              </DialogTitle>
-              {event.description && (
-                <DialogDescription className="text-base">
-                  {event.description}
-                </DialogDescription>
-              )}
-            </div>
-            {event.color && (
-              <div
-                className="w-4 h-4 rounded-full flex-shrink-0 mt-1"
-                style={{ backgroundColor: event.color }}
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+        <SheetHeader className="space-y-4 pb-4">
+          {/* Platform Badge */}
+          {event.platform && (
+            <div className="flex items-center gap-2">
+              <SocialPlatformIcon
+                platform={mapPlatformToSocialPlatform()}
+                size={24}
               />
+              <span className="text-sm font-medium">{getPlatformName()}</span>
+            </div>
+          )}
+          
+          {/* Title */}
+          <div>
+            <SheetTitle className="text-xl font-semibold leading-relaxed">
+              {event.title}
+            </SheetTitle>
+            {event.description && (
+              <SheetDescription className="mt-2 text-base">
+                {event.description}
+              </SheetDescription>
             )}
           </div>
-        </DialogHeader>
+        </SheetHeader>
 
-        <div className="space-y-4">
-          {/* Date & Time */}
-          <div className="flex items-start gap-3">
-            <Calendar className="w-5 h-5 text-muted-foreground mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-medium">
-                {isMultiDay ? (
-                  <>
-                    {format(event.start, "EEEE, MMMM d, yyyy")}
-                    <span className="text-muted-foreground mx-2">→</span>
-                    {format(event.end, "EEEE, MMMM d, yyyy")}
-                  </>
-                ) : (
-                  format(event.start, "EEEE, MMMM d, yyyy")
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                {format(event.start, "HH:mm")} - {format(event.end, "HH:mm")}
-                <span className="text-muted-foreground">({duration})</span>
-              </div>
+        <Separator className="my-4" />
+
+        <div className="space-y-6">
+          {/* Status */}
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${statusInfo.bgColor}`}>
+              <StatusIcon className={`w-5 h-5 ${statusInfo.color}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{statusInfo.label}</p>
+              <p className="text-xs text-muted-foreground">Yayın durumu</p>
             </div>
           </div>
 
-          {/* Duration Badge */}
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              Duration: {duration}
-            </Badge>
+          {/* Date & Time */}
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-muted">
+              <Calendar className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {isMultiDay ? (
+                  <>
+                    {format(event.start, "d MMMM yyyy")}
+                    <span className="text-muted-foreground mx-2">→</span>
+                    {format(event.end, "d MMMM yyyy")}
+                  </>
+                ) : (
+                  format(event.start, "d MMMM yyyy, EEEE")
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {format(event.start, "HH:mm")} - {format(event.end, "HH:mm")}
+                <span className="text-muted-foreground/70">({duration})</span>
+              </p>
+            </div>
           </div>
 
-          {/* Event ID for debugging */}
-          <div className="text-xs text-muted-foreground border-t pt-2">
-            Event ID: {event.id}
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-xs text-muted-foreground mb-1">Süre</p>
+              <p className="text-sm font-medium">{duration}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-xs text-muted-foreground mb-1">Platform</p>
+              <p className="text-sm font-medium">{getPlatformName()}</p>
+            </div>
+          </div>
+
+          {/* Event ID */}
+          <div className="text-xs text-muted-foreground p-3 rounded-lg bg-muted/30 font-mono">
+            ID: {event.id}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-          >
-            Close
-          </Button>
+        <div className="flex items-center gap-2 pt-6 mt-6 border-t">
           {onEdit && (
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
+              className="flex-1"
               onClick={() => {
                 onEdit(event);
                 onOpenChange(false);
               }}
             >
-              Edit Event
+              <Edit className="w-4 h-4 mr-2" />
+              Düzenle
             </Button>
           )}
           {onDelete && (
             <Button
               variant="destructive"
               size="sm"
+              className="flex-1"
               onClick={() => {
                 onDelete(event);
                 onOpenChange(false);
               }}
             >
-              Delete
+              <Trash2 className="w-4 h-4 mr-2" />
+              Sil
             </Button>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

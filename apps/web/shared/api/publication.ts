@@ -228,6 +228,48 @@ export async function createFacebookPublication(
 }
 
 /**
+ * Create a draft Instagram publication
+ */
+export async function createDraftInstagramPublication(
+  brandId: string,
+  payload: Omit<CreateInstagramPublicationRequest, "publishAt">
+): Promise<PublicationResponse> {
+  const response = await httpClient.post<CreatePublicationResponse>(
+    `/brands/${brandId}/publications/instagram/draft`,
+    payload
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(response.details, "Failed to create draft Instagram publication")
+    );
+  }
+
+  return response.data.data;
+}
+
+/**
+ * Create a draft Facebook publication
+ */
+export async function createDraftFacebookPublication(
+  brandId: string,
+  payload: Omit<CreateFacebookPublicationRequest, "publishAt">
+): Promise<PublicationResponse> {
+  const response = await httpClient.post<CreatePublicationResponse>(
+    `/brands/${brandId}/publications/facebook/draft`,
+    payload
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(response.details, "Failed to create draft Facebook publication")
+    );
+  }
+
+  return response.data.data;
+}
+
+/**
  * List publications for a brand
  */
 export async function listPublications(

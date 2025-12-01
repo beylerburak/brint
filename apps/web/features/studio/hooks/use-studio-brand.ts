@@ -34,12 +34,12 @@ export function useCalendarPublications(brandId: string) {
     if (!data?.data?.items) return [];
 
     return data.data.items.map((publication: PublicationListItem): CalendarEvent => {
-      // Use publishedAt if available, otherwise scheduledAt
+      // Use publishedAt if available, otherwise scheduledAt, for drafts use createdAt
       const eventDate = publication.publishedAt
         ? new Date(publication.publishedAt)
         : publication.scheduledAt
         ? new Date(publication.scheduledAt)
-        : new Date(publication.createdAt);
+        : new Date(publication.createdAt); // Drafts and immediate publishes use createdAt
 
       // Create end time (assume 1 hour duration for publications)
       const endDate = new Date(eventDate.getTime() + 60 * 60 * 1000);
@@ -59,6 +59,8 @@ export function useCalendarPublications(brandId: string) {
       // Status-based colors for accent lines (primary)
       const getStatusColor = (status: string) => {
         switch (status) {
+          case "draft":
+            return "#6B7280"; // Gray
           case "scheduled":
             return "#3B82F6"; // Blue
           case "published":
@@ -67,6 +69,8 @@ export function useCalendarPublications(brandId: string) {
             return "#EF4444"; // Red
           case "publishing":
             return "#F59E0B"; // Yellow
+          case "cancelled":
+            return "#F97316"; // Orange
           default:
             return getPlatformColor(publication.platform); // Fallback to platform color
         }

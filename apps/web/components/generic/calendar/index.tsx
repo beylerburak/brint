@@ -38,6 +38,8 @@ export interface CalendarProps {
   onDateChange?: (date: Date) => void;
   /** Callback when event is clicked */
   onEventClick?: (event: CalendarEvent) => void;
+  /** Callback when a day is clicked (for creating new content on that date) */
+  onDayClick?: (date: Date) => void;
   /** Callback for toolbar action button */
   onActionClick?: () => void;
   /** Custom action button label */
@@ -75,6 +77,7 @@ export function Calendar({
   onViewChange,
   onDateChange,
   onEventClick,
+  onDayClick,
   onActionClick,
   actionButtonLabel = "New Event",
   toolbarActions,
@@ -266,17 +269,17 @@ export function Calendar({
 
     switch (currentView) {
       case "month":
-        return <CalendarMonthView {...viewProps} />;
+        return <CalendarMonthView {...viewProps} onDayClick={onDayClick} />;
       case "week":
-        return <CalendarWeekView {...viewProps} />;
+        return <CalendarWeekView {...viewProps} onDayClick={onDayClick} />;
       case "3day":
-        return <Calendar3DayView {...viewProps} />;
+        return <Calendar3DayView {...viewProps} onDayClick={onDayClick} />;
       case "day":
-        return <CalendarDayView {...viewProps} />;
+        return <CalendarDayView {...viewProps} onDayClick={onDayClick} />;
       case "agenda":
         return <CalendarAgendaView {...viewProps} />;
       default:
-        return <CalendarMonthView {...viewProps} />;
+        return <CalendarMonthView {...viewProps} onDayClick={onDayClick} />;
     }
   };
 

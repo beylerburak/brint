@@ -56,6 +56,14 @@ export default function StudioBrandCalendarPage() {
     router.push(`${localePrefix}/${workspace.slug}/studio/${brand.slug}/contents/new`);
   };
 
+  const handleDayClick = (date: Date) => {
+    if (!workspace?.slug) return;
+    const localePrefix = locale === "en" ? "" : `/${locale}`;
+    // Navigate to new content page with date as query param
+    const dateStr = date.toISOString().split('T')[0];
+    router.push(`${localePrefix}/${workspace.slug}/studio/${brand.slug}/contents/new?date=${dateStr}`);
+  };
+
   return (
     <div className="h-full flex flex-col">
       <Calendar
@@ -65,6 +73,7 @@ export default function StudioBrandCalendarPage() {
         onDateChange={setCurrentDate}
         onViewChange={setCurrentView}
         onEventClick={handleEventClick}
+        onDayClick={handleDayClick}
         onActionClick={handleActionClick}
         actionButtonLabel="New Content"
         loading={publicationsLoading}

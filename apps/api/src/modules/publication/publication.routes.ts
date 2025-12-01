@@ -13,6 +13,8 @@ import { validateBody, validateParams, validateQuery } from "../../lib/validatio
 import {
   createInstagramPublicationSchema,
   createFacebookPublicationSchema,
+  createDraftInstagramPublicationSchema,
+  createDraftFacebookPublicationSchema,
   brandParamsSchema,
   cursorPaginationQuerySchema,
 } from "@brint/core-validation";
@@ -212,6 +214,185 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
       brandId,
       socialAccountId: body.socialAccountId,
       publishAt: body.publishAt ? new Date(body.publishAt) : undefined,
+      payload: body.payload,
+      actorUserId: userId,
+      clientRequestId: body.clientRequestId,
+    }, request);
+
+    return reply.status(201).send({
+      success: true,
+      data: {
+        id: publication.id,
+        status: publication.status,
+        scheduledAt: publication.scheduledAt?.toISOString() ?? null,
+      },
+    });
+  });
+
+  // ====================
+  // Draft Publication Endpoints
+  // ====================
+
+  /**
+   * POST /v1/brands/:brandId/publications/instagram/draft
+   * Create a draft Instagram publication
+   */
+  app.post("/brands/:brandId/publications/instagram/draft", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
+    schema: {
+      tags: ["Publications", "Instagram", "Drafts"],
+      summary: "Create draft Instagram publication",
+      description: "Create a draft publication for Instagram (not published automatically)",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      body: {
+        type: "object",
+        properties: {
+          socialAccountId: { type: "string", description: "ID of the Instagram social account" },
+          clientRequestId: { type: "string", description: "Client-provided idempotency key" },
+          payload: {
+            type: "object",
+            description: "Instagram-specific payload (IMAGE, CAROUSEL, REEL, or STORY)",
+            properties: {
+              contentType: { type: "string", enum: ["IMAGE", "CAROUSEL", "REEL", "STORY"] },
+              caption: { type: "string" },
+              imageMediaId: { type: "string" },
+              videoMediaId: { type: "string" },
+              storyType: { type: "string", enum: ["IMAGE", "VIDEO"] },
+              items: { type: "array" },
+            },
+            required: ["contentType"],
+          },
+        },
+        required: ["socialAccountId", "payload"],
+      },
+      response: {
+        201: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                status: { type: "string" },
+                scheduledAt: { type: ["string", "null"] },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    // Debug: Log request body
+    console.log("📥 Draft Instagram request body:", JSON.stringify(request.body, null, 2));
+    const body = validateBody(createDraftInstagramPublicationSchema, request);
+    console.log("✅ Draft Instagram validated body:", JSON.stringify(body, null, 2));
+
+    const publication = await publicationService.createDraftInstagramPublication({
+      workspaceId,
+      brandId,
+      socialAccountId: body.socialAccountId,
+      payload: body.payload,
+      actorUserId: userId,
+      clientRequestId: body.clientRequestId,
+    }, request);
+
+    return reply.status(201).send({
+      success: true,
+      data: {
+        id: publication.id,
+        status: publication.status,
+        scheduledAt: publication.scheduledAt?.toISOString() ?? null,
+      },
+    });
+  });
+
+  /**
+   * POST /v1/brands/:brandId/publications/facebook/draft
+   * Create a draft Facebook publication
+   */
+  app.post("/brands/:brandId/publications/facebook/draft", {
+    preHandler: [requirePermission(PERMISSIONS.STUDIO_CONTENT_PUBLISH)],
+    schema: {
+      tags: ["Publications", "Facebook", "Drafts"],
+      summary: "Create draft Facebook publication",
+      description: "Create a draft publication for Facebook (not published automatically)",
+      params: {
+        type: "object",
+        properties: {
+          brandId: { type: "string" },
+        },
+        required: ["brandId"],
+      },
+      body: {
+        type: "object",
+        properties: {
+          socialAccountId: { type: "string", description: "ID of the Facebook social account" },
+          clientRequestId: { type: "string", description: "Client-provided idempotency key" },
+          payload: {
+            type: "object",
+            description: "Facebook-specific payload (PHOTO, VIDEO, LINK, or STORY)",
+            properties: {
+              contentType: { type: "string", enum: ["PHOTO", "VIDEO", "LINK", "STORY", "CAROUSEL"] },
+              message: { type: "string" },
+              imageMediaId: { type: "string" },
+              videoMediaId: { type: "string" },
+              linkUrl: { type: "string" },
+              storyType: { type: "string", enum: ["IMAGE", "VIDEO"] },
+              items: { type: "array" },
+            },
+            required: ["contentType"],
+          },
+        },
+        required: ["socialAccountId", "payload"],
+      },
+      response: {
+        201: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                status: { type: "string" },
+                scheduledAt: { type: ["string", "null"] },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { brandId } = validateParams(brandParamsSchema, request.params);
+    const workspaceId = requireWorkspaceMatch(request);
+    const userId = request.auth?.userId;
+    if (!userId) {
+      throw new BadRequestError("USER_ID_REQUIRED", "User ID is required");
+    }
+
+    // Debug: Log request body
+    console.log("📥 Draft Facebook request body:", JSON.stringify(request.body, null, 2));
+    const body = validateBody(createDraftFacebookPublicationSchema, request);
+    console.log("✅ Draft Facebook validated body:", JSON.stringify(body, null, 2));
+
+    const publication = await publicationService.createDraftFacebookPublication({
+      workspaceId,
+      brandId,
+      socialAccountId: body.socialAccountId,
       payload: body.payload,
       actorUserId: userId,
       clientRequestId: body.clientRequestId,

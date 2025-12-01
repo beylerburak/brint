@@ -44,12 +44,17 @@ function AvatarContainer({
           whileHover="hover"
           whileTap="hover"
           style={{ position: 'relative', zIndex }}
+          variants={{
+            initial: { zIndex },
+            hover: { zIndex: 100 },
+          }}
         >
           <motion.div
             variants={{
-              initial: { y: 0 },
-              hover: { y: translate },
+              initial: { y: 0, scale: 1 },
+              hover: { y: translate, scale: 1.05 },
             }}
+            style={{ transformOrigin: 'bottom center' }}
             {...props}
           />
         </motion.div>
@@ -97,6 +102,8 @@ function AvatarGroup({
         style={{
           display: 'flex',
           alignItems: 'center',
+          overflow: 'visible',
+          position: 'relative',
           ...style,
         }}
         {...props}

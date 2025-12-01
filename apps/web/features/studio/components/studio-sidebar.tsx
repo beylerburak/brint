@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { useLocale } from "next-intl";
-import { ArrowLeft, Settings, HelpCircle, Command, Search } from "lucide-react";
+import { ArrowLeft, Sliders, HelpCircle, Command, Search } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { StudioBrandSwitcher } from "./studio-brand-switcher";
 import { StudioNavItems } from "./studio-nav-items";
+import { SettingsDialog } from "@/features/settings/components/settings-dialog";
 import { buildWorkspaceRoute } from "@/features/space/constants";
 import type { BrandDetail } from "@/features/brand/types";
 
@@ -103,25 +104,17 @@ export function StudioSidebar({ workspaceSlug, brand }: StudioSidebarProps) {
         <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Brand Settings" asChild>
-              <Link
-                href={buildWorkspaceRoute(
-                  locale,
-                  workspaceSlug,
-                  `studio/${brand.slug}/brand-profile`
-                )}
-              >
-                <Settings className="size-4" />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
+            <SettingsDialog defaultActiveItem="preferences">
+              <SidebarMenuButton tooltip="Preferences">
+                <Sliders className="size-4" />
+                <span>Preferences</span>
+              </SidebarMenuButton>
+            </SettingsDialog>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Help & Support" asChild>
-              <Link href={brandsListUrl}>
-                <HelpCircle className="size-4" />
-                <span>Help</span>
-              </Link>
+            <SidebarMenuButton tooltip="Help & Support" disabled>
+              <HelpCircle className="size-4" />
+              <span>Help</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

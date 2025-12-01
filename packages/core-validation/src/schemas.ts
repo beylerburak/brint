@@ -545,6 +545,146 @@ export const createFacebookPublicationSchema = z.object({
 
 export type CreateFacebookPublicationInput = z.infer<typeof createFacebookPublicationSchema>;
 
+// --------------------
+// Draft Publication Request Schemas
+// --------------------
+
+/**
+ * Draft Instagram IMAGE payload (media optional for drafts)
+ */
+const draftInstagramImagePayload = instagramPayloadBase.extend({
+  contentType: z.literal('IMAGE'),
+  imageMediaId: mediaIdSchema.optional(), // Optional for drafts
+  altText: z.string().max(1000, 'validation.instagram.altText.max').optional(),
+  locationId: z.string().optional(),
+  userTags: z.array(instagramUserTagSchema).optional(),
+});
+
+/**
+ * Draft Instagram CAROUSEL payload (items optional for drafts)
+ */
+const draftInstagramCarouselPayload = instagramPayloadBase.extend({
+  contentType: z.literal('CAROUSEL'),
+  items: z.array(instagramCarouselItemSchema)
+    .min(2, 'validation.instagram.carousel.items.min')
+    .max(10, 'validation.instagram.carousel.items.max')
+    .optional(), // Optional for drafts - can be undefined
+  locationId: z.string().optional(),
+});
+
+/**
+ * Draft Instagram REEL payload (media optional for drafts)
+ */
+const draftInstagramReelPayload = instagramPayloadBase.extend({
+  contentType: z.literal('REEL'),
+  videoMediaId: mediaIdSchema.optional(), // Optional for drafts
+  coverMediaId: mediaIdSchema.optional(),
+  shareToFeed: z.boolean().default(true),
+  thumbOffsetSeconds: z.number().int().min(0).max(60).optional(),
+  audioRename: z.string().max(255).optional(),
+});
+
+/**
+ * Draft Instagram STORY payload (media optional for drafts)
+ * Note: storyType is optional only if no media is provided
+ */
+const draftInstagramStoryPayload = z.object({
+  contentType: z.literal('STORY'),
+  storyType: z.enum(['IMAGE', 'VIDEO']).optional(),
+  imageMediaId: mediaIdSchema.optional(),
+  videoMediaId: mediaIdSchema.optional(),
+}).passthrough(); // Allow additional fields for drafts
+
+/**
+ * Draft Instagram publication payload - union of all content types
+ */
+export const draftInstagramPublicationPayloadSchema = z.union([
+  draftInstagramImagePayload,
+  draftInstagramCarouselPayload, // Items optional for drafts
+  draftInstagramReelPayload,
+  draftInstagramStoryPayload,
+]);
+
+export type DraftInstagramPublicationPayload = z.infer<typeof draftInstagramPublicationPayloadSchema>;
+
+/**
+ * Create draft Instagram publication request body schema
+ * Used for POST /v1/brands/:brandId/publications/instagram/draft
+ */
+export const createDraftInstagramPublicationSchema = z.object({
+  socialAccountId: cuidSchema,
+  clientRequestId: z.string().max(64).optional(),
+  payload: draftInstagramPublicationPayloadSchema,
+});
+
+export type CreateDraftInstagramPublicationInput = z.infer<typeof createDraftInstagramPublicationSchema>;
+
+/**
+ * Draft Facebook PHOTO payload (media optional for drafts)
+ */
+const draftFacebookPhotoPayload = facebookPayloadBase.extend({
+  contentType: z.literal('PHOTO'),
+  imageMediaId: mediaIdSchema.optional(), // Optional for drafts
+  altText: z.string().max(1000, 'validation.facebook.altText.max').optional(),
+});
+
+/**
+ * Draft Facebook VIDEO payload (media optional for drafts)
+ */
+const draftFacebookVideoPayload = facebookPayloadBase.extend({
+  contentType: z.literal('VIDEO'),
+  videoMediaId: mediaIdSchema.optional(), // Optional for drafts
+  title: z.string().max(255).optional(),
+  thumbMediaId: mediaIdSchema.optional(),
+});
+
+/**
+ * Draft Facebook STORY payload (media optional for drafts)
+ * Note: storyType is optional only if no media is provided
+ */
+const draftFacebookStoryPayload = z.object({
+  contentType: z.literal('STORY'),
+  storyType: z.enum(['IMAGE', 'VIDEO']).optional(),
+  imageMediaId: mediaIdSchema.optional(),
+  videoMediaId: mediaIdSchema.optional(),
+}).passthrough(); // Allow additional fields for drafts
+
+/**
+ * Draft Facebook CAROUSEL payload (items optional for drafts)
+ */
+const draftFacebookCarouselPayload = facebookPayloadBase.extend({
+  contentType: z.literal('CAROUSEL'),
+  items: z.array(facebookCarouselItemSchema)
+    .min(2, 'validation.facebook.carousel.items.min')
+    .max(10, 'validation.facebook.carousel.items.max')
+    .optional(), // Optional for drafts
+});
+
+/**
+ * Draft Facebook publication payload - union of all content types
+ */
+export const draftFacebookPublicationPayloadSchema = z.union([
+  draftFacebookPhotoPayload,
+  draftFacebookCarouselPayload, // Items optional for drafts
+  draftFacebookVideoPayload,
+  facebookLinkPayload, // Link doesn't require media
+  draftFacebookStoryPayload,
+]);
+
+export type DraftFacebookPublicationPayload = z.infer<typeof draftFacebookPublicationPayloadSchema>;
+
+/**
+ * Create draft Facebook publication request body schema
+ * Used for POST /v1/brands/:brandId/publications/facebook/draft
+ */
+export const createDraftFacebookPublicationSchema = z.object({
+  socialAccountId: cuidSchema,
+  clientRequestId: z.string().max(64).optional(),
+  payload: draftFacebookPublicationPayloadSchema,
+});
+
+export type CreateDraftFacebookPublicationInput = z.infer<typeof createDraftFacebookPublicationSchema>;
+
 /**
  * Publication params schema
  * Used for validating route parameters like :brandId and :publicationId

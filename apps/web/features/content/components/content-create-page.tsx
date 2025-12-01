@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -28,13 +28,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ExternalLink } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ExternalLink, AlertTriangle, GripVertical, Save } from "lucide-react";
 import { useStudioPageHeader } from "@/features/studio/context";
 import { useStudioBrand } from "@/features/studio/hooks";
 import { useSocialAccounts } from "@/features/social-account/hooks";
 import { useWorkspace } from "@/features/space/context/workspace-context";
+import { useSidebar } from "@/components/animate-ui/components/radix/sidebar";
 import { presignUpload, finalizeUpload, getMediaConfig, type MediaConfig } from "@/shared/api/media";
-import { createInstagramPublication, createFacebookPublication } from "@/shared/api/publication";
+import { createInstagramPublication, createFacebookPublication, createDraftInstagramPublication, createDraftFacebookPublication } from "@/shared/api/publication";
 import { useToast } from "@/components/ui/use-toast";
 import { PLATFORM_INFO } from "@/features/social-account/types";
 import { SocialPlatformIcon } from "@/features/brand/components/social-platform-icon";
@@ -64,6 +66,9 @@ import {
   mapSocialPlatformToPlatformId,
 } from "@/shared/content/content-type-matrix";
 import * as TagsInput from "@diceui/tags-input";
+
+// Platform display order constant
+const PLATFORM_ORDER: PlatformId[] = ["instagram", "facebook", "tiktok", "x", "youtube", "linkedin", "pinterest"];
 
 // Content type definitions (matching matrix)
 const CONTENT_TYPES: Array<{
@@ -133,14 +138,52 @@ export function ContentCreatePage() {
   const [internalTags, setInternalTags] = useState<string[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [mediaConfig, setMediaConfig] = useState<MediaConfig | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [draggedMediaIndex, setDraggedMediaIndex] = useState<number | null>(null);
 
   // Router for navigation
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Sidebar collapse on mount - always start collapsed
+  const sidebar = useSidebar();
+  const hasCollapsedOnMount = useRef(false);
+  const hasInitializedDate = useRef(false);
+  
+  useEffect(() => {
+    if (!hasCollapsedOnMount.current && sidebar) {
+      hasCollapsedOnMount.current = true;
+      // Force collapse sidebar on mount
+      if (sidebar.open) {
+        sidebar.setOpen(false);
+      }
+    }
+  }, [sidebar]);
 
-  // Function to navigate back to the referring page
+  // Pre-fill schedule date from URL query param (e.g., from calendar day click)
+  useEffect(() => {
+    if (!hasInitializedDate.current) {
+      const dateParam = searchParams.get("date");
+      if (dateParam) {
+        hasInitializedDate.current = true;
+        // Set the schedule date and enable schedule mode
+        setScheduledDate(dateParam);
+        setSelectedDate(new Date(dateParam));
+        setScheduledTime("10:00"); // Default time
+        setScheduleForLater(true);
+      }
+    }
+  }, [searchParams]);
+
+  // Cancel always goes back in history
+  const handleCancel = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  // Function to navigate back to the referring page (after successful publish)
   const navigateBackToReferrer = useCallback(() => {
     const referrer = document.referrer;
-    const currentUrl = window.location.href;
 
     // Check if coming from calendar page
     if (referrer.includes('/calendar')) {
@@ -177,6 +220,66 @@ export function ContentCreatePage() {
     brandId: brand?.id,
     status: "ACTIVE",
   });
+
+  // =========================
+  // VALIDATION LOGIC
+  // =========================
+  
+  // Check if selected media has video
+  const hasVideoMedia = useMemo(() => {
+    return selectedMedia.some((m) => m.file.type.startsWith("video/"));
+  }, [selectedMedia]);
+
+  // Check if any selected account is Instagram
+  const hasInstagramSelected = useMemo(() => {
+    return Array.from(selectedAccounts).some((accountId) => {
+      const account = accounts.find((a) => a.id === accountId);
+      return account?.platform === "INSTAGRAM_BUSINESS" || account?.platform === "INSTAGRAM_BASIC";
+    });
+  }, [selectedAccounts, accounts]);
+
+  // Check if any selected account is TikTok
+  const hasTikTokSelected = useMemo(() => {
+    return Array.from(selectedAccounts).some((accountId) => {
+      const account = accounts.find((a) => a.id === accountId);
+      return account?.platform === "TIKTOK_BUSINESS";
+    });
+  }, [selectedAccounts, accounts]);
+
+  // Validation rules
+  const validationErrors = useMemo(() => {
+    const errors: string[] = [];
+
+    // Rule 1: At least one account must be selected
+    if (selectedAccounts.size === 0) {
+      errors.push("En az bir hesap seçmelisiniz.");
+    }
+
+    // Rule 2: Reel/Short content type requires video media
+    if (selectedContentType === "vertical_video" && !hasVideoMedia) {
+      errors.push("Reel/Short için video yüklemelisiniz.");
+    }
+
+    // Rule 3: Single post with Instagram or TikTok requires media
+    if (selectedContentType === "single_post" && (hasInstagramSelected || hasTikTokSelected) && selectedMedia.length === 0) {
+      errors.push("Instagram veya TikTok için tek gönderi medya gerektirir.");
+    }
+
+    // Rule 4: Single post + Instagram = only image (no video)
+    if (selectedContentType === "single_post" && hasInstagramSelected && hasVideoMedia) {
+      errors.push("Instagram tek gönderisi için sadece resim desteklenir.");
+    }
+
+    // Rule 5: Only carousel and story allow multiple media
+    if (selectedContentType && selectedContentType !== "carousel" && selectedContentType !== "story" && selectedMedia.length > 1) {
+      errors.push("Bu içerik tipi için sadece 1 medya seçebilirsiniz.");
+    }
+
+    return errors;
+  }, [selectedAccounts, selectedContentType, selectedMedia, hasVideoMedia, hasInstagramSelected, hasTikTokSelected]);
+
+  // Is publish allowed?
+  const canPublish = validationErrors.length === 0 && selectedContentType !== null;
 
   // Load media config
   useEffect(() => {
@@ -232,7 +335,7 @@ export function ContentCreatePage() {
     }
   };
 
-  // Handle drag and drop
+  // Handle drag and drop for file upload
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -242,6 +345,36 @@ export function ContentCreatePage() {
     e.preventDefault();
     e.stopPropagation();
     handleFileSelect(e.dataTransfer.files);
+  };
+
+  // Handle media reordering via drag and drop
+  const handleMediaDragStart = (index: number) => {
+    setDraggedMediaIndex(index);
+  };
+
+  const handleMediaDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedMediaIndex === null || draggedMediaIndex === index) return;
+  };
+
+  const handleMediaDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedMediaIndex === null || draggedMediaIndex === targetIndex) {
+      setDraggedMediaIndex(null);
+      return;
+    }
+
+    setSelectedMedia((prev) => {
+      const newMedia = [...prev];
+      const [draggedItem] = newMedia.splice(draggedMediaIndex, 1);
+      newMedia.splice(targetIndex, 0, draggedItem);
+      return newMedia;
+    });
+    setDraggedMediaIndex(null);
+  };
+
+  const handleMediaDragEnd = () => {
+    setDraggedMediaIndex(null);
   };
 
   // Handle file upload (will be called when posting)
@@ -332,21 +465,262 @@ export function ContentCreatePage() {
     };
   }, [selectedMedia]);
 
-  // Filter accounts based on selected content type
+  // Filter accounts based on selected content type and sort by platform order
   const filteredAccounts = useMemo(() => {
-    if (!selectedContentType) {
-      return accounts;
+    let filtered = accounts;
+    
+    if (selectedContentType) {
+      filtered = accounts.filter((account) => {
+        const platformId = mapSocialPlatformToPlatformId(account.platform);
+        if (!platformId) return false;
+
+        return isPlatformSupported(selectedContentType, platformId, {
+          includeDegraded: true,
+        });
+      });
     }
 
-    return accounts.filter((account) => {
-      const platformId = mapSocialPlatformToPlatformId(account.platform);
-      if (!platformId) return false;
-
-      return isPlatformSupported(selectedContentType, platformId, {
-        includeDegraded: true,
-      });
+    // Sort by platform order: INSTAGRAM, FACEBOOK, TIKTOK, X, YOUTUBE, LINKEDIN, PINTEREST
+    return filtered.sort((a, b) => {
+      const platformA = mapSocialPlatformToPlatformId(a.platform);
+      const platformB = mapSocialPlatformToPlatformId(b.platform);
+      const indexA = platformA ? PLATFORM_ORDER.indexOf(platformA) : 999;
+      const indexB = platformB ? PLATFORM_ORDER.indexOf(platformB) : 999;
+      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     });
   }, [accounts, selectedContentType]);
+
+  // Handle draft save
+  const handleSaveDraft = useCallback(async () => {
+    if (!workspaceReady || !workspace?.id || !brand?.id) {
+      toast({
+        title: "Hata",
+        description: "Çalışma alanı ve marka hazır olmalı",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedContentType) {
+      toast({
+        title: "Hata",
+        description: "Lütfen bir içerik tipi seçin",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedAccounts.size === 0) {
+      toast({
+        title: "Hata",
+        description: "En az bir hesap seçmelisiniz",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    try {
+      // Upload all media first - show uploading state
+      setIsUploadingMedia(true);
+      const mediaIds: string[] = [];
+      for (const mediaItem of selectedMedia) {
+        const mediaId = await handleMediaUpload(mediaItem);
+        if (mediaId) {
+          mediaIds.push(mediaId);
+        }
+      }
+      setIsUploadingMedia(false);
+
+      if (selectedMedia.length > 0 && mediaIds.length === 0) {
+        toast({
+          title: "Hata",
+          description: "Medya yüklenemedi",
+          variant: "destructive",
+        });
+        setIsSavingDraft(false);
+        return;
+      }
+
+      // Filter only Instagram and Facebook accounts
+      // Get selected accounts directly from filteredAccounts and selectedAccounts
+      const selectedAccountsArray = filteredAccounts.filter((account) =>
+        selectedAccounts.has(account.id)
+      );
+      const publishableAccounts = selectedAccountsArray.filter(
+        (account) =>
+          account.platform === "INSTAGRAM_BUSINESS" ||
+          account.platform === "INSTAGRAM_BASIC" ||
+          account.platform === "FACEBOOK_PAGE"
+      );
+
+      if (publishableAccounts.length === 0) {
+        toast({
+          title: "Hata",
+          description: "Sadece Instagram ve Facebook hesapları destekleniyor",
+          variant: "destructive",
+        });
+        setIsSavingDraft(false);
+        return;
+      }
+
+      // Get caption (platform-specific or base)
+      const getCaption = (account: typeof publishableAccounts[0]): string => {
+        const platformId = mapSocialPlatformToPlatformId(account.platform);
+        if (platformId && customizePerPlatform && platformCaptions[platformId]) {
+          return platformCaptions[platformId];
+        }
+        return baseCaption;
+      };
+
+      // Create draft publications for each account (no publishAt, no job queue)
+      const publications = await Promise.allSettled(
+        publishableAccounts.map(async (account) => {
+          const platformId = mapSocialPlatformToPlatformId(account.platform);
+          if (!platformId) return;
+
+          const caption = getCaption(account);
+          const isInstagram = account.platform === "INSTAGRAM_BUSINESS" || account.platform === "INSTAGRAM_BASIC";
+          const isFacebook = account.platform === "FACEBOOK_PAGE";
+
+          if (isInstagram) {
+            const instagramContentType = mapContentTypeToInstagram(selectedContentType);
+            const payload: any = {
+              contentType: instagramContentType,
+            };
+
+            if (caption && selectedContentType !== "story") {
+              payload.caption = caption;
+            }
+
+            // Add media IDs based on content type
+            if (selectedMedia.length > 0) {
+              if (instagramContentType === "CAROUSEL") {
+                payload.items = mediaIds.map((mediaId) => {
+                  const mediaItem = selectedMedia.find((m) => m.mediaId === mediaId);
+                  const isVideo = mediaItem?.file.type.startsWith("video/");
+                  return {
+                    mediaId,
+                    type: isVideo ? "VIDEO" : "IMAGE",
+                  };
+                });
+              } else if (instagramContentType === "REEL") {
+                payload.videoMediaId = mediaIds[0];
+              } else if (instagramContentType === "STORY") {
+                const firstMedia = selectedMedia[0];
+                const isVideo = firstMedia?.file.type.startsWith("video/");
+                payload.storyType = isVideo ? "VIDEO" : "IMAGE";
+                if (isVideo) {
+                  payload.videoMediaId = mediaIds[0];
+                } else {
+                  payload.imageMediaId = mediaIds[0];
+                }
+              } else {
+                payload.imageMediaId = mediaIds[0];
+              }
+            }
+
+            const draftPayload = {
+              socialAccountId: account.id,
+              payload,
+            };
+            console.log("📝 Creating draft Instagram publication:", draftPayload);
+            return createDraftInstagramPublication(brand.id, draftPayload);
+          } else if (isFacebook) {
+            const facebookContentType = mapContentTypeToFacebook(selectedContentType);
+            const payload: any = {
+              contentType: facebookContentType,
+            };
+
+            if (caption && selectedContentType !== "story") {
+              payload.message = caption;
+            }
+
+            // Add media IDs based on content type
+            if (selectedMedia.length > 0) {
+              if (facebookContentType === "STORY") {
+                const firstMedia = selectedMedia[0];
+                const isVideo = firstMedia?.file.type.startsWith("video/");
+                payload.storyType = isVideo ? "VIDEO" : "IMAGE";
+                if (isVideo) {
+                  payload.videoMediaId = mediaIds[0];
+                } else {
+                  payload.imageMediaId = mediaIds[0];
+                }
+              } else if (facebookContentType === "VIDEO") {
+                payload.videoMediaId = mediaIds[0];
+              } else if (facebookContentType === "CAROUSEL") {
+                payload.items = mediaIds.map((mediaId) => {
+                  const mediaItem = selectedMedia.find((m) => m.mediaId === mediaId);
+                  const isVideo = mediaItem?.file.type.startsWith("video/");
+                  return {
+                    mediaId,
+                    type: isVideo ? "VIDEO" : "IMAGE",
+                  };
+                });
+              } else {
+                payload.imageMediaId = mediaIds[0];
+              }
+            }
+
+            const draftPayload = {
+              socialAccountId: account.id,
+              payload,
+            };
+            console.log("📝 Creating draft Facebook publication:", draftPayload);
+            return createDraftFacebookPublication(brand.id, draftPayload);
+          }
+        })
+      );
+
+      // Check results
+      const successful = publications.filter((p) => p.status === "fulfilled").length;
+      const failed = publications.filter((p) => p.status === "rejected").length;
+
+      if (successful > 0) {
+        toast({
+          title: "Taslak kaydedildi",
+          description: `${successful} hesap için taslak kaydedildi${failed > 0 ? ` (${failed} hesap için başarısız)` : ""}`,
+        });
+
+        // Navigate back to the referring page after a short delay
+        setTimeout(() => {
+          navigateBackToReferrer();
+        }, 1500);
+      } else {
+        toast({
+          title: "Hata",
+          description: "Hiçbir hesap için taslak kaydedilemedi",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Draft save error:", error);
+      toast({
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Taslak kaydedilemedi",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDraft(false);
+      setIsUploadingMedia(false);
+    }
+  }, [
+    workspaceReady,
+    workspace?.id,
+    brand?.id,
+    selectedContentType,
+    selectedAccounts,
+    filteredAccounts,
+    selectedMedia,
+    customizePerPlatform,
+    platformCaptions,
+    baseCaption,
+    handleMediaUpload,
+    toast,
+    navigateBackToReferrer,
+  ]);
 
   // Get selected accounts for display
   const selectedAccountsList = useMemo(() => {
@@ -452,7 +826,11 @@ export function ContentCreatePage() {
     }
 
     // Filter only Instagram and Facebook accounts
-    const publishableAccounts = selectedAccountsList.filter(
+    // Get selected accounts directly from filteredAccounts and selectedAccounts
+    const selectedAccountsArray = filteredAccounts.filter((account) =>
+      selectedAccounts.has(account.id)
+    );
+    const publishableAccounts = selectedAccountsArray.filter(
       (account) =>
         account.platform === "INSTAGRAM_BUSINESS" ||
         account.platform === "INSTAGRAM_BASIC" ||
@@ -471,7 +849,8 @@ export function ContentCreatePage() {
     setIsPublishing(true);
 
     try {
-      // Upload all media first
+      // Upload all media first - show uploading state
+      setIsUploadingMedia(true);
       const mediaIds: string[] = [];
       for (const mediaItem of selectedMedia) {
         const mediaId = await handleMediaUpload(mediaItem);
@@ -479,11 +858,12 @@ export function ContentCreatePage() {
           mediaIds.push(mediaId);
         }
       }
+      setIsUploadingMedia(false);
 
       if (selectedMedia.length > 0 && mediaIds.length === 0) {
         toast({
-          title: "Error",
-          description: "Failed to upload media",
+          title: "Hata",
+          description: "Medya yüklenemedi",
           variant: "destructive",
         });
         setIsPublishing(false);
@@ -491,12 +871,25 @@ export function ContentCreatePage() {
       }
 
       // Calculate publishAt (if scheduled)
+      // Use scheduledDate and scheduledTime directly instead of scheduleForLater state
+      // because state updates are async and might not be ready when handlePublish is called
       let publishAt: string | undefined;
-      if (scheduleForLater && scheduledDate && scheduledTime) {
+      if (scheduledDate && scheduledTime) {
         const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
         if (!isNaN(dateTime.getTime())) {
-          publishAt = dateTime.toISOString();
+          // Only set publishAt if the date is in the future
+          const now = new Date();
+          if (dateTime > now) {
+            publishAt = dateTime.toISOString();
+            console.log("📅 Scheduling publication for:", publishAt);
+          } else {
+            console.warn("⚠️ Scheduled date is in the past, publishing immediately");
+          }
+        } else {
+          console.warn("⚠️ Invalid date/time combination:", scheduledDate, scheduledTime);
         }
+      } else {
+        console.log("📤 Publishing immediately (no schedule)");
       }
       // If not scheduled and "Publish Now", publishAt is undefined (immediate)
 
@@ -559,11 +952,17 @@ export function ContentCreatePage() {
               }
             }
 
-            return createInstagramPublication(brand.id, {
+            const publicationPayload = {
               socialAccountId: account.id,
               publishAt,
               payload,
+            };
+            console.log("📤 Creating Instagram publication:", {
+              socialAccountId: account.id,
+              publishAt: publishAt || "immediate",
+              contentType: payload.contentType,
             });
+            return createInstagramPublication(brand.id, publicationPayload);
           } else if (isFacebook) {
             const facebookContentType = mapContentTypeToFacebook(selectedContentType);
             const payload: any = {
@@ -604,11 +1003,17 @@ export function ContentCreatePage() {
     }
             }
 
-            return createFacebookPublication(brand.id, {
+            const publicationPayload = {
               socialAccountId: account.id,
               publishAt,
               payload,
+            };
+            console.log("📤 Creating Facebook publication:", {
+              socialAccountId: account.id,
+              publishAt: publishAt || "immediate",
+              contentType: payload.contentType,
             });
+            return createFacebookPublication(brand.id, publicationPayload);
           }
         })
       );
@@ -618,9 +1023,13 @@ export function ContentCreatePage() {
       const failed = publications.filter((p) => p.status === "rejected").length;
 
       if (successful > 0) {
+        // Different message for scheduled vs immediate publish
+        const isScheduled = scheduleForLater && scheduledDate && scheduledTime;
         toast({
-          title: "İşleme alındı",
-          description: `${successful} hesap${successful > 1 ? "" : ""} için yayınlama işlemi başlatıldı${failed > 0 ? ` (${failed} hesap için başarısız)` : ""}`,
+          title: isScheduled ? "Planlandı" : "İşleme alındı",
+          description: isScheduled 
+            ? `İçerik paylaşılmak üzere plana alındı.${failed > 0 ? ` (${failed} hesap için başarısız)` : ""}`
+            : `${successful} hesap için yayınlama işlemi başlatıldı${failed > 0 ? ` (${failed} hesap için başarısız)` : ""}`,
         });
 
         // Navigate back to the referring page after a short delay
@@ -637,17 +1046,15 @@ export function ContentCreatePage() {
     } catch (error) {
       console.error("Publish error:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to publish",
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Yayınlama başarısız",
         variant: "destructive",
       });
+      // DON'T reset schedule date/time on error - user should be able to retry
     } finally {
       setIsPublishing(false);
-      // Reset scheduling state after publish
-      setScheduleForLater(false);
-      setScheduledDate("");
-      setScheduledTime("");
-      setSelectedDate(undefined);
+      // Only reset if successful - schedule date/time should persist on error
+      // The navigateBackToReferrer will handle cleanup for successful publishes
       setIsSchedulePopoverOpen(false);
     }
   }, [
@@ -656,7 +1063,7 @@ export function ContentCreatePage() {
     brand?.id,
     selectedContentType,
     selectedAccounts,
-    selectedAccountsList,
+    filteredAccounts,
     selectedMedia,
     scheduleForLater,
     scheduledDate,
@@ -675,8 +1082,8 @@ export function ContentCreatePage() {
       const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
       if (isNaN(dateTime.getTime())) {
         toast({
-          title: "Error",
-          description: "Invalid date or time selected",
+          title: "Hata",
+          description: "Geçersiz tarih veya saat seçildi",
           variant: "destructive",
         });
         return;
@@ -685,19 +1092,18 @@ export function ContentCreatePage() {
       const now = new Date();
       if (dateTime <= now) {
         toast({
-          title: "Error",
-          description: "Scheduled time must be in the future",
+          title: "Hata",
+          description: "Planlanan zaman gelecekte olmalıdır",
           variant: "destructive",
         });
         return;
       }
 
+      // Set scheduleForLater for toast message display
       setScheduleForLater(true);
     } else {
-      // Publish now mode
+      // Publish now mode - clear schedule state
       setScheduleForLater(false);
-      setScheduledDate("");
-      setScheduledTime("");
     }
     handlePublish();
   }, [scheduledDate, scheduledTime, handlePublish, toast]);
@@ -712,11 +1118,22 @@ export function ContentCreatePage() {
         "Create a new content and prepare it for publishing across your social accounts.",
       actions: (
         <div className="flex items-center gap-3">
-          <Button variant="link" size="sm" className="text-muted-foreground">
+          <Button 
+            variant="link" 
+            size="sm" 
+            className="text-muted-foreground"
+            onClick={handleCancel}
+          >
             İptal
           </Button>
-          <Button variant="outline" size="sm">
-            Taslak Kaydet
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft}
+          >
+            <Save className="h-4 w-4 mr-1" />
+            {isSavingDraft ? "Kaydediliyor..." : "Taslak Kaydet"}
           </Button>
           <ButtonGroup>
             <Popover open={isSchedulePopoverOpen} onOpenChange={setIsSchedulePopoverOpen}>
@@ -724,7 +1141,7 @@ export function ContentCreatePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={isPublishing}
+                  disabled={isPublishing || isUploadingMedia}
                 >
                   {formattedScheduleText}
                 </Button>
@@ -733,9 +1150,9 @@ export function ContentCreatePage() {
                 <div className="p-4">
                   <div className="space-y-4">
                     <div>
-                      <Label className="text-sm font-medium">Select Date</Label>
+                      <Label className="text-sm font-medium">Tarih Seçin</Label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Choose when to publish this content
+                        İçeriğin ne zaman yayınlanacağını seçin
                       </p>
                     </div>
 
@@ -757,7 +1174,7 @@ export function ContentCreatePage() {
                     />
 
                     <div className="space-y-2">
-                      <Label htmlFor="schedule-time">Time</Label>
+                      <Label htmlFor="schedule-time">Saat</Label>
                       <Input
                         id="schedule-time"
                         type="time"
@@ -771,13 +1188,13 @@ export function ContentCreatePage() {
                       <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950/20 rounded px-3 py-2">
                         <span>📅</span>
                         <span>
-                          Will publish on {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString('tr-TR', {
+                          {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString('tr-TR', {
                             month: 'short',
                             day: 'numeric',
                             weekday: 'short',
                             hour: '2-digit',
                             minute: '2-digit'
-                          })}
+                          })} tarihinde yayınlanacak
                         </span>
                       </div>
                     )}
@@ -787,10 +1204,16 @@ export function ContentCreatePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setIsSchedulePopoverOpen(false)}
+                        onClick={() => {
+                          // Clear schedule when cancelled
+                          setScheduledDate("");
+                          setScheduledTime("");
+                          setSelectedDate(undefined);
+                          setIsSchedulePopoverOpen(false);
+                        }}
                         className="flex-1"
                       >
-                        Cancel
+                        Temizle
                       </Button>
                       <Button
                         size="sm"
@@ -807,15 +1230,18 @@ export function ContentCreatePage() {
             <Button
               size="sm"
               onClick={handlePublishNow}
-              disabled={isPublishing}
+              disabled={isPublishing || isUploadingMedia || !canPublish}
+              title={!canPublish ? validationErrors.join("\n") : undefined}
             >
-              {isPublishing ? "Publishing..." : (scheduledDate && scheduledTime ? "Schedule" : "Publish Now")}
+              {isPublishing || isUploadingMedia 
+                ? (isUploadingMedia ? "Medya yükleniyor..." : "Yayınlanıyor...") 
+                : (scheduledDate && scheduledTime ? "Planla" : "Şimdi Yayınla")}
             </Button>
           </ButtonGroup>
         </div>
       ),
     }),
-    [isPublishing, handlePublish, handlePublishNow, isSchedulePopoverOpen, selectedDate, scheduledDate, scheduledTime, formattedScheduleText]
+    [isPublishing, isUploadingMedia, handlePublish, handlePublishNow, handleCancel, handleSaveDraft, isSavingDraft, isSchedulePopoverOpen, selectedDate, scheduledDate, scheduledTime, formattedScheduleText, canPublish, validationErrors]
   );
 
   useStudioPageHeader(headerConfig);
@@ -824,21 +1250,10 @@ export function ContentCreatePage() {
     <div className="flex h-full flex-col">
       {/* Main Resizable Area - Edge to edge */}
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Left Panel - Content Settings with Tabs */}
+        {/* Left Panel - Content Settings */}
         <ResizablePanel defaultSize={60} minSize={40}>
           <div className="flex h-full flex-col border-r">
-            <Tabs defaultValue="settings" className="flex h-full flex-col">
-              {/* Tabs Header */}
-              <div className="border-b px-6 py-3">
-                <TabsList>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                  <TabsTrigger value="media">Media</TabsTrigger>
-                </TabsList>
-              </div>
-
-              {/* Settings Tab - Only Content Type and Platforms */}
-              <TabsContent value="settings" className="flex-1 overflow-hidden m-0">
-                <div className="h-full space-y-6 overflow-y-auto px-6 py-6">
+            <div className="h-full space-y-6 overflow-y-auto px-6 py-6">
                   {/* Title */}
                   <div className="space-y-2">
                     <Label htmlFor="title">Title</Label>
@@ -1017,6 +1432,161 @@ export function ContentCreatePage() {
                         })}
                       </div>
                     )}
+                  </div>
+
+                  {/* Media Selection */}
+                  <div className="space-y-3">
+                    {/* Story Alert for Multiple Media */}
+                    {selectedContentType === "story" && selectedMedia.length > 1 && (
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          Story içerik tipinde birden fazla medya yüklediniz. Her medya ayrı bir story olarak yayınlanacaktır.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Upload Area - Shows upload zone when empty, shows media grid when has media */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Medya</Label>
+                        {selectedMedia.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById("media-upload")?.click()}
+                          >
+                            <Upload className="h-4 w-4 mr-1" />
+                            Daha fazla ekle
+                          </Button>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        id="media-upload"
+                        multiple
+                        accept="image/*,video/*"
+                        className="hidden"
+                        onChange={(e) => handleFileSelect(e.target.files)}
+                      />
+                      
+                      {selectedMedia.length === 0 ? (
+                        <label
+                          htmlFor="media-upload"
+                          className="block rounded-xl border-2 border-dashed p-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/30 cursor-pointer"
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                        >
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                              <Upload className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">
+                                Dosyaları buraya sürükleyin veya tıklayın
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Resim (JPG, PNG, GIF) ve video (MP4, MOV) desteklenir
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="mt-2"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                document.getElementById("media-upload")?.click();
+                              }}
+                            >
+                              Dosya seç
+                            </Button>
+                          </div>
+                        </label>
+                      ) : (
+                        <div 
+                          className="grid grid-cols-2 gap-3"
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                        >
+                          {selectedMedia.map((media, index) => {
+                            const isVideo = media.file.type.startsWith("video/");
+                            return (
+                              <div
+                                key={index}
+                                draggable
+                                onDragStart={() => handleMediaDragStart(index)}
+                                onDragOver={(e) => handleMediaDragOver(e, index)}
+                                onDrop={(e) => handleMediaDrop(e, index)}
+                                onDragEnd={handleMediaDragEnd}
+                                className={cn(
+                                  "group relative rounded-lg border overflow-hidden cursor-grab active:cursor-grabbing",
+                                  draggedMediaIndex === index && "opacity-50 ring-2 ring-primary"
+                                )}
+                              >
+                                {/* Drag Handle */}
+                                <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="rounded bg-black/50 p-1">
+                                    <GripVertical className="h-4 w-4 text-white" />
+                                  </div>
+                                </div>
+                                {/* Order Badge */}
+                                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
+                                  <div className="rounded-full bg-black/50 text-white text-xs font-medium px-2 py-0.5">
+                                    {index + 1}
+                                  </div>
+                                </div>
+                                {isVideo ? (
+                                  <video
+                                    src={media.previewUrl}
+                                    className="w-full h-32 object-cover"
+                                    controls={false}
+                                  />
+                                ) : (
+                                  <img
+                                    src={media.previewUrl}
+                                    alt={media.file.name}
+                                    className="w-full h-32 object-cover"
+                                  />
+                                )}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMedia(media)}
+                                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                >
+                                  <div className="rounded-full bg-destructive text-destructive-foreground p-1">
+                                    <X className="h-4 w-4" />
+                                  </div>
+                                </button>
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pointer-events-none">
+                                  <p className="text-xs text-white truncate">
+                                    {media.file.name}
+                                  </p>
+                                  <p className="text-xs text-white/80">
+                                    {(media.file.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {/* Add more media placeholder */}
+                          <label
+                            htmlFor="media-upload"
+                            className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed h-32 text-center transition-colors hover:border-primary/50 hover:bg-accent/30 cursor-pointer"
+                          >
+                            <Upload className="h-6 w-6 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Daha ekle</span>
+                          </label>
+                        </div>
+                      )}
+                      
+                      {selectedMedia.length > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          💡 Sırayı değiştirmek için medyaları sürükleyip bırakın
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Content Details */}
@@ -1373,131 +1943,6 @@ export function ContentCreatePage() {
                     </TagsInput.Root>
                   </div>
                 </div>
-              </TabsContent>
-
-              {/* Media Tab */}
-              <TabsContent value="media" className="flex-1 overflow-hidden m-0">
-                <div className="h-full space-y-6 overflow-y-auto px-6 py-6">
-                  {/* Upload Area */}
-                  <div className="space-y-3">
-                    <Label>Upload media</Label>
-                    <input
-                      type="file"
-                      id="media-upload"
-                      multiple
-                      accept="image/*,video/*"
-                      className="hidden"
-                      onChange={(e) => handleFileSelect(e.target.files)}
-                    />
-                    <label
-                      htmlFor="media-upload"
-                      className="block rounded-xl border-2 border-dashed p-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/30 cursor-pointer"
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                    >
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                          <Upload className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">
-                            Drop files here or click to upload
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Supports images (JPG, PNG, GIF) and videos (MP4, MOV)
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            document.getElementById("media-upload")?.click();
-                          }}
-                        >
-                          Browse files
-                        </Button>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Media Library Quick Access */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Or choose from library</Label>
-                      <Button variant="link" size="sm" className="h-auto p-0">
-                        Open media library
-                      </Button>
-                    </div>
-                    
-                    {/* Placeholder for media library grid */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <MediaPlaceholder icon={ImagePlus} label="Images" />
-                      <MediaPlaceholder icon={Film} label="Videos" />
-                      <MediaPlaceholder icon={ImagesIcon} label="Recent" />
-                    </div>
-                  </div>
-
-                  {/* Selected Media Preview */}
-                  <div className="space-y-3">
-                    <Label>Selected media</Label>
-                    {selectedMedia.length === 0 ? (
-                      <div className="rounded-xl border border-dashed p-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          No media selected yet. Upload or choose from library above.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        {selectedMedia.map((media, index) => {
-                          const isVideo = media.file.type.startsWith("video/");
-                          return (
-                            <div
-                              key={index}
-                              className="group relative rounded-lg border overflow-hidden"
-                            >
-                              {isVideo ? (
-                                <video
-                                  src={media.previewUrl}
-                                  className="w-full h-32 object-cover"
-                                  controls={false}
-                                />
-                              ) : (
-                                <img
-                                  src={media.previewUrl}
-                                  alt={media.file.name}
-                                  className="w-full h-32 object-cover"
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMedia(media)}
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <div className="rounded-full bg-destructive text-destructive-foreground p-1">
-                                  <X className="h-4 w-4" />
-                                </div>
-                              </button>
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                                <p className="text-xs text-white truncate">
-                                  {media.file.name}
-                                </p>
-                                <p className="text-xs text-white/80">
-                                  {(media.file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
           </div>
         </ResizablePanel>
 

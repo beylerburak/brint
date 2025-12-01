@@ -23,6 +23,8 @@ import {
   graphGet,
   verifyFacebookPostPublished,
   extractGraphApiErrorMessage,
+  isRetryableError,
+  RetryablePublicationError,
   GRAPH_API_BASE,
   type GraphApiResponse,
 } from "./graph-api.utils.js";
@@ -95,9 +97,15 @@ async function publishFacebookPhoto(
   );
 
   if (postResponse.error || !postResponse.id) {
-    throw new Error(
-      `Failed to post FB photo: ${extractGraphApiErrorMessage(postResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(postResponse.error);
+    const fullMessage = `Failed to post FB photo: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready, rate limiting)
+    if (isRetryableError(postResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, postResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const photoId = postResponse.id;
@@ -174,9 +182,15 @@ async function publishFacebookVideo(
   );
 
   if (postResponse.error || !postResponse.id) {
-    throw new Error(
-      `Failed to post FB video: ${extractGraphApiErrorMessage(postResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(postResponse.error);
+    const fullMessage = `Failed to post FB video: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready, rate limiting)
+    if (isRetryableError(postResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, postResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const videoId = postResponse.id;
@@ -211,6 +225,163 @@ async function publishFacebookVideo(
 }
 
 /**
+ * Publish a CAROUSEL (multi-photo post) to Facebook Page
+ * Facebook carousel posts use unpublished photos with attached_media parameter
+ */
+async function publishFacebookCarousel(
+  pageId: string,
+  payload: FacebookPublicationPayload & { contentType: "CAROUSEL" },
+  accessToken: string
+): Promise<{ postId: string; permalink: string }> {
+  // Type assertion for carousel payload with items
+  const carouselPayload = payload as FacebookPublicationPayload & {
+    contentType: "CAROUSEL";
+    items: Array<{ mediaId: string; type: "IMAGE" | "VIDEO"; altText?: string }>;
+    message?: string;
+  };
+
+  logger.info(
+    { pageId, itemCount: carouselPayload.items?.length, items: carouselPayload.items },
+    "Starting Facebook carousel publish"
+  );
+
+  if (!carouselPayload.items || carouselPayload.items.length === 0) {
+    throw new Error("Carousel payload must contain at least one item");
+  }
+
+  // 1. Upload each photo as unpublished (required for carousel)
+  const photoIds: string[] = [];
+
+  for (const item of carouselPayload.items) {
+    // Only support IMAGE items for Facebook carousel (videos not supported in carousel)
+    if (item.type !== "IMAGE") {
+      logger.warn(
+        { itemType: item.type, pageId },
+        "Facebook carousel only supports IMAGE items, skipping non-image item"
+      );
+      continue;
+    }
+
+    const imageUrl = await getMediaPublicUrl(item.mediaId);
+    if (!imageUrl) {
+      throw new Error(`Cannot get public URL for carousel item: ${item.mediaId}`);
+    }
+
+    // Upload photo as unpublished (required for carousel)
+    const uploadParams: Record<string, string | boolean> = {
+      url: imageUrl,
+      published: false, // Must be unpublished for carousel
+    };
+
+    logger.debug({ pageId, mediaId: item.mediaId }, "Uploading unpublished photo for carousel");
+
+    const uploadResponse = await graphPost(
+      `/${pageId}/photos`,
+      uploadParams,
+      accessToken
+    );
+
+    if (uploadResponse.error || !uploadResponse.id) {
+      const errorMessage = extractGraphApiErrorMessage(uploadResponse.error);
+      const fullMessage = `Failed to upload carousel photo: ${errorMessage}`;
+      
+      // Check if this is a retryable error (e.g., media not ready, rate limiting)
+      if (isRetryableError(uploadResponse.error)) {
+        throw new RetryablePublicationError(fullMessage, uploadResponse.error);
+      }
+      
+      throw new Error(fullMessage);
+    }
+
+    photoIds.push(uploadResponse.id);
+    logger.debug({ pageId, photoId: uploadResponse.id, totalUploaded: photoIds.length }, "Photo uploaded successfully for carousel");
+  }
+
+  logger.info({ pageId, totalPhotos: photoIds.length, photoIds }, "All photos uploaded for carousel");
+
+  if (photoIds.length === 0) {
+    throw new Error("No valid photos uploaded for carousel");
+  }
+
+  // Always use carousel format (even for single photo) - Facebook handles it correctly
+
+  // 2. Create carousel post using /feed endpoint with attached_media
+  // Facebook requires attached_media as bracket notation: attached_media[0], attached_media[1], etc.
+  // Each value must be a JSON string: {"media_fbid":"photo_id"}
+  // Format must be form-urlencoded, not JSON body
+  const feedParams: Record<string, string> = {};
+
+  if (carouselPayload.message) {
+    feedParams.message = carouselPayload.message;
+  }
+
+  // Add each photo as attached_media[index] = JSON string
+  photoIds.forEach((photoId, index) => {
+    feedParams[`attached_media[${index}]`] = JSON.stringify({ media_fbid: photoId });
+  });
+
+  logger.info(
+    {
+      pageId,
+      photoCount: photoIds.length,
+      photoIds,
+      feedParams,
+    },
+    "Creating Facebook carousel post via /feed with attached_media[n] bracket notation"
+  );
+
+  // Use graphPost with form-urlencoded (Facebook Graph API standard format)
+  // attached_media must use bracket notation: attached_media[0], attached_media[1], etc.
+  const feedResponse = await graphPost(
+    `/${pageId}/feed`,
+    feedParams,
+    accessToken
+  );
+
+  if (feedResponse.error || !feedResponse.id) {
+    const errorMessage = extractGraphApiErrorMessage(feedResponse.error);
+    const fullMessage = `Failed to create FB carousel: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., rate limiting)
+    if (isRetryableError(feedResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, feedResponse.error);
+    }
+    
+    throw new Error(fullMessage);
+  }
+
+  const postId = feedResponse.id;
+
+  // 3. Verify post was published and get permalink
+  logger.info({ postId }, "Verifying Facebook carousel was published");
+  const verification = await verifyFacebookPostPublished(postId, accessToken);
+  
+  if (!verification.exists) {
+    throw new Error("Facebook carousel was not successfully published or is not accessible");
+  }
+
+  // Get permalink
+  let permalink = verification.permalink || "";
+  if (!permalink) {
+    try {
+      const postDetails = await graphGet(
+        `/${postId}`,
+        { fields: "permalink_url" },
+        accessToken
+      );
+      permalink = postDetails.permalink_url || "";
+    } catch (error) {
+      logger.warn({ postId, error }, "Failed to get carousel permalink");
+    }
+  }
+
+  return {
+    postId,
+    permalink,
+  };
+}
+
+/**
  * Publish a LINK to Facebook Page
  */
 async function publishFacebookLink(
@@ -234,9 +405,15 @@ async function publishFacebookLink(
   );
 
   if (postResponse.error || !postResponse.id) {
-    throw new Error(
-      `Failed to post FB link: ${extractGraphApiErrorMessage(postResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(postResponse.error);
+    const fullMessage = `Failed to post FB link: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., rate limiting)
+    if (isRetryableError(postResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, postResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const postId = postResponse.id;
@@ -360,9 +537,16 @@ async function publishFacebookPhotoStory(
       },
       "Facebook photo upload failed"
     );
-      throw new Error(
-        `Failed to upload photo for story: ${extractGraphApiErrorMessage(uploadResponse.error)}`
-      );
+    
+    const errorMessage = extractGraphApiErrorMessage(uploadResponse.error);
+    const fullMessage = `Failed to upload photo for story: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready, rate limiting)
+    if (isRetryableError(uploadResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, uploadResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const photoId = uploadResponse.id;
@@ -401,7 +585,14 @@ async function publishFacebookPhotoStory(
                     `Facebook error (code: ${error.code}): ${JSON.stringify(error)}`;
     }
 
-    throw new Error(`Failed to post FB photo story: ${errorMessage}`);
+    const fullMessage = `Failed to post FB photo story: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready, rate limiting)
+    if (isRetryableError(storyResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, storyResponse.error);
+    }
+
+    throw new Error(fullMessage);
   }
 
   // Facebook Story API returns post_id directly for stories
@@ -498,7 +689,15 @@ async function publishFacebookVideoStoryResumable(
     );
 
     if (startResponse.error || !startResponse.id) {
-      throw new Error(`Failed to start resumable upload: ${extractGraphApiErrorMessage(startResponse.error)}`);
+      const errorMessage = extractGraphApiErrorMessage(startResponse.error);
+      const fullMessage = `Failed to start resumable upload: ${errorMessage}`;
+      
+      // Check if this is a retryable error (e.g., rate limiting)
+      if (isRetryableError(startResponse.error)) {
+        throw new RetryablePublicationError(fullMessage, startResponse.error);
+      }
+      
+      throw new Error(fullMessage);
     }
 
     const uploadSessionId = startResponse.id.replace('upload:', '');
@@ -559,9 +758,16 @@ async function publishFacebookVideoStoryResumable(
         },
         "Facebook video story with file handle failed"
       );
-      throw new Error(
-        `Failed to create video story with file handle: ${extractGraphApiErrorMessage(storyResponse.error)}`
-      );
+      
+      const errorMessage = extractGraphApiErrorMessage(storyResponse.error);
+      const fullMessage = `Failed to create video story with file handle: ${errorMessage}`;
+      
+      // Check if this is a retryable error (e.g., media not ready, rate limiting)
+      if (isRetryableError(storyResponse.error)) {
+        throw new RetryablePublicationError(fullMessage, storyResponse.error);
+      }
+      
+      throw new Error(fullMessage);
     }
 
     // Facebook Video Story API may return different response formats
@@ -614,9 +820,16 @@ async function publishFacebookVideoStoryStandard(
       },
       "Facebook video story start failed"
     );
-    throw new Error(
-      `Failed to start video story upload: ${extractGraphApiErrorMessage(startResponse.error)}`
-    );
+    
+    const errorMessage = extractGraphApiErrorMessage(startResponse.error);
+    const fullMessage = `Failed to start video story upload: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., rate limiting)
+    if (isRetryableError(startResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, startResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const videoId = startResponse.video_id;
@@ -677,9 +890,16 @@ async function publishFacebookVideoStoryStandard(
       },
       "Facebook video story finish failed"
     );
-    throw new Error(
-      `Failed to finish video story: ${extractGraphApiErrorMessage(finishResponse.error)}`
-    );
+    
+    const errorMessage = extractGraphApiErrorMessage(finishResponse.error);
+    const fullMessage = `Failed to finish video story: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready, rate limiting)
+    if (isRetryableError(finishResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, finishResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   // Facebook Video Story API may return different response formats
@@ -768,6 +988,16 @@ async function processFacebookPublishJob(job: Job<PublishJobData>): Promise<void
   // 7. Execute publish based on content type
   const payload = publication.payloadJson as FacebookPublicationPayload;
 
+  logger.info(
+    { 
+      publicationId, 
+      contentType: payload.contentType, 
+      payloadKeys: Object.keys(payload),
+      fullPayload: JSON.stringify(payload, null, 2)
+    },
+    "Publication payload received"
+  );
+
   try {
     let result: { postId: string; permalink: string };
 
@@ -776,6 +1006,14 @@ async function processFacebookPublishJob(job: Job<PublishJobData>): Promise<void
         result = await publishFacebookPhoto(
           pageId,
           payload as FacebookPublicationPayload & { contentType: "PHOTO" },
+          credentials.accessToken
+        );
+        break;
+
+      case "CAROUSEL":
+        result = await publishFacebookCarousel(
+          pageId,
+          payload as FacebookPublicationPayload & { contentType: "CAROUSEL" },
           credentials.accessToken
         );
         break;

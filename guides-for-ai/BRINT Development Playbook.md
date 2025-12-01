@@ -351,7 +351,8 @@ GÖREV: Yeni bir domain/feature geliştir: <DOMAIN_ADI_KOY>
   - ActivityEventType union’ına yeni event type’larını ekle.
   - Başarılı create/update/delete ve önemli sistem aksiyonlarında logActivity çağır.
 - Queue & worker gerekiyorsa:
-  - Mevcut BullMQ pattern’lerini (email.queue.ts) referans al.
+  - Mevcut BullMQ pattern'lerini (email.queue.ts) referans al.
+  - Publication worker'ları için: `publication-worker-retryable-errors.md` rehberini takip et.
   - İşlerin hem success hem failure senaryolarında ActivityEvent yaz.
 - WebSocket gerekiyorsa:
   - core/realtime/events.ts içine event type ekle.

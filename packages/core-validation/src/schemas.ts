@@ -416,7 +416,7 @@ export type InstagramPublicationPayload = z.infer<typeof instagramPublicationPay
 /**
  * Facebook content type enum
  */
-export const facebookContentTypeEnum = z.enum(['PHOTO', 'VIDEO', 'LINK', 'STORY']);
+export const facebookContentTypeEnum = z.enum(['PHOTO', 'CAROUSEL', 'VIDEO', 'LINK', 'STORY']);
 
 export type FacebookContentType = z.infer<typeof facebookContentTypeEnum>;
 
@@ -435,6 +435,25 @@ const facebookPhotoPayload = facebookPayloadBase.extend({
   contentType: z.literal('PHOTO'),
   imageMediaId: mediaIdSchema,
   altText: z.string().max(1000, 'validation.facebook.altText.max').optional(),
+});
+
+/**
+ * Facebook CAROUSEL item schema
+ */
+const facebookCarouselItemSchema = z.object({
+  mediaId: mediaIdSchema,
+  type: z.enum(['IMAGE', 'VIDEO']),
+  altText: z.string().max(1000, 'validation.facebook.altText.max').optional(),
+});
+
+/**
+ * Facebook CAROUSEL payload
+ */
+const facebookCarouselPayload = facebookPayloadBase.extend({
+  contentType: z.literal('CAROUSEL'),
+  items: z.array(facebookCarouselItemSchema)
+    .min(2, 'validation.facebook.carousel.items.min')
+    .max(10, 'validation.facebook.carousel.items.max'),
 });
 
 /**
@@ -488,6 +507,7 @@ const facebookStoryPayload = z.object({
  */
 export const facebookPublicationPayloadSchema = z.union([
   facebookPhotoPayload,
+  facebookCarouselPayload,
   facebookVideoPayload,
   facebookLinkPayload,
   facebookStoryPayload,

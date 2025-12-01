@@ -24,6 +24,8 @@ import {
   waitForStatus,
   verifyInstagramPostPublished,
   extractGraphApiErrorMessage,
+  isRetryableError,
+  RetryablePublicationError,
   type GraphApiResponse,
   type MediaResponse,
 } from "./graph-api.utils.js";
@@ -104,9 +106,15 @@ async function publishInstagramImage(
   );
 
   if (containerResponse.error || !containerResponse.id) {
-    throw new Error(
-      `Failed to create IG media container: ${extractGraphApiErrorMessage(containerResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(containerResponse.error);
+    const fullMessage = `Failed to create IG media container: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(containerResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, containerResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const containerId = containerResponse.id;
@@ -119,9 +127,15 @@ async function publishInstagramImage(
   );
 
   if (publishResponse.error || !publishResponse.id) {
-    throw new Error(
-      `Failed to publish IG media: ${extractGraphApiErrorMessage(publishResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(publishResponse.error);
+    const fullMessage = `Failed to publish IG media: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(publishResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, publishResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const mediaId = publishResponse.id;
@@ -192,9 +206,15 @@ async function publishInstagramCarousel(
     );
 
     if (childResponse.error || !childResponse.id) {
-      throw new Error(
-        `Failed to create carousel child: ${extractGraphApiErrorMessage(childResponse.error)}`
-      );
+      const errorMessage = extractGraphApiErrorMessage(childResponse.error);
+      const fullMessage = `Failed to create carousel child: ${errorMessage}`;
+      
+      // Check if this is a retryable error (e.g., media not ready)
+      if (isRetryableError(childResponse.error)) {
+        throw new RetryablePublicationError(fullMessage, childResponse.error);
+      }
+      
+      throw new Error(fullMessage);
     }
 
     childIds.push(childResponse.id);
@@ -220,9 +240,15 @@ async function publishInstagramCarousel(
   );
 
   if (containerResponse.error || !containerResponse.id) {
-    throw new Error(
-      `Failed to create carousel container: ${extractGraphApiErrorMessage(containerResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(containerResponse.error);
+    const fullMessage = `Failed to create carousel container: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(containerResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, containerResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const containerId = containerResponse.id;
@@ -235,9 +261,15 @@ async function publishInstagramCarousel(
   );
 
   if (publishResponse.error || !publishResponse.id) {
-    throw new Error(
-      `Failed to publish carousel: ${extractGraphApiErrorMessage(publishResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(publishResponse.error);
+    const fullMessage = `Failed to publish carousel: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(publishResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, publishResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const mediaId = publishResponse.id;
@@ -314,9 +346,15 @@ async function publishInstagramReel(
   );
 
   if (containerResponse.error || !containerResponse.id) {
-    throw new Error(
-      `Failed to create reel container: ${extractGraphApiErrorMessage(containerResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(containerResponse.error);
+    const fullMessage = `Failed to create reel container: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(containerResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, containerResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const containerId = containerResponse.id;
@@ -360,9 +398,15 @@ async function publishInstagramReel(
   );
 
   if (publishResponse.error || !publishResponse.id) {
-    throw new Error(
-      `Failed to publish reel: ${extractGraphApiErrorMessage(publishResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(publishResponse.error);
+    const fullMessage = `Failed to publish reel: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(publishResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, publishResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const mediaId = publishResponse.id;
@@ -450,9 +494,15 @@ async function publishInstagramStory(
   );
 
   if (containerResponse.error || !containerResponse.id) {
-    throw new Error(
-      `Failed to create story container: ${extractGraphApiErrorMessage(containerResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(containerResponse.error);
+    const fullMessage = `Failed to create story container: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(containerResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, containerResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const containerId = containerResponse.id;
@@ -512,9 +562,15 @@ async function publishInstagramStory(
       error: publishResponse.error,
     }, "Instagram story publish failed");
 
-    throw new Error(
-      `Failed to publish story: ${extractGraphApiErrorMessage(publishResponse.error)}`
-    );
+    const errorMessage = extractGraphApiErrorMessage(publishResponse.error);
+    const fullMessage = `Failed to publish story: ${errorMessage}`;
+    
+    // Check if this is a retryable error (e.g., media not ready)
+    if (isRetryableError(publishResponse.error)) {
+      throw new RetryablePublicationError(fullMessage, publishResponse.error);
+    }
+    
+    throw new Error(fullMessage);
   }
 
   const storyMediaId = publishResponse.id;

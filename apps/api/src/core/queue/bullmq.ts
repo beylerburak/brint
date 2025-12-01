@@ -55,6 +55,31 @@ export function createWorker<T = any>(
   });
 
   worker.on("failed", (job, err) => {
+    // Check if this is a retryable error
+    const isRetryable = (err as any).isRetryable === true;
+    const attemptsMade = job?.attemptsMade ?? 0;
+    const maxAttempts = job?.opts?.attempts ?? 3;
+    const isMaxAttemptsReached = attemptsMade >= maxAttempts;
+    
+    // Log level depends on whether it's retryable and if max attempts reached
+    if (isRetryable && !isMaxAttemptsReached) {
+      // Retryable error with attempts remaining - log as warning, don't send to Sentry
+      logger.warn(
+        {
+          queue: name,
+          jobId: job?.id,
+          jobName: job?.name,
+          error: err.message,
+          attemptsMade,
+          maxAttempts,
+          willRetry: true,
+        },
+        "Job failed (retryable, will retry)"
+      );
+      return;
+    }
+    
+    // Non-retryable error or max attempts reached - log as error and send to Sentry
     logger.error(
       {
         queue: name,
@@ -62,16 +87,22 @@ export function createWorker<T = any>(
         jobName: job?.name,
         error: err.message,
         stack: err.stack,
+        attemptsMade,
+        maxAttempts,
+        isRetryable,
       },
       "Job failed"
     );
 
-    // Send to Sentry if initialized
+    // Send to Sentry only for non-retryable errors or after max attempts
     if (isSentryInitialized()) {
       captureException(err, {
         queue: name,
         jobId: job?.id?.toString(),
         jobName: job?.name,
+        attemptsMade,
+        maxAttempts,
+        isRetryable,
       });
     }
   });

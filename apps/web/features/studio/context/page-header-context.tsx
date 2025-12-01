@@ -76,26 +76,22 @@ export function useStudioPageHeaderConfig(): StudioPageHeaderConfig | null {
  * }), [handleAction]);
  * useStudioPageHeader(headerConfig);
  */
-export function useStudioPageHeader(config: StudioPageHeaderConfig) {
-  const { setConfig } = useStudioPageHeaderContext();
+export function useStudioPageHeader(config: StudioPageHeaderConfig | null) {
+  const { setConfig, configRef } = useStudioPageHeaderContext();
   
-  // Track the current page's config identity
-  const prevConfigRef = React.useRef<StudioPageHeaderConfig | null>(null);
-
-  // Update config when it changes (by reference)
+  // Combined effect: set config on mount/update, clear on unmount
+  // This handles React Strict Mode correctly by always setting config on mount
   React.useEffect(() => {
-    // Only update if this is a new config reference
-    if (prevConfigRef.current !== config) {
-      prevConfigRef.current = config;
+    // Always set config on mount/update
+    // Check current context value, not a local ref, to handle Strict Mode re-mounts
+    if (configRef.current !== config) {
       setConfig(config);
     }
-  }, [config, setConfig]);
-
-  // Clean up on unmount
-  React.useEffect(() => {
+    
+    // Clean up on unmount
     return () => {
       setConfig(null);
     };
-  }, [setConfig]);
+  }, [config, setConfig, configRef]);
 }
 

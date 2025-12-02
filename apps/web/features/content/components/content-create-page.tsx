@@ -2,11 +2,6 @@
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +24,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ExternalLink, AlertTriangle, GripVertical, Save } from "lucide-react";
 import { useStudioPageHeader } from "@/features/studio/context";
 import { useStudioBrand } from "@/features/studio/hooks";
@@ -66,6 +62,7 @@ import {
   mapSocialPlatformToPlatformId,
 } from "@/shared/content/content-type-matrix";
 import * as TagsInput from "@diceui/tags-input";
+import { ContentPreview } from "@/components/generic/content-preview";
 
 // Platform display order constant
 const PLATFORM_ORDER: PlatformId[] = ["instagram", "facebook", "tiktok", "x", "youtube", "linkedin", "pinterest"];
@@ -104,6 +101,26 @@ const CONTENT_TYPES: Array<{
 ] as const;
 
 /**
+ * Helper function to get dynamic accordion title based on platform and content type
+ */
+const getAccordionTitle = (platform: SocialPlatform, contentType: AppContentType): string => {
+  const platformInfo = PLATFORM_INFO[platform];
+  const platformName = platformInfo?.shortName || platform;
+
+  // Map content types to platform-specific display names
+  const contentTypeLabels: Record<AppContentType, string> = {
+    single_post: "Post",
+    carousel: "Carousel",
+    vertical_video: "Reel",
+    story: "Story"
+  };
+
+  const contentLabel = contentTypeLabels[contentType] || contentType;
+
+  return `${platformName} ${contentLabel}`;
+};
+
+/**
  * Content Create Page Layout
  *
  * A resizable two-panel layout for creating new content:
@@ -111,6 +128,7 @@ const CONTENT_TYPES: Array<{
  * - Right panel (40%): Preview placeholder
  */
 interface SelectedMedia {
+  id: string; // Unique ID for each media item
   file: File;
   previewUrl: string;
   mediaId?: string;
@@ -141,6 +159,26 @@ export function ContentCreatePage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [draggedMediaIndex, setDraggedMediaIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Store blob URLs separately to prevent them from being lost during drag operations
+  const blobUrlsRef = React.useRef<Map<string, string>>(new Map());
+
+  // Separate state for preview media to prevent unnecessary re-renders
+  const [previewMedia, setPreviewMedia] = useState<Array<{url: string, type: "image" | "video"}>>([]);
+
+  // Update preview media when selectedMedia changes
+  React.useEffect(() => {
+    const newPreviewMedia = selectedMedia.map((media) => {
+      const preservedUrl = blobUrlsRef.current.get(media.id) || media.previewUrl;
+      console.log('Updating preview media - ID:', media.id, 'URL:', preservedUrl);
+      return {
+        url: preservedUrl,
+        type: media.file.type.startsWith("video/") ? "video" as const : "image" as const,
+      };
+    });
+    setPreviewMedia(newPreviewMedia);
+  }, [selectedMedia]);
 
   // Router for navigation
   const router = useRouter();
@@ -323,8 +361,16 @@ export function ContentCreatePage() {
       
       // Create blob URL for preview
       const previewUrl = URL.createObjectURL(file);
-      
+
+      // Generate unique ID for this media item
+      const mediaId = `${file.name}-${file.lastModified}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Store blob URL in ref to prevent loss during drag operations
+      blobUrlsRef.current.set(mediaId, previewUrl);
+      console.log('Created blob URL for', mediaId, previewUrl);
+
       newMedia.push({
+        id: mediaId,
         file,
         previewUrl,
       });
@@ -354,27 +400,47 @@ export function ContentCreatePage() {
 
   const handleMediaDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedMediaIndex === null || draggedMediaIndex === index) return;
+    if (draggedMediaIndex === null || draggedMediaIndex === index) {
+      setDragOverIndex(null);
+      return;
+    }
+    setDragOverIndex(index);
   };
 
   const handleMediaDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     if (draggedMediaIndex === null || draggedMediaIndex === targetIndex) {
       setDraggedMediaIndex(null);
+      setDragOverIndex(null);
       return;
     }
 
+    // Reorder media array without losing blob URLs
     setSelectedMedia((prev) => {
       const newMedia = [...prev];
-      const [draggedItem] = newMedia.splice(draggedMediaIndex, 1);
-      newMedia.splice(targetIndex, 0, draggedItem);
+      const draggedItem = newMedia[draggedMediaIndex];
+
+      // Remove dragged item
+      newMedia.splice(draggedMediaIndex, 1);
+
+      // Insert at target position with preserved blob URL
+      const preservedUrl = blobUrlsRef.current.get(draggedItem.id) || draggedItem.previewUrl;
+      console.log('Drag drop - dragged item ID:', draggedItem.id, 'preserved URL:', preservedUrl);
+      const preservedItem = {
+        ...draggedItem,
+        previewUrl: preservedUrl
+      };
+      newMedia.splice(targetIndex, 0, preservedItem);
+
       return newMedia;
     });
     setDraggedMediaIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleMediaDragEnd = () => {
     setDraggedMediaIndex(null);
+    setDragOverIndex(null);
   };
 
   // Handle file upload (will be called when posting)
@@ -453,17 +519,22 @@ export function ContentCreatePage() {
   const handleRemoveMedia = (mediaItem: SelectedMedia) => {
     // Revoke blob URL to free memory
     URL.revokeObjectURL(mediaItem.previewUrl);
+    // Remove from blob URLs ref
+    blobUrlsRef.current.delete(mediaItem.id);
     setSelectedMedia((prev) => prev.filter((item) => item !== mediaItem));
   };
 
-  // Cleanup blob URLs on unmount
+  // Cleanup blob URLs on unmount only
   useEffect(() => {
+    const blobUrls = blobUrlsRef.current;
     return () => {
-      selectedMedia.forEach((media) => {
-        URL.revokeObjectURL(media.previewUrl);
+      // Revoke all blob URLs from the ref on unmount
+      blobUrls.forEach((url) => {
+        URL.revokeObjectURL(url);
       });
+      blobUrls.clear();
     };
-  }, [selectedMedia]);
+  }, []); // Empty dependency - only cleanup on unmount
 
   // Filter accounts based on selected content type and sort by platform order
   const filteredAccounts = useMemo(() => {
@@ -1248,20 +1319,19 @@ export function ContentCreatePage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Main Resizable Area - Edge to edge */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      {/* Main Area - Fixed split */}
+      <div className="flex-1 flex">
         {/* Left Panel - Content Settings */}
-        <ResizablePanel defaultSize={60} minSize={40}>
-          <div className="flex h-full flex-col border-r">
-            <div className="h-full space-y-6 overflow-y-auto px-6 py-6">
-                  {/* Title */}
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Title</Label>
-                    <Input id="title" placeholder="Summer campaign launch post" />
-                  </div>
+        <div className="flex-1 flex flex-col border-r">
+          <div className="h-full space-y-6 overflow-y-auto px-6 py-6">
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input id="title" placeholder="Summer campaign launch post" />
+            </div>
 
-                  {/* Content Type - Card Selection */}
-                  <div className="space-y-3">
+            {/* Content Type - Card Selection */}
+            <div className="space-y-3">
                     <Label>Content type</Label>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {CONTENT_TYPES.map((type) => (
@@ -1504,25 +1574,46 @@ export function ContentCreatePage() {
                           </div>
                         </label>
                       ) : (
-                        <div 
-                          className="grid grid-cols-2 gap-3"
+                        <div
+                          className="flex flex-wrap gap-2"
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
                         >
                           {selectedMedia.map((media, index) => {
                             const isVideo = media.file.type.startsWith("video/");
+
+                            // Calculate visual position during drag
+                            let visualIndex = index;
+                            if (draggedMediaIndex !== null && dragOverIndex !== null && draggedMediaIndex !== dragOverIndex) {
+                              if (draggedMediaIndex < dragOverIndex) {
+                                // Dragging right
+                                if (index > draggedMediaIndex && index <= dragOverIndex) {
+                                  visualIndex = index - 1;
+                                }
+                              } else {
+                                // Dragging left
+                                if (index < draggedMediaIndex && index >= dragOverIndex) {
+                                  visualIndex = index + 1;
+                                }
+                              }
+                            }
+
                             return (
                               <div
-                                key={index}
+                                key={media.id} // More stable key
                                 draggable
                                 onDragStart={() => handleMediaDragStart(index)}
                                 onDragOver={(e) => handleMediaDragOver(e, index)}
                                 onDrop={(e) => handleMediaDrop(e, index)}
                                 onDragEnd={handleMediaDragEnd}
                                 className={cn(
-                                  "group relative rounded-lg border overflow-hidden cursor-grab active:cursor-grabbing",
-                                  draggedMediaIndex === index && "opacity-50 ring-2 ring-primary"
+                                  "group relative rounded-lg border overflow-hidden cursor-grab active:cursor-grabbing w-24 aspect-square transition-transform duration-200",
+                                  draggedMediaIndex === index && "opacity-50 ring-2 ring-primary scale-105 z-10",
+                                  dragOverIndex === index && draggedMediaIndex !== null && "ring-2 ring-blue-500"
                                 )}
+                                style={{
+                                  order: visualIndex
+                                }}
                               >
                                 {/* Drag Handle */}
                                 <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1539,14 +1630,15 @@ export function ContentCreatePage() {
                                 {isVideo ? (
                                   <video
                                     src={media.previewUrl}
-                                    className="w-full h-32 object-cover"
+                                    className="w-full h-full object-cover"
                                     controls={false}
                                   />
                                 ) : (
                                   <img
                                     src={media.previewUrl}
                                     alt={media.file.name}
-                                    className="w-full h-32 object-cover"
+                                    className="w-full h-full object-cover"
+                                    onError={() => console.log('Image failed to load:', media.previewUrl, 'for media ID:', media.id)}
                                   />
                                 )}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
@@ -1573,7 +1665,10 @@ export function ContentCreatePage() {
                           {/* Add more media placeholder */}
                           <label
                             htmlFor="media-upload"
-                            className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed h-32 text-center transition-colors hover:border-primary/50 hover:bg-accent/30 cursor-pointer"
+                            className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed w-24 aspect-square text-center transition-colors hover:border-primary/50 hover:bg-accent/30 cursor-pointer"
+                            style={{
+                              order: selectedMedia.length
+                            }}
                           >
                             <Upload className="h-6 w-6 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">Daha ekle</span>
@@ -1591,7 +1686,7 @@ export function ContentCreatePage() {
 
                   {/* Content Details */}
                   {selectedContentType && (selectedContentType as string) !== "story" && (
-                    <div className="space-y-4">
+                    <>
                       <div
                         role="button"
                         tabIndex={0}
@@ -1676,116 +1771,115 @@ export function ContentCreatePage() {
                         </div>
                       </div>
 
-                    {customizePerPlatform && selectedContentType && (selectedContentType as string) !== "story" ? (
-                      // Platform-specific tabs
-                      selectedPlatforms.length > 0 ? (
-                        <Tabs defaultValue={selectedPlatforms[0]?.platformId} className="w-full">
-                          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${selectedPlatforms.length}, minmax(0, 1fr))` }}>
+                      {customizePerPlatform ? (
+                        // Platform-specific tabs
+                        selectedPlatforms.length > 0 ? (
+                          <Tabs defaultValue={selectedPlatforms[0]?.platformId} className="w-full">
+                            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${selectedPlatforms.length}, minmax(0, 1fr))` }}>
+                              {selectedPlatforms.map(({ platformId, accounts }) => {
+                                const account = accounts[0];
+                                const platformInfo = account
+                                  ? PLATFORM_INFO[account.platform]
+                                  : null;
+                                return (
+                                  <TabsTrigger key={platformId} value={platformId} className="flex items-center gap-2">
+                                    {account && (
+                                      <SocialPlatformIcon platform={account.platform} size={16} />
+                                    )}
+                                    <span className="truncate">
+                                      {platformInfo?.shortName || platformId}
+                                    </span>
+                                  </TabsTrigger>
+                                );
+                              })}
+                            </TabsList>
                             {selectedPlatforms.map(({ platformId, accounts }) => {
                               const account = accounts[0];
                               const platformInfo = account
                                 ? PLATFORM_INFO[account.platform]
                                 : null;
-                              return (
-                                <TabsTrigger key={platformId} value={platformId} className="flex items-center gap-2">
-                                  {account && (
-                                    <SocialPlatformIcon platform={account.platform} size={16} />
-                                  )}
-                                  <span className="truncate">
-                                    {platformInfo?.shortName || platformId}
-                                  </span>
-                                </TabsTrigger>
-                              );
-                            })}
-                          </TabsList>
-                          {selectedPlatforms.map(({ platformId, accounts }) => {
-                            const account = accounts[0];
-                            const platformInfo = account
-                              ? PLATFORM_INFO[account.platform]
-                              : null;
-                            const platformTypeLabel = platformId && selectedContentType
-                              ? getPlatformTypeLabel(selectedContentType, platformId)
-                              : null;
-                            
-                            const formatPlatformTypeLabel = (label: string | null): string => {
-                              if (!label) return "";
-                              return label
-                                .split("_")
-                                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                                .join(" ");
-                            };
+                              const platformTypeLabel = platformId && selectedContentType
+                                ? getPlatformTypeLabel(selectedContentType, platformId)
+                                : null;
 
-                            return (
-                              <TabsContent key={platformId} value={platformId} className="mt-4">
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Label htmlFor={`caption-${platformId}`}>
-                                      {platformInfo?.shortName || platformId} Metni
-                                    </Label>
-                                    {platformTypeLabel && (
-                                      <Badge variant="outline" className="text-xs h-5 px-1.5 font-normal">
-                                        {formatPlatformTypeLabel(platformTypeLabel)}
-                                      </Badge>
-                                    )}
-                                  </div>
+                              const formatPlatformTypeLabel = (label: string | null): string => {
+                                if (!label) return "";
+                                return label
+                                  .split("_")
+                                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                                  .join(" ");
+                              };
+
+                              return (
+                                <TabsContent key={platformId} value={platformId} className="mt-4">
                                   <div className="space-y-2">
-                                    <Textarea
-                                      id={`caption-${platformId}`}
-                                      rows={5}
-                                      placeholder={`${platformInfo?.shortName || platformId} için metin yazın...`}
-                                      value={platformCaptions[platformId] || ""}
-                                      onChange={(e) => {
-                                        setPlatformCaptions((prev) => ({
-                                          ...prev,
-                                          [platformId]: e.target.value,
-                                        }));
-                                      }}
-                                    />
-                                    <CaptionEditorExtensions
-                                      value={platformCaptions[platformId] || ""}
-                                      onEmojiSelect={(emoji) => {
-                                        const currentValue = platformCaptions[platformId] || "";
-                                        const textarea = document.getElementById(`caption-${platformId}`) as HTMLTextAreaElement;
-                                        if (textarea) {
-                                          const start = textarea.selectionStart;
-                                          const end = textarea.selectionEnd;
-                                          const newValue =
-                                            currentValue.substring(0, start) +
-                                            emoji +
-                                            currentValue.substring(end);
+                                    <div className="flex items-center gap-2">
+                                      <Label htmlFor={`caption-${platformId}`}>
+                                        {platformInfo?.shortName || platformId} Metni
+                                      </Label>
+                                      {platformTypeLabel && (
+                                        <Badge variant="outline" className="text-xs h-5 px-1.5 font-normal">
+                                          {formatPlatformTypeLabel(platformTypeLabel)}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Textarea
+                                        id={`caption-${platformId}`}
+                                        rows={5}
+                                        placeholder={`${platformInfo?.shortName || platformId} için metin yazın...`}
+                                        value={platformCaptions[platformId] || ""}
+                                        onChange={(e) => {
                                           setPlatformCaptions((prev) => ({
                                             ...prev,
-                                            [platformId]: newValue,
+                                            [platformId]: e.target.value,
                                           }));
-                                          // Restore cursor position
-                                          setTimeout(() => {
-                                            textarea.focus();
-                                            textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-                                          }, 0);
-                                        }
-                                      }}
-                                    />
+                                        }}
+                                      />
+                                      <CaptionEditorExtensions
+                                        value={platformCaptions[platformId] || ""}
+                                        onEmojiSelect={(emoji) => {
+                                          const currentValue = platformCaptions[platformId] || "";
+                                          const textarea = document.getElementById(`caption-${platformId}`) as HTMLTextAreaElement;
+                                          if (textarea) {
+                                            const start = textarea.selectionStart;
+                                            const end = textarea.selectionEnd;
+                                            const newValue =
+                                              currentValue.substring(0, start) +
+                                              emoji +
+                                              currentValue.substring(end);
+                                            setPlatformCaptions((prev) => ({
+                                              ...prev,
+                                              [platformId]: newValue,
+                                            }));
+                                            // Restore cursor position
+                                            setTimeout(() => {
+                                              textarea.focus();
+                                              textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+                                            }, 0);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    {accounts.length > 1 && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Bu metin {accounts.length} hesap için kullanılacak
+                                      </p>
+                                    )}
                                   </div>
-                                  {accounts.length > 1 && (
-                                    <p className="text-xs text-muted-foreground">
-                                      Bu metin {accounts.length} hesap için kullanılacak
-                                    </p>
-                                  )}
-                                </div>
-                              </TabsContent>
-                            );
-                          })}
-                        </Tabs>
+                                </TabsContent>
+                              );
+                            })}
+                          </Tabs>
+                        ) : (
+                          <div className="rounded-xl border border-dashed p-6 text-center">
+                            <p className="text-sm text-muted-foreground">
+                              Platform özelleştirmesi için önce hesap seçin
+                            </p>
+                          </div>
+                        )
                       ) : (
-                        <div className="rounded-xl border border-dashed p-6 text-center">
-                          <p className="text-sm text-muted-foreground">
-                            Platform özelleştirmesi için önce hesap seçin
-                          </p>
-                        </div>
-                      )
-                    ) : (
-                      // Base caption (common for all platforms) - Hidden for story content type
-                      selectedContentType && (selectedContentType as string) !== "story" && (
+                        // Base caption (common for all platforms)
                         <div className="space-y-2">
                           <Label htmlFor="caption">Base caption</Label>
                           <div className="space-y-2">
@@ -1810,9 +1904,9 @@ export function ContentCreatePage() {
                                   setBaseCaption(newValue);
                                   // Restore cursor position
                                   setTimeout(() => {
-                                    textarea.focus();
-                                    textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-                                  }, 0);
+                                      textarea.focus();
+                                      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+                                    }, 0);
                                 }
                               }}
                             />
@@ -1822,9 +1916,8 @@ export function ContentCreatePage() {
                             base copy.
                           </p>
                         </div>
-                      )
-                    )}
-                    </div>
+                      )}
+                    </>
                   )}
 
                   {/* Scheduling Box - Commented out, moved to header button group */}
@@ -1942,32 +2035,79 @@ export function ContentCreatePage() {
                       </p>
                     </TagsInput.Root>
                   </div>
+          </div>
+        </div>
+
+        {/* Right Panel - Preview (Fixed width) */}
+        <div className="w-[400px] flex flex-col border-l bg-muted/30 shrink-0">
+          <div className="flex-1 p-6 overflow-y-auto">
+              {selectedAccountsList.length > 0 && selectedContentType ? (
+                <Accordion type="multiple" defaultValue={selectedPlatforms.map(({ platformId }) => platformId)} className="space-y-4">
+                  {selectedPlatforms.map(({ platformId, accounts }) => {
+                    const account = accounts[0];
+                    if (!account) return null;
+
+                    // Get caption for this platform
+                    const getCaption = (): string => {
+                      if (customizePerPlatform && platformCaptions[platformId]) {
+                        return platformCaptions[platformId];
+                      }
+                      return baseCaption;
+                    };
+
+                    // Use the stable previewMedia state
+
+                    // Get platform info
+                    const platformInfo = PLATFORM_INFO[account.platform];
+                    const platformName = platformInfo?.name || platformId;
+
+                    return (
+                      <AccordionItem key={platformId} value={platformId} className="border-none">
+                        <AccordionTrigger className="px-0 hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <SocialPlatformIcon platform={account.platform} size={20} />
+                            <span className="font-semibold text-sm">
+                              {getAccordionTitle(account.platform, selectedContentType)}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 flex justify-center">
+                          <div className="w-full max-w-[320px]">
+                            <ContentPreview
+                              platform={platformId}
+                              socialAccount={{
+                                displayName: account.displayName,
+                                username: account.username,
+                                avatarUrl: account.avatarUrl,
+                                platform: account.platform,
+                                isVerified: false, // TODO: Add verified status to account
+                              }}
+                              contentType={selectedContentType}
+                              caption={getCaption()}
+                              media={previewMedia}
+                              maxWidth={320}
+                            />
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                  
+                  {selectedPlatforms.length === 0 && (
+                    <div className="flex h-full items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+                      Select accounts to see preview
+                    </div>
+                  )}
+                </Accordion>
+              ) : (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+                  {!selectedContentType && "Select content type to see preview"}
+                  {selectedContentType && selectedAccountsList.length === 0 && "Select accounts to see preview"}
                 </div>
+              )}
           </div>
-        </ResizablePanel>
-
-        {/* Handle */}
-        <ResizableHandle withHandle />
-
-        {/* Right Panel - Preview Placeholder */}
-        <ResizablePanel defaultSize={40} minSize={25}>
-          <div className="flex h-full flex-col">
-            <div className="border-b px-6 py-4">
-              <h2 className="text-sm font-medium">Preview</h2>
-              <p className="text-xs text-muted-foreground">
-                Platform-specific preview will be rendered here.
-              </p>
-            </div>
-
-            <div className="flex-1 p-6">
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
-                Preview area (TODO) — connect this with the content preview UI
-                later.
-              </div>
-            </div>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </div>
+      </div>
     </div>
   );
 }

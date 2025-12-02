@@ -4,4 +4,5 @@
 
 export { ContentCreatePage } from "./content-create-page";
 export { CaptionEditorExtensions } from "./caption-editor-extensions";
+export { ContentCard, type ContentCardProps } from "./content-card";
 

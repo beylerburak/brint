@@ -131,12 +131,15 @@ export interface PublicationListItem {
   contentType: string;
   status: string;
   caption: string | null;
+  socialAccountId: string;
+  payloadJson?: any;
+  mediaThumbnails?: string[];
+  mediaUrls?: string[];
   scheduledAt: string | null;
   publishedAt: string | null;
   failedAt: string | null;
   permalink: string | null;
   externalPostId: string | null;
-  socialAccountId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -277,11 +280,13 @@ export async function listPublications(
   options?: {
     limit?: number;
     cursor?: string;
+    status?: string;
   }
 ): Promise<ListPublicationsResponse> {
   const params = new URLSearchParams();
   if (options?.limit) params.append('limit', options.limit.toString());
   if (options?.cursor) params.append('cursor', options.cursor);
+  if (options?.status) params.append('status', options.status);
 
   const query = params.toString() ? `?${params.toString()}` : '';
 

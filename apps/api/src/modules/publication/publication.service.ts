@@ -5,7 +5,7 @@
  * Handles scheduling publications, validation, and queue integration.
  */
 
-import type { Publication } from "@prisma/client";
+import type { Publication, PublicationStatus } from "@prisma/client";
 import type { FastifyRequest } from "fastify";
 import { publicationRepository } from "./publication.repository.js";
 import {
@@ -566,6 +566,7 @@ export interface ListPublicationsParams {
   brandId: string;
   limit?: number;
   cursor?: string | null;
+  status?: PublicationStatus;
 }
 
 export interface ListPublicationsResult {
@@ -579,7 +580,7 @@ export interface ListPublicationsResult {
 export async function listBrandPublications(
   params: ListPublicationsParams
 ): Promise<ListPublicationsResult> {
-  const { workspaceId, brandId, limit = 50, cursor } = params;
+  const { workspaceId, brandId, limit = 50, cursor, status } = params;
 
   // Validate brand exists
   await brandService.getBrand(brandId, workspaceId);
@@ -589,12 +590,113 @@ export async function listBrandPublications(
     brandId,
     limit,
     cursor,
+    status,
   });
 
+  // Extract media IDs from payloadJson and fetch media URLs
+  const items = await Promise.all(
+    result.items.map(async (publication) => {
+      const item = toPublicationListItem(publication);
+      
+      // Extract media IDs from payloadJson
+      const mediaIds = extractMediaIdsFromPayload(publication.payloadJson);
+      
+      if (mediaIds.length > 0) {
+        // Fetch media info from database
+        const { prisma } = await import("../../lib/prisma.js");
+        const { storageConfig } = await import("../../config/storage.config.js");
+        
+        const mediaList = await prisma.media.findMany({
+          where: {
+            id: { in: mediaIds },
+            workspaceId,
+          },
+          select: {
+            id: true,
+            objectKey: true,
+            isPublic: true,
+            variants: true,
+            contentType: true,
+          },
+        });
+
+        console.log(`📸 Publication ${publication.id}: Found ${mediaList.length} media, ${mediaList.filter(m => m.isPublic).length} public`);
+        
+        // Use all media (not just public) for drafts - user should see their own content
+        const baseUrl = storageConfig.cdnBaseUrl || `https://${storageConfig.bucket}.s3.${storageConfig.region}.amazonaws.com`;
+
+        // Generate thumbnail URLs for card preview (small, optimized)
+        item.mediaThumbnails = mediaList.map((m) => {
+          // For videos, use original (no variants)
+          if (m.contentType.startsWith('video/')) {
+            const url = `${baseUrl}/${m.objectKey}`;
+            console.log(`  📹 Video thumbnail: ${url}`);
+            return url;
+          }
+          
+          // For images, prefer thumbnail variant
+          const variants = m.variants as any;
+          if (variants && typeof variants === 'object') {
+            // Try thumbnail first, then sm, fallback to original
+            const variantKey = variants.thumbnail?.objectKey || variants.sm?.objectKey;
+            if (variantKey) {
+              const url = `${baseUrl}/${variantKey}`;
+              console.log(`  🖼️  Image thumbnail (variant): ${url}`);
+              return url;
+            }
+          }
+          
+          // Fallback to original
+          const url = `${baseUrl}/${m.objectKey}`;
+          console.log(`  🖼️  Image thumbnail (original): ${url}`);
+          return url;
+        });
+
+        // Generate original URLs for lightbox (full quality)
+        item.mediaUrls = mediaList.map((m) => `${baseUrl}/${m.objectKey}`);
+      }
+
+      return item;
+    })
+  );
+
   return {
-    items: result.items.map(toPublicationListItem),
+    items,
     nextCursor: result.nextCursor,
   };
+}
+
+/**
+ * Extract media IDs from payloadJson
+ */
+function extractMediaIdsFromPayload(payloadJson: any): string[] {
+  if (!payloadJson || typeof payloadJson !== "object") {
+    return [];
+  }
+
+  const mediaIds: string[] = [];
+
+  // Instagram/Facebook common fields
+  if (payloadJson.imageMediaId) {
+    mediaIds.push(payloadJson.imageMediaId);
+  }
+  if (payloadJson.videoMediaId) {
+    mediaIds.push(payloadJson.videoMediaId);
+  }
+  if (payloadJson.coverMediaId) {
+    mediaIds.push(payloadJson.coverMediaId);
+  }
+
+  // Carousel items
+  if (Array.isArray(payloadJson.items)) {
+    payloadJson.items.forEach((item: any) => {
+      if (item.mediaId) {
+        mediaIds.push(item.mediaId);
+      }
+    });
+  }
+
+  return [...new Set(mediaIds)]; // Remove duplicates
 }
 
 // ====================

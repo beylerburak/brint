@@ -190,6 +190,9 @@ export interface PublicationListItem {
   contentType: PublicationContentType;
   status: PublicationStatus;
   caption: string | null;
+  payloadJson: any | null;
+  mediaThumbnails?: string[];
+  mediaUrls?: string[];
   scheduledAt: Date | null;
   publishedAt: Date | null;
   failedAt: Date | null;
@@ -212,6 +215,7 @@ export function toPublicationListItem(publication: Publication): PublicationList
     contentType: publication.contentType,
     status: publication.status,
     caption: publication.caption,
+    payloadJson: publication.payloadJson,
     scheduledAt: publication.scheduledAt,
     publishedAt: publication.publishedAt,
     failedAt: publication.failedAt,

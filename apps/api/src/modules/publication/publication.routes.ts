@@ -434,6 +434,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
         properties: {
           limit: { type: "number", minimum: 1, maximum: 100 },
           cursor: { type: "string" },
+          status: { type: "string", enum: ["draft", "scheduled", "publishing", "published", "failed", "cancelled"] },
         },
       },
       response: {
@@ -454,6 +455,10 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
                       contentType: { type: "string" },
                       status: { type: "string" },
                       caption: { type: ["string", "null"] },
+                      socialAccountId: { type: "string" },
+                      payloadJson: { type: ["object", "null"] },
+                      mediaThumbnails: { type: "array", items: { type: "string" } },
+                      mediaUrls: { type: "array", items: { type: "string" } },
                       scheduledAt: { type: ["string", "null"] },
                       publishedAt: { type: ["string", "null"] },
                       failedAt: { type: ["string", "null"] },
@@ -477,12 +482,14 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
     const { brandId } = validateParams(brandParamsSchema, request.params);
     const workspaceId = requireWorkspaceMatch(request);
     const { limit, cursor } = validateQuery(cursorPaginationQuerySchema, request.query);
+    const { status } = request.query as { status?: "draft" | "scheduled" | "publishing" | "published" | "failed" | "cancelled" };
 
     const result = await publicationService.listBrandPublications({
       workspaceId,
       brandId,
       limit,
       cursor,
+      status: status as any, // Type assertion to PublicationStatus enum
     });
 
     return reply.send({
@@ -494,6 +501,10 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
           contentType: item.contentType,
           status: item.status,
           caption: item.caption,
+          socialAccountId: item.socialAccountId,
+          payloadJson: item.payloadJson,
+          mediaThumbnails: item.mediaThumbnails || [],
+          mediaUrls: item.mediaUrls || [],
           scheduledAt: item.scheduledAt?.toISOString() ?? null,
           publishedAt: item.publishedAt?.toISOString() ?? null,
           failedAt: item.failedAt?.toISOString() ?? null,

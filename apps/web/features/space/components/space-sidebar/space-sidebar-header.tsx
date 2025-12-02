@@ -26,9 +26,9 @@ export function SpaceSidebarHeader() {
                   className="size-5"
                 />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Agency Management</span>
-                <span className="truncate text-xs">by Beyler Interactive</span>
+              <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
+                <span className="truncate font-semibold">Agency Management</span>
+                <span className="truncate text-[11px] text-muted-foreground">by Beyler Interactive</span>
               </div>
               {state === 'expanded' && (
                 <Button

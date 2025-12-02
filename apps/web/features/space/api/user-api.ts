@@ -11,6 +11,8 @@ export interface UserProfile {
   lastLoginAt: string | null;
   locale: string;
   timezone: string;
+  dateFormat: string;
+  timeFormat: string;
   phone: string | null;
   avatarMediaId: string | null;
   avatarUrl?: string | null;
@@ -50,6 +52,8 @@ export interface UpdateUserProfileRequest {
   username?: string | null;
   locale?: string;
   timezone?: string;
+  dateFormat?: string;
+  timeFormat?: string;
   phone?: string | null;
   completedOnboarding?: boolean;
   avatarMediaId?: string | null;
@@ -67,11 +71,22 @@ export async function updateUserProfile(
     throw new Error(response.message || "Failed to update profile");
   }
 
-  // Invalidate caches after successful update
-  apiCache.invalidate("user:profile");
+  // Update cache with new data instead of invalidating
+  // This prevents unnecessary refetches and provides immediate UI updates
+  const updatedProfile = response.data.data;
+  apiCache.set("user:profile", updatedProfile);
+  
+  // Invalidate session cache (it will refetch and update itself)
   apiCache.invalidate("session:current");
+  
+  // Dispatch custom event to notify components about profile update
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("userProfileUpdated", { 
+      detail: updatedProfile 
+    }));
+  }
 
-  return response.data.data;
+  return updatedProfile;
 }
 
 export async function disconnectGoogleConnection(): Promise<UserProfile> {

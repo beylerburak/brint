@@ -54,23 +54,23 @@ export function StudioSidebar({ workspaceSlug, brand }: StudioSidebarProps) {
       <SidebarContent>
         {/* Quick Actions & Search */}
         <SidebarGroup className="pb-0">
-          <div className="flex gap-2 group-data-[collapsible=icon]:flex-col">
+          <div className="flex gap-1.5 group-data-[collapsible=icon]:flex-col">
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 justify-start gap-2 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+              className="flex-1 justify-start gap-1.5 px-2 text-xs group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
             >
-              <Command className="size-4 shrink-0" />
+              <Command className="size-3.5 shrink-0" />
               <span className="group-data-[collapsible=icon]:hidden">Quick actions</span>
-              <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
+              <Kbd className="ml-auto group-data-[collapsible=icon]:hidden text-[10px] px-1">⌘K</Kbd>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+              className="px-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
             >
-              <Search className="size-4 shrink-0" />
-              <Kbd className="ml-1 group-data-[collapsible=icon]:hidden">/</Kbd>
+              <Search className="size-3.5 shrink-0" />
+              <Kbd className="ml-1 group-data-[collapsible=icon]:hidden text-[10px] px-1">/</Kbd>
             </Button>
           </div>
         </SidebarGroup>

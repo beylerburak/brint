@@ -17,6 +17,9 @@ import {
 import { Eye, Calendar, Edit, Send, MoreVertical, Trash2, Copy, PlusCircle, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/shared/utils";
+import { formatDateTime } from "@/shared/lib/date-time-format";
+import { apiCache } from "@/shared/api/cache";
+import type { UserProfile } from "@/features/space/api/user-api";
 
 export interface ContentCardProps {
   /** Social account information */
@@ -76,17 +79,36 @@ export function ContentCard({
 
   const platformKey = socialAccount.platform as keyof typeof PLATFORM_INFO;
 
-  // Format scheduled date
+  // Get user profile from cache for format preferences
+  const [userProfile, setUserProfile] = React.useState<UserProfile | null>(() => 
+    apiCache.get<UserProfile>("user:profile", 60000) || null
+  );
+  
+  // Listen for user profile updates
+  React.useEffect(() => {
+    const handleProfileUpdate = (event: CustomEvent<UserProfile>) => {
+      setUserProfile(event.detail);
+    };
+    
+    window.addEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    };
+  }, []);
+
+  // Format scheduled date using user preferences
   const formattedDate = React.useMemo(() => {
     if (!scheduledDate) return null;
     try {
       const date = typeof scheduledDate === "string" ? new Date(scheduledDate) : scheduledDate;
       if (isNaN(date.getTime())) return null;
-      return format(date, "MMM d, yyyy 'at' h:mm a");
+      // Use user's preferred date/time format with " at " separator
+      return formatDateTime(date, userProfile?.dateFormat, userProfile?.timeFormat, " at ");
     } catch {
       return null;
     }
-  }, [scheduledDate]);
+  }, [scheduledDate, userProfile?.dateFormat, userProfile?.timeFormat]);
 
   return (
     <>

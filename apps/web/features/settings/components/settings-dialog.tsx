@@ -149,6 +149,7 @@ import { locales, type Locale } from "@/shared/i18n/locales"
 import { WorkspaceMembersTable } from "./workspace-members-table"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { ConnectionCard } from "./connection-card"
+import { DATE_FORMAT_LABELS, TIME_FORMAT_LABELS, type DateFormatKey, type TimeFormatKey } from "@/shared/lib/date-time-format"
 
 // Memoized User Profile Menu Item to prevent unnecessary re-renders
 const UserProfileMenuItem = React.memo<{
@@ -451,6 +452,106 @@ function LanguagePreferenceSelect({
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+function DateFormatPreferenceSelect({
+  currentFormat,
+  onFormatChange,
+}: {
+  currentFormat: string | undefined;
+  onFormatChange: (format: string) => Promise<void>;
+}) {
+  const [isSaving, setIsSaving] = React.useState(false);
+  const t = useTranslations("common");
+
+  const formatOptions: DateFormatKey[] = Object.keys(DATE_FORMAT_LABELS) as DateFormatKey[];
+  const currentFormatKey = (currentFormat || "DD/MM/YYYY") as DateFormatKey;
+  const currentLabel = DATE_FORMAT_LABELS[currentFormatKey] || DATE_FORMAT_LABELS["DD/MM/YYYY"];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
+          disabled={isSaving}
+        >
+          {isSaving ? (t("saving") || "Saving...") : currentLabel}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[240px]" align="end">
+        {formatOptions.map((format) => (
+          <DropdownMenuItem
+            key={format}
+            onClick={async () => {
+              if (format === currentFormatKey) return;
+              setIsSaving(true);
+              try {
+                await onFormatChange(format);
+              } catch (error) {
+                logger.error("Failed to update date format:", error);
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className={currentFormatKey === format ? "bg-accent" : ""}
+          >
+            {DATE_FORMAT_LABELS[format]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TimeFormatPreferenceSelect({
+  currentFormat,
+  onFormatChange,
+}: {
+  currentFormat: string | undefined;
+  onFormatChange: (format: string) => Promise<void>;
+}) {
+  const [isSaving, setIsSaving] = React.useState(false);
+  const t = useTranslations("common");
+
+  const formatOptions: TimeFormatKey[] = Object.keys(TIME_FORMAT_LABELS) as TimeFormatKey[];
+  const currentFormatKey = (currentFormat || "24h") as TimeFormatKey;
+  const currentLabel = TIME_FORMAT_LABELS[currentFormatKey] || TIME_FORMAT_LABELS["24h"];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent rounded-md transition-colors"
+          disabled={isSaving}
+        >
+          {isSaving ? (t("saving") || "Saving...") : currentLabel}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[200px]" align="end">
+        {formatOptions.map((format) => (
+          <DropdownMenuItem
+            key={format}
+            onClick={async () => {
+              if (format === currentFormatKey) return;
+              setIsSaving(true);
+              try {
+                await onFormatChange(format);
+              } catch (error) {
+                logger.error("Failed to update time format:", error);
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className={currentFormatKey === format ? "bg-accent" : ""}
+          >
+            {TIME_FORMAT_LABELS[format]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function TimezonePreferenceSelect({ 
@@ -1878,6 +1979,52 @@ export function SettingsDialog({ children, defaultActiveItem }: SettingsDialogPr
                           toast({
                             title: t("settings.account.preferencesGroup.timezone") || "Timezone",
                             description: t("settings.account.preferencesGroup.timezoneUpdated") || "Timezone preference updated.",
+                          })
+                        }}
+                      />
+                    </div>
+
+                    {/* Date Format */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesGroup.dateFormat") || "Date Format"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesGroup.dateFormatDescription") || "Choose how dates are displayed."}
+                        </p>
+                      </div>
+                      <DateFormatPreferenceSelect
+                        currentFormat={profileUser?.dateFormat}
+                        onFormatChange={async (dateFormat: string) => {
+                          const updated = await updateUserProfile({ dateFormat })
+                          setProfileUser((prev) => prev ? { ...prev, dateFormat: updated.dateFormat } : updated)
+                          toast({
+                            title: t("settings.account.preferencesGroup.dateFormat") || "Date Format",
+                            description: t("settings.account.preferencesGroup.dateFormatUpdated") || "Date format preference updated.",
+                          })
+                        }}
+                      />
+                    </div>
+
+                    {/* Time Format */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium text-foreground block mb-1">
+                          {t("settings.account.preferencesGroup.timeFormat") || "Time Format"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.account.preferencesGroup.timeFormatDescription") || "Choose how times are displayed."}
+                        </p>
+                      </div>
+                      <TimeFormatPreferenceSelect
+                        currentFormat={profileUser?.timeFormat}
+                        onFormatChange={async (timeFormat: string) => {
+                          const updated = await updateUserProfile({ timeFormat })
+                          setProfileUser((prev) => prev ? { ...prev, timeFormat: updated.timeFormat } : updated)
+                          toast({
+                            title: t("settings.account.preferencesGroup.timeFormat") || "Time Format",
+                            description: t("settings.account.preferencesGroup.timeFormatUpdated") || "Time format preference updated.",
                           })
                         }}
                       />

@@ -34,7 +34,7 @@ import { useSidebar } from "@/components/animate-ui/components/radix/sidebar";
 import { presignUpload, finalizeUpload, getMediaConfig, type MediaConfig } from "@/shared/api/media";
 import { createInstagramPublication, createFacebookPublication, createDraftInstagramPublication, createDraftFacebookPublication } from "@/shared/api/publication";
 import { useToast } from "@/components/ui/use-toast";
-import { PLATFORM_INFO } from "@/features/social-account/types";
+import { PLATFORM_INFO, type SocialPlatform } from "@/features/social-account/types";
 import { SocialPlatformIcon } from "@/features/brand/components/social-platform-icon";
 import { CaptionEditorExtensions } from "./caption-editor-extensions";
 import {
@@ -63,6 +63,11 @@ import {
 } from "@/shared/content/content-type-matrix";
 import * as TagsInput from "@diceui/tags-input";
 import { ContentPreview } from "@/components/generic/content-preview";
+import { buildPublishAtISO, getEffectiveTimezone } from "@/shared/lib/timezone";
+import { format } from "date-fns";
+import { formatDateTime } from "@/shared/lib/date-time-format";
+import { apiCache } from "@/shared/api/cache";
+import type { UserProfile } from "@/features/space/api/user-api";
 
 // Platform display order constant
 const PLATFORM_ORDER: PlatformId[] = ["instagram", "facebook", "tiktok", "x", "youtube", "linkedin", "pinterest"];
@@ -150,9 +155,14 @@ export function ContentCreatePage() {
   const [scheduledTime, setScheduledTime] = useState("");
   const [isSchedulePopoverOpen, setIsSchedulePopoverOpen] = useState(false);
   const [scheduleStep, setScheduleStep] = useState<"select" | "datetime">("select");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    scheduledDate ? new Date(scheduledDate) : undefined
-  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
+    if (scheduledDate) {
+      // Parse date safely in local timezone
+      const [year, month, day] = scheduledDate.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    return undefined;
+  });
   const [internalTags, setInternalTags] = useState<string[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [mediaConfig, setMediaConfig] = useState<MediaConfig | null>(null);
@@ -207,7 +217,12 @@ export function ContentCreatePage() {
         hasInitializedDate.current = true;
         // Set the schedule date and enable schedule mode
         setScheduledDate(dateParam);
-        setSelectedDate(new Date(dateParam));
+        
+        // Parse date safely in local timezone
+        // "YYYY-MM-DD" format -> create Date in local timezone
+        const [year, month, day] = dateParam.split('-').map(Number);
+        setSelectedDate(new Date(year, month - 1, day));
+        
         setScheduledTime("10:00"); // Default time
         setScheduleForLater(true);
       }
@@ -239,19 +254,32 @@ export function ContentCreatePage() {
     router.push(`/${workspace?.slug}/studio/${brand?.slug}/contents`);
   }, [router, workspace?.slug, brand?.slug]);
   const [isPublishing, setIsPublishing] = useState(false);
-  // Format selected date and time for display
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => 
+    apiCache.get<UserProfile>("user:profile", 60000) || null
+  );
+  
+  // Listen for user profile updates (e.g., from Settings dialog)
+  useEffect(() => {
+    const handleProfileUpdate = (event: CustomEvent<UserProfile>) => {
+      setUserProfile(event.detail);
+    };
+    
+    window.addEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    };
+  }, []);
+  
+  // Format selected date and time for display using user preferences
   const formattedScheduleText = useMemo(() => {
     if (scheduledDate && scheduledTime) {
       const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
-      return dateTime.toLocaleString('tr-TR', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      // Use user's preferred date/time format
+      return formatDateTime(dateTime, userProfile?.dateFormat, userProfile?.timeFormat);
     }
     return 'Schedule';
-  }, [scheduledDate, scheduledTime]);
+  }, [scheduledDate, scheduledTime, userProfile?.dateFormat, userProfile?.timeFormat]);
 
   // Fetch social accounts for this brand
   const { accounts } = useSocialAccounts({
@@ -636,6 +664,23 @@ export function ContentCreatePage() {
         return;
       }
 
+      // Calculate publishAt for scheduled drafts (optional) using brand timezone
+      let publishAt: string | undefined;
+      if (scheduledDate && scheduledTime) {
+        // Get effective timezone (brand > user > browser)
+        const tz = getEffectiveTimezone(brand?.timezone, undefined);
+        
+        // Build UTC ISO string from local date/time in brand timezone
+        const utcISO = buildPublishAtISO(scheduledDate, scheduledTime, tz);
+        
+        if (utcISO) {
+          publishAt = utcISO;
+          console.log("📅 Creating scheduled draft for:", publishAt, "tz:", tz);
+        } else {
+          console.warn("⚠️ Invalid date/time or timezone for draft:", scheduledDate, scheduledTime, tz);
+        }
+      }
+
       // Get caption (platform-specific or base)
       const getCaption = (account: typeof publishableAccounts[0]): string => {
         const platformId = mapSocialPlatformToPlatformId(account.platform);
@@ -645,7 +690,7 @@ export function ContentCreatePage() {
         return baseCaption;
       };
 
-      // Create draft publications for each account (no publishAt, no job queue)
+      // Create draft publications for each account (with optional publishAt for scheduled drafts)
       const publications = await Promise.allSettled(
         publishableAccounts.map(async (account) => {
           const platformId = mapSocialPlatformToPlatformId(account.platform);
@@ -694,6 +739,7 @@ export function ContentCreatePage() {
 
             const draftPayload = {
               socialAccountId: account.id,
+              publishAt, // Optional - allows scheduled drafts
               payload,
             };
             console.log("📝 Creating draft Instagram publication:", draftPayload);
@@ -737,6 +783,7 @@ export function ContentCreatePage() {
 
             const draftPayload = {
               socialAccountId: account.id,
+              publishAt, // Optional - allows scheduled drafts
               payload,
             };
             console.log("📝 Creating draft Facebook publication:", draftPayload);
@@ -785,6 +832,8 @@ export function ContentCreatePage() {
     selectedAccounts,
     filteredAccounts,
     selectedMedia,
+    scheduledDate,
+    scheduledTime,
     customizePerPlatform,
     platformCaptions,
     baseCaption,
@@ -941,23 +990,29 @@ export function ContentCreatePage() {
         return;
       }
 
-      // Calculate publishAt (if scheduled)
+      // Calculate publishAt (if scheduled) using brand timezone
       // Use scheduledDate and scheduledTime directly instead of scheduleForLater state
       // because state updates are async and might not be ready when handlePublish is called
       let publishAt: string | undefined;
       if (scheduledDate && scheduledTime) {
-        const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
-        if (!isNaN(dateTime.getTime())) {
+        // Get effective timezone (brand > user > browser)
+        const tz = getEffectiveTimezone(brand?.timezone, undefined);
+        
+        // Build UTC ISO string from local date/time in brand timezone
+        const utcISO = buildPublishAtISO(scheduledDate, scheduledTime, tz);
+        
+        if (utcISO) {
           // Only set publishAt if the date is in the future
+          const scheduledDateTime = new Date(utcISO);
           const now = new Date();
-          if (dateTime > now) {
-            publishAt = dateTime.toISOString();
-            console.log("📅 Scheduling publication for:", publishAt);
+          if (scheduledDateTime > now) {
+            publishAt = utcISO;
+            console.log("📅 Scheduling publication for:", publishAt, "tz:", tz);
           } else {
             console.warn("⚠️ Scheduled date is in the past, publishing immediately");
           }
         } else {
-          console.warn("⚠️ Invalid date/time combination:", scheduledDate, scheduledTime);
+          console.warn("⚠️ Invalid date/time or timezone:", scheduledDate, scheduledTime, tz);
         }
       } else {
         console.log("📤 Publishing immediately (no schedule)");
@@ -1233,7 +1288,8 @@ export function ContentCreatePage() {
                       onSelect={(date) => {
                         setSelectedDate(date);
                         if (date) {
-                          setScheduledDate(date.toISOString().split('T')[0]);
+                          // Format date in local timezone (not UTC) to preserve the selected date
+                          setScheduledDate(format(date, 'yyyy-MM-dd'));
                           // Auto-set time to 10:00 if not already set
                           if (!scheduledTime) {
                             setScheduledTime("10:00");
@@ -1259,13 +1315,11 @@ export function ContentCreatePage() {
                       <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950/20 rounded px-3 py-2">
                         <span>📅</span>
                         <span>
-                          {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString('tr-TR', {
-                            month: 'short',
-                            day: 'numeric',
-                            weekday: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })} tarihinde yayınlanacak
+                          {formatDateTime(
+                            new Date(`${scheduledDate}T${scheduledTime}`),
+                            userProfile?.dateFormat,
+                            userProfile?.timeFormat
+                          )} tarihinde yayınlanacak
                         </span>
                       </div>
                     )}

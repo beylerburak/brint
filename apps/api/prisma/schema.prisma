@@ -22,6 +22,8 @@ model User {
   lastLoginAt         DateTime?
   locale              String            @default("en")
   timezone            String            @default("UTC")
+  dateFormat          String            @default("DD/MM/YYYY") // Date display format preference
+  timeFormat          String            @default("24h")        // Time display format: "12h" or "24h"
   phone               String?
   status              String            @default("active")
   avatarMediaId       String?           @unique

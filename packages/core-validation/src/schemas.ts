@@ -610,9 +610,12 @@ export type DraftInstagramPublicationPayload = z.infer<typeof draftInstagramPubl
 /**
  * Create draft Instagram publication request body schema
  * Used for POST /v1/brands/:brandId/publications/instagram/draft
+ * 
+ * Note: publishAt is optional - allows creating scheduled drafts
  */
 export const createDraftInstagramPublicationSchema = z.object({
   socialAccountId: cuidSchema,
+  publishAt: z.string().datetime().optional(), // Optional - allows scheduled drafts
   clientRequestId: z.string().max(64).optional(),
   payload: draftInstagramPublicationPayloadSchema,
 });
@@ -676,9 +679,12 @@ export type DraftFacebookPublicationPayload = z.infer<typeof draftFacebookPublic
 /**
  * Create draft Facebook publication request body schema
  * Used for POST /v1/brands/:brandId/publications/facebook/draft
+ * 
+ * Note: publishAt is optional - allows creating scheduled drafts
  */
 export const createDraftFacebookPublicationSchema = z.object({
   socialAccountId: cuidSchema,
+  publishAt: z.string().datetime().optional(), // Optional - allows scheduled drafts
   clientRequestId: z.string().max(64).optional(),
   payload: draftFacebookPublicationPayloadSchema,
 });

@@ -15,7 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SocialPlatformIcon } from "@/features/brand/components/social-platform-icon";
+import type { SocialPlatform } from "@/features/social-account";
 import { CalendarEvent } from "./index";
+import { formatDate, formatTime } from "@/shared/lib/date-time-format";
+import { apiCache } from "@/shared/api/cache";
+import type { UserProfile } from "@/features/space/api/user-api";
 
 interface EventModalProps {
   event: CalendarEvent | null;
@@ -89,18 +93,36 @@ export function EventModal({
     }
   };
 
-  const mapPlatformToSocialPlatform = () => {
+  const mapPlatformToSocialPlatform = (): SocialPlatform => {
     switch (event.platform) {
       case "instagram": return "INSTAGRAM_BUSINESS";
       case "facebook": return "FACEBOOK_PAGE";
       case "x": return "X_ACCOUNT";
-      case "tiktok": return "TIKTOK_ACCOUNT";
+      case "tiktok": return "TIKTOK_BUSINESS";
       case "youtube": return "YOUTUBE_CHANNEL";
       case "linkedin": return "LINKEDIN_PAGE";
-      case "pinterest": return "PINTEREST_ACCOUNT";
+      case "pinterest": return "PINTEREST_PROFILE";
       default: return "INSTAGRAM_BUSINESS";
     }
   };
+
+  // Get user profile from cache for format preferences
+  const [userProfile, setUserProfile] = React.useState<UserProfile | null>(() => 
+    apiCache.get<UserProfile>("user:profile", 60000) || null
+  );
+  
+  // Listen for user profile updates
+  React.useEffect(() => {
+    const handleProfileUpdate = (event: CustomEvent<UserProfile>) => {
+      setUserProfile(event.detail);
+    };
+    
+    window.addEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener("userProfileUpdated", handleProfileUpdate as EventListener);
+    };
+  }, []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -153,17 +175,20 @@ export function EventModal({
               <p className="text-sm font-medium">
                 {isMultiDay ? (
                   <>
-                    {format(event.start, "d MMMM yyyy")}
+                    {formatDate(event.start, userProfile?.dateFormat)}
                     <span className="text-muted-foreground mx-2">→</span>
-                    {format(event.end, "d MMMM yyyy")}
+                    {formatDate(event.end, userProfile?.dateFormat)}
                   </>
                 ) : (
-                  format(event.start, "d MMMM yyyy, EEEE")
+                  <>
+                    {formatDate(event.start, userProfile?.dateFormat)}
+                    <span className="text-muted-foreground">, {format(event.start, "EEEE")}</span>
+                  </>
                 )}
               </p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {format(event.start, "HH:mm")} - {format(event.end, "HH:mm")}
+                {formatTime(event.start, userProfile?.timeFormat)} - {formatTime(event.end, userProfile?.timeFormat)}
                 <span className="text-muted-foreground/70">({duration})</span>
               </p>
             </div>

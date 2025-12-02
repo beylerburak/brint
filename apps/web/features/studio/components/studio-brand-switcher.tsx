@@ -7,7 +7,7 @@
  * Follows the same UI pattern as the Team Switcher component.
  */
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import {
@@ -41,6 +41,7 @@ export function StudioBrandSwitcher({
 }: StudioBrandSwitcherProps) {
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
   const { isMobile } = useSidebar();
   const { brands, loading } = useBrandList({ includeArchived: false });
 
@@ -51,10 +52,15 @@ export function StudioBrandSwitcher({
 
   const handleBrandSelect = (brand: BrandSummary) => {
     if (brand.slug !== activeBrand.slug) {
+      // Get the current page path after the brand slug
+      // Example: /en/workspace/studio/brand-a/contents -> contents
+      const studioMatch = pathname.match(/\/studio\/[^/]+\/(.+)/);
+      const currentPage = studioMatch ? studioMatch[1] : "home";
+      
       const path = buildWorkspaceRoute(
         locale,
         workspaceSlug,
-        `studio/${brand.slug}/home`
+        `studio/${brand.slug}/${currentPage}`
       );
       router.push(path);
     }
@@ -107,11 +113,11 @@ export function StudioBrandSwitcher({
                   </span>
                 </div>
               )}
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
                 <span className="truncate font-semibold">
                   {activeBrand.name}
                 </span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate text-[11px] text-muted-foreground">
                   Brand Studio
                 </span>
               </div>

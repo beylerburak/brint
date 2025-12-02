@@ -31,6 +31,8 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 lastLoginAt: { type: ["string", "null"], format: "date-time" },
                 locale: { type: "string" },
                 timezone: { type: "string" },
+                dateFormat: { type: "string" },
+                timeFormat: { type: "string" },
                 phone: { type: ["string", "null"] },
                 avatarMediaId: { type: ["string", "null"] },
                 avatarUrl: { type: ["string", "null"] },
@@ -38,7 +40,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
               },
-              required: ["id", "email", "createdAt", "updatedAt", "completedOnboarding", "locale", "timezone", "status"],
+              required: ["id", "email", "createdAt", "updatedAt", "completedOnboarding", "locale", "timezone", "dateFormat", "timeFormat", "status"],
             },
           },
           required: ["success", "data"],
@@ -86,6 +88,8 @@ export async function registerUserRoutes(app: FastifyInstance) {
           username: { type: ["string", "null"] },
           locale: { type: "string" },
           timezone: { type: "string" },
+          dateFormat: { type: "string" },
+          timeFormat: { type: "string" },
           phone: { type: ["string", "null"] },
           avatarMediaId: { type: ["string", "null"] },
           completedOnboarding: { type: "boolean" },
@@ -108,6 +112,8 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 lastLoginAt: { type: ["string", "null"], format: "date-time" },
                 locale: { type: "string" },
                 timezone: { type: "string" },
+                dateFormat: { type: "string" },
+                timeFormat: { type: "string" },
                 phone: { type: ["string", "null"] },
                 avatarMediaId: { type: ["string", "null"] },
                 avatarUrl: { type: ["string", "null"] },
@@ -115,7 +121,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
               },
-              required: ["id", "email", "createdAt", "updatedAt", "completedOnboarding", "locale", "timezone", "status"],
+              required: ["id", "email", "createdAt", "updatedAt", "completedOnboarding", "locale", "timezone", "dateFormat", "timeFormat", "status"],
             },
           },
           required: ["success", "data"],
@@ -143,11 +149,31 @@ export async function registerUserRoutes(app: FastifyInstance) {
     const shouldRemoveAvatar = body.avatarMediaId === null;
     const avatarToDelete = shouldRemoveAvatar ? currentUser.avatarMediaId : null;
 
+    // Validate date/time format values if provided
+    const validDateFormats = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD", "DD.MM.YYYY", "DD MMM YYYY"];
+    const validTimeFormats = ["12h", "24h"];
+    
+    if (body.dateFormat && !validDateFormats.includes(body.dateFormat)) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "INVALID_DATE_FORMAT", message: "Invalid date format. Allowed: " + validDateFormats.join(", ") },
+      });
+    }
+    
+    if (body.timeFormat && !validTimeFormats.includes(body.timeFormat)) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "INVALID_TIME_FORMAT", message: "Invalid time format. Allowed: " + validTimeFormats.join(", ") },
+      });
+    }
+
     const updated = await userRepository.updateUser(request.auth.userId, {
       name: body.name,
       username: body.username,
       locale: body.locale,
       timezone: body.timezone,
+      dateFormat: body.dateFormat,
+      timeFormat: body.timeFormat,
       phone: body.phone,
       avatarMediaId: body.avatarMediaId,
       completedOnboarding,

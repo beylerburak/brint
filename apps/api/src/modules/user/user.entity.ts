@@ -15,6 +15,8 @@ export type UserProps = {
   lastLoginAt?: Date | null;
   locale?: string;
   timezone?: string;
+  dateFormat?: string;
+  timeFormat?: string;
   phone?: string | null;
   status?: string;
   avatarMediaId?: string | null;
@@ -32,6 +34,8 @@ export class UserEntity {
   public readonly lastLoginAt: Date | null;
   public readonly locale: string | undefined;
   public readonly timezone: string | undefined;
+  public readonly dateFormat: string | undefined;
+  public readonly timeFormat: string | undefined;
   public readonly phone: string | null;
   public readonly status: string | undefined;
   public readonly avatarMediaId: string | null;
@@ -48,6 +52,8 @@ export class UserEntity {
     this.lastLoginAt = props.lastLoginAt ?? null;
     this.locale = props.locale;
     this.timezone = props.timezone;
+    this.dateFormat = props.dateFormat;
+    this.timeFormat = props.timeFormat;
     this.phone = props.phone ?? null;
     this.status = props.status;
     this.avatarMediaId = props.avatarMediaId ?? null;
@@ -82,6 +88,8 @@ export class UserEntity {
     lastLoginAt: Date | null;
     locale: string;
     timezone: string;
+    dateFormat: string;
+    timeFormat: string;
     phone: string | null;
     status: string;
     createdAt: Date;
@@ -98,6 +106,8 @@ export class UserEntity {
       lastLoginAt: prismaUser.lastLoginAt,
       locale: prismaUser.locale,
       timezone: prismaUser.timezone,
+      dateFormat: prismaUser.dateFormat,
+      timeFormat: prismaUser.timeFormat,
       phone: prismaUser.phone,
       status: prismaUser.status,
       avatarMediaId: prismaUser.avatarMediaId,
@@ -120,6 +130,8 @@ export class UserEntity {
       lastLoginAt: this.lastLoginAt,
       locale: this.locale,
       timezone: this.timezone,
+      dateFormat: this.dateFormat,
+      timeFormat: this.timeFormat,
       phone: this.phone,
       status: this.status,
       avatarMediaId: this.avatarMediaId,

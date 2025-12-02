@@ -199,6 +199,8 @@ export async function getCurrentSession(): Promise<{
     completedOnboarding: boolean;
     locale: string;
     timezone: string;
+    dateFormat: string;
+    timeFormat: string;
     phone?: string | null;
     avatarMediaId?: string | null;
     avatarUrl?: string | null;
@@ -226,6 +228,8 @@ export async function getCurrentSession(): Promise<{
               completedOnboarding: boolean;
               locale: string;
               timezone: string;
+              dateFormat: string;
+              timeFormat: string;
               phone?: string | null;
               avatarMediaId?: string | null;
               avatarUrl?: string | null;
@@ -284,6 +288,8 @@ export async function getCurrentSession(): Promise<{
           lastLoginAt: null,
           locale: userData.locale,
           timezone: userData.timezone,
+          dateFormat: userData.dateFormat,
+          timeFormat: userData.timeFormat,
           phone: userData.phone,
           avatarMediaId: userData.avatarMediaId,
           avatarUrl: userData.avatarUrl,

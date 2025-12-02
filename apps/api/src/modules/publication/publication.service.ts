@@ -319,6 +319,8 @@ export async function scheduleFacebookPublication(
  * 3. Create Publication record with status DRAFT
  * 4. Do NOT enqueue job (drafts are not published)
  * 5. Log activity event
+ * 
+ * Note: publishAt is optional for drafts - allows creating scheduled drafts
  */
 export async function createDraftInstagramPublication(
   input: CreateInstagramPublicationInput,
@@ -328,6 +330,7 @@ export async function createDraftInstagramPublication(
     workspaceId,
     brandId,
     socialAccountId,
+    publishAt,
     payload,
     actorUserId,
     clientRequestId,
@@ -396,7 +399,10 @@ export async function createDraftInstagramPublication(
   // 6. Extract caption (STORY payloads don't have caption)
   const caption = "caption" in payload ? (payload.caption ?? null) : null;
 
-  // 7. Create draft publication (no scheduledAt, status is draft)
+  // 7. Calculate scheduled time (optional for drafts - allows scheduled drafts)
+  const scheduledAt = publishAt ?? null;
+
+  // 8. Create draft publication (status is always draft, scheduledAt is optional)
   const publication = await publicationRepository.createPublication({
     workspaceId,
     brandId,
@@ -404,15 +410,15 @@ export async function createDraftInstagramPublication(
     platform,
     contentType,
     status: "draft",
-    scheduledAt: null, // Drafts don't have scheduled time
+    scheduledAt, // Optional - allows creating scheduled drafts
     caption,
     payloadJson: payload,
     clientRequestId: clientRequestId ?? null,
   });
 
-  // 8. Do NOT enqueue job - drafts are not published automatically
+  // 9. Do NOT enqueue job - drafts are not published automatically
 
-  // 9. Log activity
+  // 10. Log activity
   void logActivity({
     type: "publication.draft_created",
     workspaceId,
@@ -425,6 +431,7 @@ export async function createDraftInstagramPublication(
       publicationId: publication.id,
       platform: "instagram",
       contentType: payload.contentType,
+      scheduledAt: scheduledAt?.toISOString() ?? null,
       socialAccountId,
       brandName: brand.name,
     },
@@ -443,6 +450,8 @@ export async function createDraftInstagramPublication(
  * 3. Create Publication record with status DRAFT
  * 4. Do NOT enqueue job (drafts are not published)
  * 5. Log activity event
+ * 
+ * Note: publishAt is optional for drafts - allows creating scheduled drafts
  */
 export async function createDraftFacebookPublication(
   input: CreateFacebookPublicationInput,
@@ -452,6 +461,7 @@ export async function createDraftFacebookPublication(
     workspaceId,
     brandId,
     socialAccountId,
+    publishAt,
     payload,
     actorUserId,
     clientRequestId,
@@ -519,7 +529,10 @@ export async function createDraftFacebookPublication(
   // 6. Extract message as caption (STORY payloads don't have message)
   const caption = "message" in payload ? (payload.message ?? null) : null;
 
-  // 7. Create draft publication (no scheduledAt, status is draft)
+  // 7. Calculate scheduled time (optional for drafts - allows scheduled drafts)
+  const scheduledAt = publishAt ?? null;
+
+  // 8. Create draft publication (status is always draft, scheduledAt is optional)
   const publication = await publicationRepository.createPublication({
     workspaceId,
     brandId,
@@ -527,15 +540,15 @@ export async function createDraftFacebookPublication(
     platform,
     contentType,
     status: "draft",
-    scheduledAt: null, // Drafts don't have scheduled time
+    scheduledAt, // Optional - allows creating scheduled drafts
     caption,
     payloadJson: payload,
     clientRequestId: clientRequestId ?? null,
   });
 
-  // 8. Do NOT enqueue job - drafts are not published automatically
+  // 9. Do NOT enqueue job - drafts are not published automatically
 
-  // 9. Log activity
+  // 10. Log activity
   void logActivity({
     type: "publication.draft_created",
     workspaceId,
@@ -548,6 +561,7 @@ export async function createDraftFacebookPublication(
       publicationId: publication.id,
       platform: "facebook",
       contentType: payload.contentType,
+      scheduledAt: scheduledAt?.toISOString() ?? null,
       socialAccountId,
       brandName: brand.name,
     },

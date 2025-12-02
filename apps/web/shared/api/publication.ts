@@ -232,10 +232,11 @@ export async function createFacebookPublication(
 
 /**
  * Create a draft Instagram publication
+ * Note: publishAt is optional - allows creating scheduled drafts
  */
 export async function createDraftInstagramPublication(
   brandId: string,
-  payload: Omit<CreateInstagramPublicationRequest, "publishAt">
+  payload: CreateInstagramPublicationRequest
 ): Promise<PublicationResponse> {
   const response = await httpClient.post<CreatePublicationResponse>(
     `/brands/${brandId}/publications/instagram/draft`,
@@ -253,10 +254,11 @@ export async function createDraftInstagramPublication(
 
 /**
  * Create a draft Facebook publication
+ * Note: publishAt is optional - allows creating scheduled drafts
  */
 export async function createDraftFacebookPublication(
   brandId: string,
-  payload: Omit<CreateFacebookPublicationRequest, "publishAt">
+  payload: CreateFacebookPublicationRequest
 ): Promise<PublicationResponse> {
   const response = await httpClient.post<CreatePublicationResponse>(
     `/brands/${brandId}/publications/facebook/draft`,

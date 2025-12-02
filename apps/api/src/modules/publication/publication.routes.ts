@@ -254,6 +254,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
         type: "object",
         properties: {
           socialAccountId: { type: "string", description: "ID of the Instagram social account" },
+          publishAt: { type: "string", format: "date-time", description: "Optional scheduled date/time for the draft (allows creating scheduled drafts)" },
           clientRequestId: { type: "string", description: "Client-provided idempotency key" },
           payload: {
             type: "object",
@@ -305,6 +306,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
       workspaceId,
       brandId,
       socialAccountId: body.socialAccountId,
+      publishAt: body.publishAt ? new Date(body.publishAt) : undefined,
       payload: body.payload,
       actorUserId: userId,
       clientRequestId: body.clientRequestId,
@@ -341,6 +343,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
         type: "object",
         properties: {
           socialAccountId: { type: "string", description: "ID of the Facebook social account" },
+          publishAt: { type: "string", format: "date-time", description: "Optional scheduled date/time for the draft (allows creating scheduled drafts)" },
           clientRequestId: { type: "string", description: "Client-provided idempotency key" },
           payload: {
             type: "object",
@@ -393,6 +396,7 @@ export async function registerPublicationRoutes(app: FastifyInstance) {
       workspaceId,
       brandId,
       socialAccountId: body.socialAccountId,
+      publishAt: body.publishAt ? new Date(body.publishAt) : undefined,
       payload: body.payload,
       actorUserId: userId,
       clientRequestId: body.clientRequestId,

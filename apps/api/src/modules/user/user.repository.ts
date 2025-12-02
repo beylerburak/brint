@@ -81,6 +81,8 @@ export class UserRepository {
     username?: string | null;
     locale?: string;
     timezone?: string;
+    dateFormat?: string;
+    timeFormat?: string;
     phone?: string | null;
     completedOnboarding?: boolean;
     firstOnboardedAt?: Date | null;
@@ -93,6 +95,8 @@ export class UserRepository {
         username: data.username ?? undefined,
         locale: data.locale ?? undefined,
         timezone: data.timezone ?? undefined,
+        dateFormat: data.dateFormat ?? undefined,
+        timeFormat: data.timeFormat ?? undefined,
         phone: data.phone ?? undefined,
         completedOnboarding: data.completedOnboarding ?? undefined,
         firstOnboardedAt: data.firstOnboardedAt ?? undefined,

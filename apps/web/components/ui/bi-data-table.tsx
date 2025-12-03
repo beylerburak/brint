@@ -31,6 +31,7 @@ import {
   ArrowUpDown,
   Check,
   SlidersHorizontal,
+  Funnel,
 } from "lucide-react";
 import {
   Table,
@@ -163,6 +164,8 @@ export interface BiDataTableProps<TData> {
   loadMoreLabel?: string;
   /** Loading label */
   loadingLabel?: string;
+  /** Toolbar left section */
+  toolbarLeft?: React.ReactNode;
   /** Toolbar right section */
   toolbarRight?: React.ReactNode;
   /** Empty state component */
@@ -178,6 +181,8 @@ export interface BiDataTableProps<TData> {
   defaultShowRowBorders?: boolean;
   /** Hide view settings menu */
   hideViewSettings?: boolean;
+  /** Hide entire toolbar (search, filter, etc.) */
+  hideToolbar?: boolean;
   /** Extra content for command menu (rendered after row borders toggle) */
   commandMenuExtra?: React.ReactNode;
   /** Custom skeleton row count */
@@ -245,6 +250,7 @@ export function BiDataTable<TData>({
   isLoadingMore = false,
   loadMoreLabel = "Load more",
   loadingLabel = "Loading...",
+  toolbarLeft,
   toolbarRight,
   emptyState,
   mobileCard,
@@ -253,6 +259,7 @@ export function BiDataTable<TData>({
   defaultShowVerticalLines = true,
   defaultShowRowBorders = true,
   hideViewSettings = false,
+  hideToolbar = false,
   commandMenuExtra,
   skeletonRows = 3,
   className,
@@ -485,6 +492,7 @@ export function BiDataTable<TData>({
         showRowBorders={showRowBorders}
         rowCount={skeletonRows}
         hasActions={!!actions?.length}
+        hideToolbar={hideToolbar}
       />
     );
   }
@@ -521,7 +529,7 @@ export function BiDataTable<TData>({
 
           {/* Action Row */}
           <div className="flex items-center gap-2">
-            {/* Filter Button */}
+            Filter Button
             {filterableColumns.length > 0 && (
               <Button
                 variant="outline"
@@ -665,7 +673,7 @@ export function BiDataTable<TData>({
             >
               {isLoadingMore ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   {loadingLabel}
                 </>
               ) : (
@@ -823,10 +831,13 @@ export function BiDataTable<TData>({
 
   // Desktop table view
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div className={cn("border rounded-lg overflow-hidden", className)}>
       {/* Toolbar */}
-      <div className="flex items-center gap-2">
+      {!hideToolbar && (
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-background" style={{ minHeight: '58px' }}>
         <div className="flex items-center gap-2">
+          {toolbarLeft}
+          
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -834,7 +845,7 @@ export function BiDataTable<TData>({
               placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-64 h-9"
             />
           </div>
 
@@ -842,8 +853,8 @@ export function BiDataTable<TData>({
           {filterableColumns.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm">
+                  <Funnel className="h-4 w-4" />
                   Filter
                 </Button>
               </DropdownMenuTrigger>
@@ -870,7 +881,7 @@ export function BiDataTable<TData>({
           {!hideViewSettings && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="sm" className="h-9 w-9 p-0">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -900,10 +911,11 @@ export function BiDataTable<TData>({
           )}
         </div>
       </div>
+      )}
 
       {/* Active Filters Row */}
-      {activeFilters.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
+      {!hideToolbar && activeFilters.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap px-4 py-3 border-b bg-muted/30">
           {activeFilters.map((filter) => {
             const column = columns.find((c) => c.id === filter.columnId);
             if (!column) return null;
@@ -931,7 +943,8 @@ export function BiDataTable<TData>({
         </div>
       )}
 
-      <Table>
+      <div className="overflow-auto">
+        <Table>
         <TableHeader className="[&_tr]:border-0">
           <TableRow className="border-0">
             {selectable && (
@@ -1053,10 +1066,11 @@ export function BiDataTable<TData>({
           })}
         </TableBody>
       </Table>
+      </div>
 
       {/* Load more button */}
       {hasMore && onLoadMore && (
-        <div className="flex justify-center">
+        <div className="flex justify-center p-4 border-t">
           <Button
             variant="outline"
             size="sm"
@@ -1065,7 +1079,7 @@ export function BiDataTable<TData>({
           >
             {isLoadingMore ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 {loadingLabel}
               </>
             ) : (
@@ -1254,57 +1268,74 @@ function BiDataTableSkeleton<TData>({
   showRowBorders = true,
   rowCount = 3,
   hasActions = false,
-}: BiDataTableSkeletonProps<TData>) {
+  hideToolbar = false,
+}: BiDataTableSkeletonProps<TData> & { hideToolbar?: boolean }) {
   return (
-    <Table>
-      <TableHeader className="[&_tr]:border-0">
-        <TableRow className="border-0">
-          {selectable && (
-            <TableHead className={`w-[50px] border-b px-4 bg-muted/50 rounded-tl-md ${showVerticalLines ? "border-r" : ""}`} />
-          )}
-          {columns.map((column, index) => (
-            <TableHead 
-              key={column.id}
-              className={cn(
-                "border-b px-4 bg-muted/50",
-                column.width,
-                showVerticalLines && "border-r",
-                !selectable && index === 0 && "rounded-tl-md"
+    <div className="border rounded-lg overflow-hidden">
+      {/* Toolbar skeleton */}
+      {!hideToolbar && (
+        <div className="flex items-center gap-2 p-4 border-b">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-24" />
+          <div className="ml-auto flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-10" />
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-auto">
+        <Table>
+          <TableHeader className="[&_tr]:border-0">
+            <TableRow className="border-0">
+              {selectable && (
+                <TableHead className={`w-[50px] border-b px-4 bg-muted/50 rounded-tl-md ${showVerticalLines ? "border-r" : ""}`} />
               )}
-            >
-              {column.label}
-            </TableHead>
-          ))}
-          {hasActions && (
-            <TableHead className="border-b px-4 w-[50px] bg-muted/50 rounded-tr-md" />
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {Array.from({ length: rowCount }).map((_, i) => (
-          <TableRow key={i} className="border-0">
-            {selectable && (
-              <TableCell className={`px-4 ${showVerticalLines ? "border-r" : ""} ${showRowBorders ? "border-b" : ""}`}>
-                <Skeleton className="h-4 w-4" />
-              </TableCell>
-            )}
-            {columns.map((column) => (
-              <TableCell 
-                key={column.id}
-                className={`px-4 ${showVerticalLines ? "border-r" : ""} ${showRowBorders ? "border-b" : ""}`}
-              >
-                <Skeleton className="h-4 w-[80%]" />
-              </TableCell>
+              {columns.map((column, index) => (
+                <TableHead 
+                  key={column.id}
+                  className={cn(
+                    "border-b px-4 bg-muted/50",
+                    column.width,
+                    showVerticalLines && "border-r",
+                    !selectable && index === 0 && "rounded-tl-md"
+                  )}
+                >
+                  {column.label}
+                </TableHead>
+              ))}
+              {hasActions && (
+                <TableHead className="border-b px-4 w-[50px] bg-muted/50 rounded-tr-md" />
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: rowCount }).map((_, i) => (
+              <TableRow key={i} className="border-0">
+                {selectable && (
+                  <TableCell className={`px-4 ${showVerticalLines ? "border-r" : ""} ${showRowBorders ? "border-b" : ""}`}>
+                    <Skeleton className="h-4 w-4" />
+                  </TableCell>
+                )}
+                {columns.map((column) => (
+                  <TableCell 
+                    key={column.id}
+                    className={`px-4 ${showVerticalLines ? "border-r" : ""} ${showRowBorders ? "border-b" : ""}`}
+                  >
+                    <Skeleton className="h-4 w-[80%]" />
+                  </TableCell>
+                ))}
+                {hasActions && (
+                  <TableCell className={`px-4 ${showRowBorders ? "border-b" : ""}`}>
+                    <Skeleton className="h-8 w-8 rounded" />
+                  </TableCell>
+                )}
+              </TableRow>
             ))}
-            {hasActions && (
-              <TableCell className={`px-4 ${showRowBorders ? "border-b" : ""}`}>
-                <Skeleton className="h-8 w-8 rounded" />
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 

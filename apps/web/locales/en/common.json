@@ -192,6 +192,7 @@
     "workspace": {
       "general": "General",
       "identity": "Identity",
+      "tasks": "Tasks",
       "subscription": "Subscription",
       "integrations": "Integrations",
       "supportTickets": "Support Tickets",

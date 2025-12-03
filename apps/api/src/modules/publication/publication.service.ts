@@ -619,6 +619,7 @@ export async function listBrandPublications(
         // Fetch media info from database
         const { prisma } = await import("../../lib/prisma.js");
         const { storageConfig } = await import("../../config/storage.config.js");
+        const { S3StorageService } = await import("../../lib/storage/s3.storage.service.js");
         
         const mediaList = await prisma.media.findMany({
           where: {
@@ -634,40 +635,62 @@ export async function listBrandPublications(
           },
         });
 
-        console.log(`📸 Publication ${publication.id}: Found ${mediaList.length} media, ${mediaList.filter(m => m.isPublic).length} public`);
+        console.log(`📸 Publication ${publication.id}: Found ${mediaList.length} media`);
         
-        // Use all media (not just public) for drafts - user should see their own content
-        const baseUrl = storageConfig.cdnBaseUrl || `https://${storageConfig.bucket}.s3.${storageConfig.region}.amazonaws.com`;
+        // Initialize storage service for presigned URLs
+        const storage = new S3StorageService();
+        const expireSeconds = storageConfig.presign.downloadExpireSeconds;
 
-        // Generate thumbnail URLs for card preview (small, optimized)
-        item.mediaThumbnails = mediaList.map((m) => {
-          // For videos, use original (no variants)
-          if (m.contentType.startsWith('video/')) {
-            const url = `${baseUrl}/${m.objectKey}`;
-            console.log(`  📹 Video thumbnail: ${url}`);
-            return url;
-          }
-          
-          // For images, prefer thumbnail variant
-          const variants = m.variants as any;
-          if (variants && typeof variants === 'object') {
-            // Try thumbnail first, then sm, fallback to original
-            const variantKey = variants.thumbnail?.objectKey || variants.sm?.objectKey;
-            if (variantKey) {
-              const url = `${baseUrl}/${variantKey}`;
-              console.log(`  🖼️  Image thumbnail (variant): ${url}`);
+        // Generate presigned thumbnail URLs for card preview (small, optimized)
+        item.mediaThumbnails = await Promise.all(
+          mediaList.map(async (m) => {
+            try {
+              // For videos, use original (no variants)
+              if (m.contentType.startsWith('video/')) {
+                const url = await storage.getPresignedDownloadUrl(m.objectKey, expireSeconds);
+                console.log(`  📹 Video thumbnail (presigned): ${m.objectKey}`);
+                return url;
+              }
+              
+              // For images, prefer thumbnail variant
+              const variants = m.variants as any;
+              if (variants && typeof variants === 'object') {
+                // Try thumbnail first, then sm, fallback to original
+                const variantKey = variants.thumbnail?.objectKey || variants.sm?.objectKey;
+                if (variantKey) {
+                  const url = await storage.getPresignedDownloadUrl(variantKey, expireSeconds);
+                  console.log(`  🖼️  Image thumbnail (variant presigned): ${variantKey}`);
+                  return url;
+                }
+              }
+              
+              // Fallback to original
+              const url = await storage.getPresignedDownloadUrl(m.objectKey, expireSeconds);
+              console.log(`  🖼️  Image thumbnail (original presigned): ${m.objectKey}`);
               return url;
+            } catch (error) {
+              console.error(`  ❌ Failed to generate presigned URL for ${m.objectKey}:`, error);
+              // Return empty string as fallback
+              return "";
             }
-          }
-          
-          // Fallback to original
-          const url = `${baseUrl}/${m.objectKey}`;
-          console.log(`  🖼️  Image thumbnail (original): ${url}`);
-          return url;
-        });
+          })
+        );
 
-        // Generate original URLs for lightbox (full quality)
-        item.mediaUrls = mediaList.map((m) => `${baseUrl}/${m.objectKey}`);
+        // Generate presigned original URLs for lightbox (full quality)
+        item.mediaUrls = await Promise.all(
+          mediaList.map(async (m) => {
+            try {
+              return await storage.getPresignedDownloadUrl(m.objectKey, expireSeconds);
+            } catch (error) {
+              console.error(`  ❌ Failed to generate presigned URL for ${m.objectKey}:`, error);
+              return "";
+            }
+          })
+        );
+        
+        // Filter out empty strings (failed presigns)
+        item.mediaThumbnails = item.mediaThumbnails.filter(url => url !== "");
+        item.mediaUrls = item.mediaUrls.filter(url => url !== "");
       }
 
       return item;

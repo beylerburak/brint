@@ -24,6 +24,9 @@ import { registerBrandRoutes } from '../../modules/brand/brand.routes.js';
 import { registerSocialAccountRoutes } from '../../modules/social-account/social-account.routes.js';
 import { registerSocialAccountOAuthRoutes } from '../../modules/social-account/social-account-oauth.routes.js';
 import { registerPublicationRoutes } from '../../modules/publication/publication.routes.js';
+import { registerTaskCategoryRoutes } from '../../modules/task-category/task-category.routes.js';
+import { registerTaskStatusRoutes } from '../../modules/task-status/task-status.routes.js';
+import { registerTaskRoutes } from '../../modules/task/task.routes.js';
 import { redis } from '../../lib/redis.js';
 import { setupFastifyErrorHandler } from '../observability/sentry.js';
 import { requestIdHook } from './request-id.js';
@@ -163,6 +166,9 @@ export async function createServer(): Promise<FastifyInstance> {
     await registerSocialAccountRoutes(fastify);
     await registerSocialAccountOAuthRoutes(fastify);
     await registerPublicationRoutes(fastify);
+    await registerTaskCategoryRoutes(fastify);
+    await registerTaskStatusRoutes(fastify);
+    await registerTaskRoutes(fastify);
   }, { prefix: '/v1' });
 
   return app;

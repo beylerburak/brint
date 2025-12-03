@@ -197,6 +197,121 @@ async function main() {
   }
   console.log(`✅ workspace-member → ${memberPermissions.length} permissions`);
 
+  // 7. Default Task Statuses (3 essential, non-deletable but renameable)
+  const defaultStatuses = [
+    // TODO Group - Essential default
+    {
+      name: 'Not Started',
+      slug: 'not-started',
+      group: 'TODO' as const,
+      color: '#6B7280', // gray
+      icon: 'circle',
+      description: 'Tasks that have not been started yet',
+      order: 0,
+    },
+    // IN_PROGRESS Group - Essential default
+    {
+      name: 'In Progress',
+      slug: 'in-progress',
+      group: 'IN_PROGRESS' as const,
+      color: '#8B5CF6', // purple
+      icon: 'circle-dot',
+      description: 'Currently being worked on',
+      order: 0,
+    },
+    // DONE Group - Essential default
+    {
+      name: 'Completed',
+      slug: 'completed',
+      group: 'DONE' as const,
+      color: '#10B981', // green
+      icon: 'check-circle',
+      description: 'Completed successfully',
+      order: 0,
+    },
+  ];
+
+  // Create or update default statuses
+  const createdStatuses: any[] = [];
+  
+  for (const statusData of defaultStatuses) {
+    const existing = await prisma.taskStatus.findFirst({
+      where: {
+        workspaceId: workspace.id,
+        brandId: null,
+        slug: statusData.slug,
+      },
+    });
+
+    if (existing) {
+      // Update existing status
+      const updated = await prisma.taskStatus.update({
+        where: { id: existing.id },
+        data: {
+          name: statusData.name,
+          group: statusData.group,
+          color: statusData.color,
+          icon: statusData.icon,
+          description: statusData.description,
+          isDefault: true,
+          order: statusData.order,
+        },
+      });
+      createdStatuses.push(updated);
+      console.log(`✅ Updated status: ${statusData.name}`);
+    } else {
+      // Create new status
+      const created = await prisma.taskStatus.create({
+        data: {
+          workspaceId: workspace.id,
+          brandId: null,
+          name: statusData.name,
+          slug: statusData.slug,
+          group: statusData.group,
+          color: statusData.color,
+          icon: statusData.icon,
+          description: statusData.description,
+          isDefault: true,
+          order: statusData.order,
+        },
+      });
+      createdStatuses.push(created);
+      console.log(`✅ Created status: ${statusData.name}`);
+    }
+  }
+
+  // Migrate tasks from old statuses to new ones
+  const notStartedStatus = createdStatuses.find((s) => s.slug === 'not-started');
+  
+  if (notStartedStatus) {
+    // Find old statuses that should map to "Not Started"
+    const oldTodoStatuses = await prisma.taskStatus.findMany({
+      where: {
+        workspaceId: workspace.id,
+        isDefault: true,
+        slug: { in: ['backlog', 'todo'] },
+      },
+    });
+
+    for (const oldStatus of oldTodoStatuses) {
+      if (oldStatus.id !== notStartedStatus.id) {
+        // Migrate tasks
+        await prisma.task.updateMany({
+          where: { statusId: oldStatus.id },
+          data: { statusId: notStartedStatus.id },
+        });
+        
+        // Delete old status
+        await prisma.taskStatus.delete({
+          where: { id: oldStatus.id },
+        });
+        console.log(`🔄 Migrated tasks from "${oldStatus.name}" to "Not Started"`);
+      }
+    }
+  }
+
+  console.log(`✅ Configured ${defaultStatuses.length} essential default task statuses`);
+
   console.log('🎉 Seed completed successfully!');
 }
 

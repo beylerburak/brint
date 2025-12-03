@@ -147,6 +147,7 @@ import { Switch } from "@/components/ui/switch"
 import { ChevronDown } from "lucide-react"
 import { locales, type Locale } from "@/shared/i18n/locales"
 import { WorkspaceMembersTable } from "./workspace-members-table"
+import { WorkspaceTaskStatusesManager } from "./workspace-task-statuses-manager"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { ConnectionCard } from "./connection-card"
 import { DATE_FORMAT_LABELS, TIME_FORMAT_LABELS, type DateFormatKey, type TimeFormatKey } from "@/shared/lib/date-time-format"
@@ -253,6 +254,11 @@ const navGroups: NavGroup[] = [
         id: "identity",
         translationKey: "settings.workspace.identity",
         icon: Shield,
+      },
+      {
+        id: "tasks",
+        translationKey: "settings.workspace.tasks",
+        icon: CheckCircle2,
       },
       {
         id: "subscription",
@@ -1903,6 +1909,18 @@ export function SettingsDialog({ children, defaultActiveItem }: SettingsDialogPr
                       </TabsContent>
                     </TabsContents>
                   </Tabs>
+                </div>
+              ) : activeItem === "tasks" ? (
+                <div className="flex flex-col gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-base font-semibold text-foreground">
+                      Task Statuses
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Manage task statuses that will be available across all brands in this workspace.
+                    </p>
+                  </div>
+                  <WorkspaceTaskStatusesManager />
                 </div>
               ) : activeItem === "preferences" ? (
                 <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 pt-0 gap-6">

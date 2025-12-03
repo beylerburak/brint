@@ -701,3 +701,180 @@ export const publicationParamsSchema = z.object({
 });
 
 export type PublicationParamsInput = z.infer<typeof publicationParamsSchema>;
+
+// ====================
+// Task Category Schemas
+// ====================
+
+/**
+ * Create task category schema
+ */
+export const createTaskCategorySchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: slugSchema.optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'validation.taskCategory.color.invalid').optional().nullable(),
+  isDefault: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+  brandId: cuidSchema.optional().nullable(),
+});
+
+export type CreateTaskCategoryInput = z.infer<typeof createTaskCategorySchema>;
+
+/**
+ * Update task category schema
+ */
+export const updateTaskCategorySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: slugSchema.optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'validation.taskCategory.color.invalid').optional().nullable(),
+  isDefault: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export type UpdateTaskCategoryInput = z.infer<typeof updateTaskCategorySchema>;
+
+/**
+ * Task category params schema
+ */
+export const taskCategoryParamsSchema = z.object({
+  categoryId: cuidSchema,
+});
+
+export type TaskCategoryParamsInput = z.infer<typeof taskCategoryParamsSchema>;
+
+/**
+ * Task category list query schema
+ */
+export const taskCategoryListQuerySchema = z.object({
+  brandId: cuidSchema.optional().nullable(),
+});
+
+export type TaskCategoryListQueryInput = z.infer<typeof taskCategoryListQuerySchema>;
+
+// ====================
+// Task Status Schemas (User-Defined)
+// ====================
+
+/**
+ * Task status group enum (Fixed, System-Level)
+ */
+export const taskStatusGroupSchema = z.enum(['TODO', 'IN_PROGRESS', 'DONE']);
+
+export type TaskStatusGroup = z.infer<typeof taskStatusGroupSchema>;
+
+/**
+ * Create task status schema
+ */
+export const createTaskStatusSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: slugSchema.optional(),
+  group: taskStatusGroupSchema,
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'validation.taskStatus.color.invalid').optional().nullable(),
+  icon: z.string().max(50).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  isDefault: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+  brandId: cuidSchema.optional().nullable(),
+});
+
+export type CreateTaskStatusInput = z.infer<typeof createTaskStatusSchema>;
+
+/**
+ * Update task status schema
+ */
+export const updateTaskStatusSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: slugSchema.optional(),
+  group: taskStatusGroupSchema.optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'validation.taskStatus.color.invalid').optional().nullable(),
+  icon: z.string().max(50).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  isDefault: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
+
+/**
+ * Task status params schema
+ */
+export const taskStatusParamsSchema = z.object({
+  statusId: cuidSchema,
+});
+
+export type TaskStatusParamsInput = z.infer<typeof taskStatusParamsSchema>;
+
+/**
+ * Task status list query schema
+ */
+export const taskStatusListQuerySchema = z.object({
+  brandId: cuidSchema.optional().nullable(),
+  group: taskStatusGroupSchema.optional(),
+});
+
+export type TaskStatusListQueryInput = z.infer<typeof taskStatusListQuerySchema>;
+
+// ====================
+// Task Schemas
+// ====================
+
+/**
+ * Task priority enum
+ */
+export const taskPrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
+
+/**
+ * Create task schema
+ */
+export const createTaskSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().max(5000).optional().nullable(),
+  categoryId: cuidSchema.optional().nullable(),
+  statusId: cuidSchema.optional().nullable(), // If not provided, backend will use default Backlog status
+  priority: taskPrioritySchema.optional(),
+  assigneeId: cuidSchema.optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  brandId: cuidSchema.optional().nullable(),
+});
+
+export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+
+/**
+ * Update task schema
+ */
+export const updateTaskSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().max(5000).optional().nullable(),
+  categoryId: cuidSchema.optional().nullable(),
+  statusId: cuidSchema.optional(), // Change status to user-defined status
+  priority: taskPrioritySchema.optional(),
+  assigneeId: cuidSchema.optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+});
+
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+
+/**
+ * Task params schema
+ */
+export const taskParamsSchema = z.object({
+  taskId: cuidSchema,
+});
+
+export type TaskParamsInput = z.infer<typeof taskParamsSchema>;
+
+/**
+ * Task list query schema
+ */
+export const taskListQuerySchema = z.object({
+  brandId: cuidSchema.optional().nullable(),
+  statusId: cuidSchema.optional(), // Filter by specific status
+  statusGroup: taskStatusGroupSchema.optional(), // Filter by status group (TODO, IN_PROGRESS, DONE)
+  categoryId: cuidSchema.optional().nullable(),
+  assigneeId: cuidSchema.optional().nullable(),
+  search: z.string().max(255).optional(),
+});
+
+export type TaskListQueryInput = z.infer<typeof taskListQuerySchema>;

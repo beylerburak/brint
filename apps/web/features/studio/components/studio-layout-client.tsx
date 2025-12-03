@@ -33,12 +33,12 @@ export function StudioLayoutClient({
   return (
     <div className="fixed inset-0 z-40 flex overflow-hidden bg-background">
       <StudioBrandProvider brand={brand} refreshBrand={refreshBrand}>
-        <SidebarProvider className="!min-h-0 h-full">
+        <SidebarProvider className="!min-h-0 h-full min-w-0 overflow-hidden">
           <StudioSidebar workspaceSlug={workspaceSlug} brand={brand} />
-          <SidebarInset className="!flex-col h-full">
+          <SidebarInset className="!flex-col h-full min-w-0 overflow-hidden">
             <StudioPageHeaderProvider>
               <StudioPageHeader />
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
                 {children}
               </div>
             </StudioPageHeaderProvider>

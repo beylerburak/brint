@@ -15,6 +15,7 @@ import {
   Calendar,
   Users,
   BadgeInfo,
+  CheckSquare,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -34,6 +35,7 @@ const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { hrefSuffix: "/home", label: "Home", icon: Home },
   { hrefSuffix: "/contents", label: "Contents", icon: FileText },
   { hrefSuffix: "/calendar", label: "Calendar", icon: Calendar },
+  { hrefSuffix: "/tasks", label: "Tasks", icon: CheckSquare },
   { hrefSuffix: "/social-accounts", label: "Social Accounts", icon: Users },
   { hrefSuffix: "/brand-profile", label: "Brand Profile", icon: BadgeInfo },
 ];

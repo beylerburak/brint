@@ -89,7 +89,7 @@ export function LoginForm({
               href="#"
               className="flex flex-col items-center font-medium"
             >
-              <div className="flex items-center justify-center">
+              {/* <div className="flex items-center justify-center">
                 <svg 
                   width="71" 
                   height="48" 
@@ -104,19 +104,19 @@ export function LoginForm({
                     fill="currentColor"
                   />
                 </svg>
-              </div>
-              <span className="sr-only">Beyler Interactive</span>
+              </div> */}
+              {/* <span className="sr-only">Beyler Interactive</span> */}
             </a>
-            <div className="flex flex-col items-center gap-2">
+            {/* <div className="flex flex-col items-center gap-2">
               <h1 className="text-xl font-bold">{t("loginTitle")}</h1>
-            </div>
+            </div> */}
           </div>
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               type="email"
-              placeholder="m@example.com"
+              placeholder="Enter your email"
               {...register("email")}
               aria-invalid={errors.email ? "true" : "false"}
             />
@@ -129,7 +129,7 @@ export function LoginForm({
               {isSubmitting ? "Sending magic link..." : "Send magic link"}
             </Button>
           </Field>
-          <FieldSeparator>Or</FieldSeparator>
+          <FieldSeparator>Or continue with</FieldSeparator>
           <Field className="grid gap-4 sm:grid-cols-1">
             {/* <Button variant="outline" type="button">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

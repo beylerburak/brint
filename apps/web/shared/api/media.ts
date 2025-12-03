@@ -141,3 +141,29 @@ export async function finalizeUpload(payload: {
 
   return response.data.data;
 }
+
+export interface PresignDownloadResponse {
+  downloadUrl: string;
+  expiresInSeconds: number;
+}
+
+export async function presignDownload(
+  objectKey: string,
+  workspaceId: string
+): Promise<PresignDownloadResponse> {
+  const response = await httpClient.post<{ success: boolean; data: PresignDownloadResponse }>(
+    "/media/presign-download",
+    { objectKey },
+    {
+      headers: {
+        "X-Workspace-Id": workspaceId,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(response.message || "Failed to presign download");
+  }
+
+  return response.data.data;
+}

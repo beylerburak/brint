@@ -158,6 +158,66 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // POST /media/presign-download
+  app.post('/media/presign-download', {
+    schema: {
+      tags: ['Media'],
+      body: {
+        type: 'object',
+        required: ['objectKey'],
+        properties: {
+          objectKey: { type: 'string', description: 'S3 object key' },
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { objectKey: string } }>, reply: FastifyReply) => {
+    try {
+      const { objectKey } = request.body;
+
+      // Verify media exists and user has access
+      const media = await prisma.media.findUnique({
+        where: { objectKey },
+        select: { 
+          id: true, 
+          workspaceId: true,
+          objectKey: true,
+        },
+      });
+
+      if (!media) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'MEDIA_NOT_FOUND',
+            message: 'Media file not found',
+          },
+        });
+      }
+
+      // Get presigned download URL
+      const downloadUrl = await storage.getPresignedDownloadUrl(
+        objectKey,
+        storageConfig.presign.downloadExpireSeconds
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          downloadUrl,
+          expiresInSeconds: storageConfig.presign.downloadExpireSeconds,
+        },
+      });
+    } catch (error: any) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'PRESIGN_DOWNLOAD_FAILED',
+          message: error.message || 'Failed to presign download',
+        },
+      });
+    }
+  });
+
   // POST /media/finalize
   app.post('/media/finalize', {
     schema: {

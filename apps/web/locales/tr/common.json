@@ -192,6 +192,7 @@
     "workspace": {
       "general": "Genel",
       "identity": "Kimlik",
+      "tasks": "Görevler",
       "subscription": "Abonelik",
       "integrations": "Entegrasyonlar",
       "supportTickets": "Destek Talepleri",

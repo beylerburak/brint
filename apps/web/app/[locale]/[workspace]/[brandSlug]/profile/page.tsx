@@ -3,6 +3,8 @@
 import { useParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { useWorkspace } from "@/contexts/workspace-context"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { motion, PanInfo } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { 
   Tabs, 
@@ -17,7 +19,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconPencil, IconExternalLink, IconPhone, IconMail, IconSparkles, IconPlus, IconCheck, IconX, IconUpload, IconLayoutDashboard, IconUsers, IconMessageCircle, IconShieldCheck, IconPalette } from "@tabler/icons-react"
+import { IconPencil, IconExternalLink, IconPhone, IconMail, IconSparkles, IconPlus, IconCheck, IconX, IconUpload, IconLayoutDashboard, IconUsers, IconMessageCircle, IconShieldCheck, IconPalette, IconBriefcase } from "@tabler/icons-react"
 import { Slider } from "@/components/ui/slider"
 import { CountingNumber } from "@/components/animate-ui/primitives/texts/counting-number"
 import {
@@ -48,6 +50,7 @@ export default function BrandProfilePage() {
   const params = useParams()
   const brandSlug = params?.brandSlug as string
   const { currentWorkspace } = useWorkspace()
+  const isMobile = useIsMobile()
   const [brand, setBrand] = useState<Brand | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   
@@ -63,6 +66,56 @@ export default function BrandProfilePage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [progressValue, setProgressValue] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Tab order for swipe navigation
+  const tabOrder = ["overview", "business", "audience", "voice", "rules", "assets"]
+  
+  const handleSwipe = (direction: 'left' | 'right') => {
+    const currentIndex = tabOrder.indexOf(activeTab)
+    if (direction === 'left' && currentIndex < tabOrder.length - 1) {
+      setActiveTab(tabOrder[currentIndex + 1])
+    } else if (direction === 'right' && currentIndex > 0) {
+      setActiveTab(tabOrder[currentIndex - 1])
+    }
+  }
+
+  // TODO: This mock data will be replaced with backend BrandProfile JSON
+  const businessProfile = {
+    businessType: "Service", // "Service" | "Product" | "Both"
+    marketType: "B2B", // "B2B" | "B2C" | "B2B2C"
+    deliveryModel: "Online & On-site", // free text
+
+    coreServices: [
+      "Social media management",
+      "Performance marketing",
+      "UX/UI design",
+      "Content strategy",
+    ],
+    coreProducts: [
+      "Analytics dashboards",
+      "Automation templates",
+      "Brand guideline kits",
+    ],
+
+    salesChannels: [
+      "Website",
+      "Email & WhatsApp",
+      "Partner agencies",
+      "Direct outreach",
+    ],
+    transactionTypes: [
+      "Project-based",
+      "Retainer",
+      "Hybrid packages",
+    ],
+
+    structureType: "Single-location", // "Single-location" | "Multi-branch" | "Franchise" | "Online-only"
+    hqLocation: "Istanbul, TR",
+    serviceRegions: [
+      "Turkey (primary: Marmara region)",
+      "Europe (select projects)",
+    ],
+  }
 
   useEffect(() => {
     if (currentWorkspace?.id && brandSlug) {
@@ -388,53 +441,76 @@ export default function BrandProfilePage() {
 
       {/* Tabs with Edit Button */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
-        <div className="flex items-center justify-between gap-4">
-          <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1">
+        <div className="flex items-start justify-between gap-2 md:gap-4">
+          <div className="flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1 min-w-max">
             <TabsHighlight className="bg-background shadow-sm rounded-md">
               <TabsHighlightItem value="overview">
-                <TabsTrigger value="overview" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
-                  <IconLayoutDashboard className="h-4 w-4" />
-                  Overview
+                <TabsTrigger value="overview" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconLayoutDashboard className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "overview") && <span>Overview</span>}
+                </TabsTrigger>
+              </TabsHighlightItem>
+              
+              <TabsHighlightItem value="business">
+                <TabsTrigger value="business" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconBriefcase className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "business") && <span>Business</span>}
                 </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="audience">
-                <TabsTrigger value="audience" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
-                  <IconUsers className="h-4 w-4" />
-                  Audience & Positioning
+                <TabsTrigger value="audience" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconUsers className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "audience") && <span>Audience</span>}
                 </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="voice">
-                <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
-                  <IconMessageCircle className="h-4 w-4" />
-                  Voice & Tone
+                <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconMessageCircle className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "voice") && <span>Voice</span>}
                 </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="rules">
-                <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
-                  <IconShieldCheck className="h-4 w-4" />
-                  Content Rules
+                <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconShieldCheck className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "rules") && <span>Rules</span>}
                 </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="assets">
-                <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
-                  <IconPalette className="h-4 w-4" />
-                  Assets & AI Config
+                <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                  <IconPalette className="h-4 w-4 shrink-0" />
+                  {(!isMobile || activeTab === "assets") && <span>Assets</span>}
                 </TabsTrigger>
               </TabsHighlightItem>
             </TabsHighlight>
           </TabsList>
+          </div>
           
-          <Button size="sm">
+          <Button size="sm" className="shrink-0">
             <IconPencil className="h-4 w-4" />
-            Edit Profile
+            <span className="hidden sm:inline ml-2">Edit Profile</span>
           </Button>
         </div>
 
-        <TabsContents className="mt-2">
+        <motion.div 
+          className="mt-4"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={(e, info: PanInfo) => {
+            const swipeThreshold = 50
+            if (info.offset.x > swipeThreshold) {
+              handleSwipe('right')
+            } else if (info.offset.x < -swipeThreshold) {
+              handleSwipe('left')
+            }
+          }}
+        >
+        <TabsContents>
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
             {/* Optimization Score - Outer Container */}
@@ -617,10 +693,206 @@ export default function BrandProfilePage() {
                           : 'Not set'}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Working Hours</span>
+                      <span className="font-medium">Mon–Fri 09:00–18:00</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Business & Offering Tab */}
+          <TabsContent value="business" className="space-y-4">
+            {/* Business Overview */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Business Overview</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Business Type</div>
+                    <div className="font-medium">{businessProfile.businessType}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Market Type</div>
+                    <div className="font-medium">{businessProfile.marketType}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Delivery Model</div>
+                    <div className="font-medium">{businessProfile.deliveryModel}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Core Offerings */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Core Offerings</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPlus className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2 text-sm">
+                  <div>
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">
+                      Core Services
+                    </div>
+                    {businessProfile.coreServices?.length ? (
+                      <ul className="space-y-2">
+                        {businessProfile.coreServices.map((item) => (
+                          <li key={item} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                            <div className="flex items-center gap-2">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              <span>{item}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <IconX className="h-3 w-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">
+                        No services defined yet.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">
+                      Core Products
+                    </div>
+                    {businessProfile.coreProducts?.length ? (
+                      <ul className="space-y-2">
+                        {businessProfile.coreProducts.map((item) => (
+                          <li key={item} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                            <div className="flex items-center gap-2">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              <span>{item}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <IconX className="h-3 w-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">
+                        No products defined yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sales & Service Channels */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Sales & Service Channels</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2 text-sm">
+                  <div>
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">
+                      Sales Channels
+                    </div>
+                    {businessProfile.salesChannels?.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {businessProfile.salesChannels.map((item) => (
+                          <Badge key={item} variant="secondary" className="gap-1 pr-1">
+                            {item}
+                            <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                              <IconX className="h-2.5 w-2.5" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">
+                        No sales channels defined yet.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">
+                      Transaction Types
+                    </div>
+                    {businessProfile.transactionTypes?.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {businessProfile.transactionTypes.map((item) => (
+                          <Badge key={item} variant="secondary" className="gap-1 pr-1">
+                            {item}
+                            <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                              <IconX className="h-2.5 w-2.5" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">
+                        No transaction types defined yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Service Regions & Structure */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Service Regions & Structure</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2 text-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Structure Type</span>
+                      <span className="font-medium">{businessProfile.structureType}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">HQ Location</span>
+                      <span className="font-medium">{businessProfile.hqLocation}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">
+                      Service Regions
+                    </div>
+                    {businessProfile.serviceRegions?.length ? (
+                      <div className="space-y-2">
+                        {businessProfile.serviceRegions.map((item) => (
+                          <div key={item} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                            <span>{item}</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <IconX className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">
+                        No service regions defined yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Audience & Positioning Tab */}
@@ -1077,6 +1349,7 @@ export default function BrandProfilePage() {
             </div>
           </TabsContent>
         </TabsContents>
+        </motion.div>
       </Tabs>
 
       {/* Avatar Crop Dialog */}

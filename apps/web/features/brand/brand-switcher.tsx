@@ -32,6 +32,7 @@ export function BrandSwitcher() {
 
   const [brands, setBrands] = React.useState<Brand[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
+  const [logoPreview, setLogoPreview] = React.useState<{ [brandId: string]: string }>({})
 
   // Load brands
   React.useEffect(() => {
@@ -39,6 +40,22 @@ export function BrandSwitcher() {
       loadBrands()
     }
   }, [currentWorkspace?.id])
+
+  // Listen for logo preview updates from profile page
+  React.useEffect(() => {
+    const handleLogoPreview = (event: CustomEvent) => {
+      const { brandId, previewUrl } = event.detail
+      setLogoPreview(prev => ({
+        ...prev,
+        [brandId]: previewUrl
+      }))
+    }
+
+    window.addEventListener('brand-logo-preview' as any, handleLogoPreview as any)
+    return () => {
+      window.removeEventListener('brand-logo-preview' as any, handleLogoPreview as any)
+    }
+  }, [])
 
   const loadBrands = async () => {
     if (!currentWorkspace?.id) return
@@ -78,7 +95,11 @@ export function BrandSwitcher() {
           className="h-auto !px-2 py-1.5 data-[state=open]:bg-accent gap-2"
         >
           <Avatar className="h-8 w-8 rounded-md">
-            <AvatarImage src={currentBrand.logoUrl || undefined} alt={currentBrand.name} />
+            <AvatarImage 
+              src={logoPreview[currentBrand.id] || currentBrand.logoUrl || undefined} 
+              alt={currentBrand.name}
+              key={logoPreview[currentBrand.id] || currentBrand.logoUrl || 'fallback'}
+            />
             <AvatarFallback className="rounded-md text-xs">
               {currentBrand.name.charAt(0).toUpperCase()}
             </AvatarFallback>
@@ -107,7 +128,11 @@ export function BrandSwitcher() {
             disabled={brand.slug === currentBrandSlug}
           >
             <Avatar className="h-8 w-8 rounded-md">
-              <AvatarImage src={brand.logoUrl || undefined} alt={brand.name} />
+              <AvatarImage 
+                src={logoPreview[brand.id] || brand.logoUrl || undefined} 
+                alt={brand.name}
+                key={logoPreview[brand.id] || brand.logoUrl || 'fallback'}
+              />
               <AvatarFallback className="rounded-md text-xs">
                 {brand.name.charAt(0).toUpperCase()}
               </AvatarFallback>

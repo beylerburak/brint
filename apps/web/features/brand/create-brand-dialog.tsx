@@ -220,6 +220,20 @@ export function CreateBrandDialog({
 
     setIsUploadingLogo(true)
     try {
+      // If there's an existing logo, delete it first
+      if (logoMediaId) {
+        try {
+          await fetch(`http://localhost:3001/workspaces/${workspaceId}/media/${logoMediaId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          })
+          console.log('Old logo deleted:', logoMediaId)
+        } catch (error) {
+          console.warn('Failed to delete old logo:', error)
+          // Don't fail the whole operation
+        }
+      }
+
       const croppedBlob = await createCroppedImage()
       const formData = new FormData()
       formData.append('file', croppedBlob, selectedFile.name)

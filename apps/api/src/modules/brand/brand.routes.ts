@@ -28,9 +28,10 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { workspaceId } = request.params as { workspaceId: string };
+    const userId = request.auth?.userId;
 
     try {
-      const brand = await createBrand(workspaceId, request.body as any);
+      const brand = await createBrand(workspaceId, request.body as any, userId);
 
       return reply.status(201).send({
         success: true,
@@ -231,9 +232,10 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { workspaceId, brandId } = request.params as { workspaceId: string; brandId: string };
+    const userId = request.auth?.userId;
 
     try {
-      const brand = await updateBrand(brandId, workspaceId, request.body as any);
+      const brand = await updateBrand(brandId, workspaceId, request.body as any, userId);
 
       return reply.status(200).send({
         success: true,
@@ -286,9 +288,10 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { workspaceId, brandId } = request.params as { workspaceId: string; brandId: string };
+    const userId = request.auth?.userId;
 
     try {
-      await deleteBrand(brandId, workspaceId);
+      await deleteBrand(brandId, workspaceId, userId);
 
       return reply.status(200).send({
         success: true,

@@ -64,7 +64,11 @@ export async function isBrandSlugAvailable(slug: string, excludeBrandId?: string
 /**
  * Create a new brand
  */
-export async function createBrand(workspaceId: string, data: CreateBrandInput) {
+export async function createBrand(
+  workspaceId: string,
+  data: CreateBrandInput,
+  userId?: string
+) {
   logger.info({ workspaceId, slug: data.slug }, 'Creating brand');
 
   // Validate input
@@ -94,7 +98,7 @@ export async function createBrand(workspaceId: string, data: CreateBrandInput) {
 
   logger.info({ brandId: brand.id, slug: brand.slug }, 'Brand created');
 
-  // Log activity (example - actorUserId should be passed from route)
+  // Log activity
   await logActivity(
     buildBrandActivity({
       workspaceId,
@@ -102,11 +106,14 @@ export async function createBrand(workspaceId: string, data: CreateBrandInput) {
       entityId: brand.id,
       eventKey: 'brand.created',
       message: `Brand created: ${brand.name}`,
-      actorType: ActivityActorType.SYSTEM, // TODO: Change to USER when userId is available
+      actorType: userId ? ActivityActorType.USER : ActivityActorType.SYSTEM,
+      actorUserId: userId,
       payload: {
         name: brand.name,
         slug: brand.slug,
         industry: brand.industry,
+        country: brand.country,
+        city: brand.city,
       },
     })
   );
@@ -120,7 +127,8 @@ export async function createBrand(workspaceId: string, data: CreateBrandInput) {
 export async function updateBrand(
   brandId: string,
   workspaceId: string,
-  data: UpdateBrandInput
+  data: UpdateBrandInput,
+  userId?: string
 ) {
   logger.info({ brandId, workspaceId }, 'Updating brand');
 
@@ -146,13 +154,32 @@ export async function updateBrand(
 
   logger.info({ brandId }, 'Brand updated');
 
+  // Log activity
+  await logActivity(
+    buildBrandActivity({
+      workspaceId,
+      brandId,
+      entityId: brandId,
+      eventKey: 'brand.updated',
+      message: `Brand updated: ${brand.name}`,
+      actorType: userId ? ActivityActorType.USER : ActivityActorType.SYSTEM,
+      actorUserId: userId,
+      context: 'brand_profile',
+      payload: validated,
+    })
+  );
+
   return brand;
 }
 
 /**
  * Delete brand
  */
-export async function deleteBrand(brandId: string, workspaceId: string) {
+export async function deleteBrand(
+  brandId: string,
+  workspaceId: string,
+  userId?: string
+) {
   logger.info({ brandId, workspaceId }, 'Deleting brand');
 
   // Get brand info before deletion
@@ -183,7 +210,8 @@ export async function deleteBrand(brandId: string, workspaceId: string) {
       entityId: brandId,
       eventKey: 'brand.deleted',
       message: `Brand deleted: ${brand.name}`,
-      actorType: ActivityActorType.SYSTEM, // TODO: Change to USER when userId is available
+      actorType: userId ? ActivityActorType.USER : ActivityActorType.SYSTEM,
+      actorUserId: userId,
       payload: {
         name: brand.name,
         slug: brand.slug,

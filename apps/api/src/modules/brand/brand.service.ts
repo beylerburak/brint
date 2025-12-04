@@ -8,7 +8,9 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { z } from 'zod';
 import type { BrandStatus, WorkspacePlan } from '@prisma/client';
+import { ActivityActorType } from '@prisma/client';
 import { APP_CONFIG } from '../../config/app-config.js';
+import { logActivity, buildBrandActivity } from '../../core/activity/activity-log.service.js';
 
 const CreateBrandSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -92,6 +94,23 @@ export async function createBrand(workspaceId: string, data: CreateBrandInput) {
 
   logger.info({ brandId: brand.id, slug: brand.slug }, 'Brand created');
 
+  // Log activity (example - actorUserId should be passed from route)
+  await logActivity(
+    buildBrandActivity({
+      workspaceId,
+      brandId: brand.id,
+      entityId: brand.id,
+      eventKey: 'brand.created',
+      message: `Brand created: ${brand.name}`,
+      actorType: ActivityActorType.SYSTEM, // TODO: Change to USER when userId is available
+      payload: {
+        name: brand.name,
+        slug: brand.slug,
+        industry: brand.industry,
+      },
+    })
+  );
+
   return brand;
 }
 
@@ -136,6 +155,16 @@ export async function updateBrand(
 export async function deleteBrand(brandId: string, workspaceId: string) {
   logger.info({ brandId, workspaceId }, 'Deleting brand');
 
+  // Get brand info before deletion
+  const brand = await prisma.brand.findFirst({
+    where: { id: brandId, workspaceId },
+    select: { id: true, name: true, slug: true },
+  });
+
+  if (!brand) {
+    throw new Error('BRAND_NOT_FOUND');
+  }
+
   // Delete brand
   await prisma.brand.delete({
     where: {
@@ -145,6 +174,22 @@ export async function deleteBrand(brandId: string, workspaceId: string) {
   });
 
   logger.info({ brandId }, 'Brand deleted');
+
+  // Log activity
+  await logActivity(
+    buildBrandActivity({
+      workspaceId,
+      brandId,
+      entityId: brandId,
+      eventKey: 'brand.deleted',
+      message: `Brand deleted: ${brand.name}`,
+      actorType: ActivityActorType.SYSTEM, // TODO: Change to USER when userId is available
+      payload: {
+        name: brand.name,
+        slug: brand.slug,
+      },
+    })
+  );
 }
 
 /**

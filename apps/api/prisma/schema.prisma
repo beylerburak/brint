@@ -62,6 +62,37 @@ enum BrandStatus {
   ARCHIVED
 }
 
+enum ActivityEntityType {
+  WORKSPACE
+  BRAND
+  SOCIAL_ACCOUNT
+  CONTENT
+  PUBLICATION
+  MEDIA
+  USER
+  SETTINGS
+  OTHER
+}
+
+enum ActivityActorType {
+  USER // paneldeki kullanıcı
+  SYSTEM // uygulamanın kendi otomatik işleri
+  WORKER // queue worker'ları
+  INTEGRATION // dış servisler: Meta API, Google Ads vb.
+}
+
+enum ActivityVisibility {
+  INTERNAL // sadece internal ekranlarda
+  CLIENT // müşteri de görebilir
+  SYSTEM // sadece debug/log amaçlı, UI'da gösterilmeyebilir
+}
+
+enum ActivitySeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -124,11 +155,12 @@ model Workspace {
   // Generic settings for per-workspace configuration
   settings Json?
 
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  members   WorkspaceMember[]
-  brands    Brand[]
-  media     Media[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  members      WorkspaceMember[]
+  brands       Brand[]
+  media        Media[]
+  activityLogs ActivityLog[]
 
   @@map("workspaces")
 }
@@ -179,9 +211,10 @@ model Brand {
 
   logoMediaId String?
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  logoMedia Media?    @relation("BrandLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
-  media     Media[]
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  logoMedia    Media?        @relation("BrandLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+  media        Media[]
+  activityLogs ActivityLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -235,4 +268,62 @@ model Media {
   @@index([workspaceId])
   @@index([brandId])
   @@map("media")
+}
+
+/// ActivityLog - Global event/activity log for the entire application.
+/// 
+/// This single table captures all important events across domains:
+/// - Brand operations: "brand.created", "brand.updated"
+/// - Content operations: "content.scheduled", "content.published"
+/// - Publication events: "publication.failed", "publication.completed"
+/// - Worker events: automated tasks and background jobs
+/// 
+/// Benefits:
+/// - Single source of truth for all activities
+/// - Easy timeline reconstruction via entityType + entityId
+/// - Flexible actor types (USER, SYSTEM, WORKER, INTEGRATION)
+/// - Visibility control (INTERNAL, CLIENT, SYSTEM)
+/// - Rich payload for debugging and audit trails
+model ActivityLog {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String? // brand'e bağlı olmayan workspace-level eventler için null olabilir
+
+  entityType ActivityEntityType
+  entityId   String // Brand.id, Content.id, Publication.id vs.
+
+  /// Domain seviyesinde event kodu:
+  /// Örn: "brand.created", "brand.profile_updated",
+  /// "content.scheduled", "publication.failed"
+  eventKey String
+
+  /// UI'da kısa açıklama olarak gösterilebilecek mesaj
+  message String?
+
+  /// Ek kategori / context:
+  /// Örn: "brand_profile", "scheduler", "publication_worker"
+  context String?
+
+  actorType   ActivityActorType
+  actorUserId String? // USER ise dolu, diğer actor tiplerinde genelde null
+  actorLabel  String? // "Scheduler Worker", "Meta API" gibi serbest text
+
+  /// Detaylı event payload'u:
+  /// örn: before/after diff, error bilgileri, sayısal değerler
+  payload Json?
+
+  visibility ActivityVisibility @default(INTERNAL)
+  severity   ActivitySeverity   @default(INFO)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  brand     Brand?    @relation(fields: [brandId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([brandId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([eventKey, createdAt])
+  @@map("activity_logs")
 }

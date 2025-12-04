@@ -5,10 +5,21 @@
  * Contains business rules and validation logic.
  */
 
+import type { TimezonePreference, DateFormat, TimeFormat } from '@prisma/client';
+
 export type UserProps = {
   id: string;
   email: string;
   name?: string | null;
+  avatarUrl?: string | null;
+  timezonePreference: TimezonePreference;
+  timezone?: string | null;
+  locale?: string | null;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  phoneNumber?: string | null;
+  phoneVerifiedAt?: Date | null;
+  settings?: Record<string, any> | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -17,6 +28,15 @@ export class UserEntity {
   public readonly id: string;
   public readonly email: string;
   public readonly name: string | null;
+  public readonly avatarUrl: string | null;
+  public readonly timezonePreference: TimezonePreference;
+  public readonly timezone: string | null;
+  public readonly locale: string | null;
+  public readonly dateFormat: DateFormat;
+  public readonly timeFormat: TimeFormat;
+  public readonly phoneNumber: string | null;
+  public readonly phoneVerifiedAt: Date | null;
+  public readonly settings: Record<string, any> | null;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -24,6 +44,15 @@ export class UserEntity {
     this.id = props.id;
     this.email = props.email;
     this.name = props.name ?? null;
+    this.avatarUrl = props.avatarUrl ?? null;
+    this.timezonePreference = props.timezonePreference;
+    this.timezone = props.timezone ?? null;
+    this.locale = props.locale ?? null;
+    this.dateFormat = props.dateFormat;
+    this.timeFormat = props.timeFormat;
+    this.phoneNumber = props.phoneNumber ?? null;
+    this.phoneVerifiedAt = props.phoneVerifiedAt ?? null;
+    this.settings = props.settings ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -49,6 +78,15 @@ export class UserEntity {
     id: string;
     email: string;
     name: string | null;
+    avatarUrl: string | null;
+    timezonePreference: TimezonePreference;
+    timezone: string | null;
+    locale: string | null;
+    dateFormat: DateFormat;
+    timeFormat: TimeFormat;
+    phoneNumber: string | null;
+    phoneVerifiedAt: Date | null;
+    settings: any;
     createdAt: Date;
     updatedAt: Date;
   }): UserEntity {
@@ -56,6 +94,15 @@ export class UserEntity {
       id: prismaUser.id,
       email: prismaUser.email,
       name: prismaUser.name,
+      avatarUrl: prismaUser.avatarUrl,
+      timezonePreference: prismaUser.timezonePreference,
+      timezone: prismaUser.timezone,
+      locale: prismaUser.locale,
+      dateFormat: prismaUser.dateFormat,
+      timeFormat: prismaUser.timeFormat,
+      phoneNumber: prismaUser.phoneNumber,
+      phoneVerifiedAt: prismaUser.phoneVerifiedAt,
+      settings: prismaUser.settings as Record<string, any> | null,
       createdAt: prismaUser.createdAt,
       updatedAt: prismaUser.updatedAt,
     });
@@ -69,6 +116,15 @@ export class UserEntity {
       id: this.id,
       email: this.email,
       name: this.name,
+      avatarUrl: this.avatarUrl,
+      timezonePreference: this.timezonePreference,
+      timezone: this.timezone,
+      locale: this.locale,
+      dateFormat: this.dateFormat,
+      timeFormat: this.timeFormat,
+      phoneNumber: this.phoneNumber,
+      phoneVerifiedAt: this.phoneVerifiedAt,
+      settings: this.settings,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

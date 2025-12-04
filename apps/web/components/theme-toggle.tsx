@@ -17,34 +17,79 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="outline" size="icon" disabled>
-        <Sun className="size-4" />
+      <Button variant="ghost" size="icon" disabled>
+        <Sun className="size-5" />
         <span className="sr-only">Toggle theme</span>
       </Button>
     )
   }
 
   const handleToggle = () => {
-    if (theme === "light") {
-      setTheme("dark")
-    } else if (theme === "dark") {
-      setTheme("light")
+    // Inject animation styles
+    const styleId = `theme-transition-${Date.now()}`
+    const style = document.createElement('style')
+    style.id = styleId
+    
+    // Circle expand animation from center
+    const css = `
+      @supports (view-transition-name: root) {
+        ::view-transition-old(root) { 
+          animation: none;
+        }
+        ::view-transition-new(root) {
+          animation: circle-expand 0.4s ease-out;
+          transform-origin: center;
+        }
+        @keyframes circle-expand {
+          from {
+            clip-path: circle(0% at 50% 50%);
+          }
+          to {
+            clip-path: circle(150% at 50% 50%);
+          }
+        }
+      }
+    `
+    
+    style.textContent = css
+    document.head.appendChild(style)
+    
+    // Clean up animation styles after transition
+    setTimeout(() => {
+      const styleEl = document.getElementById(styleId)
+      if (styleEl) {
+        styleEl.remove()
+      }
+    }, 3000)
+
+    // Use View Transitions API if available
+    const updateTheme = () => {
+      if (theme === "light") {
+        setTheme("dark")
+      } else if (theme === "dark") {
+        setTheme("light")
+      } else {
+        setTheme("light")
+      }
+    }
+
+    if ('startViewTransition' in document) {
+      (document as any).startViewTransition(updateTheme)
     } else {
-      // system veya undefined durumunda light'a geç
-      setTheme("light")
+      updateTheme()
     }
   }
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={handleToggle}
     >
       {theme === "dark" ? (
-        <Sun className="size-4" />
+        <Sun className="size-5" />
       ) : (
-        <Moon className="size-4" />
+        <Moon className="size-5" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>

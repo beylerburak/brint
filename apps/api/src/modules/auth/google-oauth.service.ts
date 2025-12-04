@@ -83,10 +83,26 @@ export async function loginOrRegisterWithGoogle(
     ipAddress: ctx.ipAddress ?? null,
   });
 
-  // 4) Token'ları üret
+  // 4) Fetch all workspace memberships for JWT payload
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId: user.id },
+    select: {
+      workspaceId: true,
+      role: true,
+    },
+  });
+
+  const workspaces = memberships.map((m) => ({
+    id: m.workspaceId,
+    role: m.role,
+  }));
+
+  // 5) Token'ları üret
   const accessToken = tokenService.signAccessToken({
     sub: user.id,
-    // workspaceId/brandId ileride workspace seçimi sonrası doldurulacak
+    email: user.email,
+    workspaces,
+    hasCompletedOnboarding: !!user.onboardingCompletedAt,
   });
 
   const refreshToken = tokenService.signRefreshToken({

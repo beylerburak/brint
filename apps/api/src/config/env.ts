@@ -3,11 +3,16 @@ import { z } from 'zod';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Load .env file from project root
+// Load .env file - prioritize apps/api/.env, fallback to project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// Go up from apps/api/src/config to project root
+// Go up from apps/api/src/config to apps/api
+const apiDir = join(__dirname, '../../');
+// Go up to project root
 const rootDir = join(__dirname, '../../../../');
+
+// Try apps/api/.env first (with override), then root .env
+config({ path: join(apiDir, '.env'), override: true });
 config({ path: join(rootDir, '.env') });
 
 const envSchema = z.object({

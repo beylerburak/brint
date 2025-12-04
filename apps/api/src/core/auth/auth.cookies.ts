@@ -4,6 +4,8 @@ import { authConfig } from '../../config/index.js';
 const ACCESS_COOKIE_NAME = 'access_token';
 const REFRESH_COOKIE_NAME = 'refresh_token';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export function setAuthCookies(reply: FastifyReply, tokens: {
   accessToken: string;
   refreshToken: string;
@@ -11,15 +13,21 @@ export function setAuthCookies(reply: FastifyReply, tokens: {
   const accessMaxAgeSeconds = authConfig.accessToken.expiresInMinutes * 60;
   const refreshMaxAgeSeconds = authConfig.refreshToken.expiresInDays * 24 * 60 * 60;
 
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+
   reply
     .setCookie(ACCESS_COOKIE_NAME, tokens.accessToken, {
-      // secure, httpOnly, sameSite vs. cookie plugin'de global olarak set
+      ...cookieOptions,
       maxAge: accessMaxAgeSeconds,
-      path: '/',
     })
     .setCookie(REFRESH_COOKIE_NAME, tokens.refreshToken, {
+      ...cookieOptions,
       maxAge: refreshMaxAgeSeconds,
-      path: '/',
     });
 }
 

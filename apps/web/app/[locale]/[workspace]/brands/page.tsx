@@ -1,0 +1,242 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import { IconBrandAsana, IconPlus, IconDots } from "@tabler/icons-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { CursorProvider, Cursor, CursorFollow } from "@/components/animate-ui/components/animate/cursor"
+import { CreateBrandDialog } from "@/features/brand/create-brand-dialog"
+import { UpgradeDialog } from "@/features/workspace/upgrade-dialog"
+
+type Brand = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  industry: string | null
+  country: string | null
+  city: string | null
+  status: 'ACTIVE' | 'ARCHIVED'
+  logoMediaId: string | null
+  logoUrl: string | null
+  mediaCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+const PLAN_LIMITS = {
+  FREE: { maxBrands: 1, maxStorageGB: 1, maxTeamMembers: 2 },
+  STARTER: { maxBrands: 5, maxStorageGB: 10, maxTeamMembers: 5 },
+  PRO: { maxBrands: 20, maxStorageGB: 100, maxTeamMembers: 20 },
+  AGENCY: { maxBrands: -1, maxStorageGB: 500, maxTeamMembers: 50 },
+} as const
+
+export default function BrandsPage() {
+  const t = useTranslations('brands')
+  const params = useParams()
+  const { currentWorkspace } = useWorkspace()
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+
+  const canCreateBrand = () => {
+    if (!currentWorkspace) return false
+    const planLimit = PLAN_LIMITS[currentWorkspace.plan as keyof typeof PLAN_LIMITS]
+    if (planLimit.maxBrands === -1) return true // unlimited
+    return brands.length < planLimit.maxBrands
+  }
+
+  const getBrandLimitText = () => {
+    if (!currentWorkspace) return ''
+    const planLimit = PLAN_LIMITS[currentWorkspace.plan as keyof typeof PLAN_LIMITS]
+    if (planLimit.maxBrands === -1) return 'Unlimited'
+    return `${brands.length}/${planLimit.maxBrands}`
+  }
+
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+
+    if (diffDays > 30) {
+      const diffMonths = Math.floor(diffDays / 30)
+      return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`
+    } else if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    } else if (diffMinutes > 0) {
+      return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`
+    } else {
+      return 'Just now'
+    }
+  }
+
+  useEffect(() => {
+    if (currentWorkspace?.id) {
+      loadBrands()
+    }
+  }, [currentWorkspace?.id])
+
+  const loadBrands = async () => {
+    if (!currentWorkspace?.id) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(
+        `http://localhost:3001/workspaces/${currentWorkspace.id}/brands`,
+        { credentials: 'include' }
+      )
+      const data = await response.json()
+      if (data.success) {
+        setBrands(data.brands)
+      }
+    } catch (error) {
+      console.error('Failed to load brands:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  if (brands.length === 0) {
+    return (
+      <>
+        <div className="flex items-center justify-center min-h-[600px]">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <IconBrandAsana className="size-12" />
+              </EmptyMedia>
+              <EmptyTitle>{t('noBrands')}</EmptyTitle>
+              <EmptyDescription>{t('noBrandsDesc')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <IconPlus className="h-4 w-4" />
+                {t('createBrand')}
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+        
+        <CreateBrandDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          workspaceId={currentWorkspace?.id || ''}
+          onSuccess={loadBrands}
+        />
+      </>
+    )
+  }
+
+  return (
+    <CursorProvider>
+      <Cursor />
+      <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <IconDots className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {getBrandLimitText()} brands
+          </span>
+        </div>
+        <Button 
+          onClick={() => {
+            if (canCreateBrand()) {
+              setShowCreateDialog(true)
+            } else {
+              setShowUpgradeDialog(true)
+            }
+          }}
+        >
+          <IconPlus className="h-4 w-4" />
+          {t('createBrand')}
+        </Button>
+      </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {brands.map((brand) => (
+            <div key={brand.id} className="relative">
+              <CursorFollow>
+                {t('goToBrandStudio')}
+              </CursorFollow>
+              <div className="rounded-lg border p-4 hover:bg-accent/50 transition-colors cursor-pointer">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10 rounded-lg">
+                  <AvatarImage src={brand.logoUrl || undefined} alt={brand.name} />
+                  <AvatarFallback className="rounded-lg">
+                    {brand.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-semibold truncate">{brand.name}</h3>
+                        <span className="text-sm text-muted-foreground">@{brand.slug}</span>
+                      </div>
+                      {brand.description && (
+                        <p className="text-sm text-muted-foreground truncate">{brand.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {getRelativeTime(brand.createdAt)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {brand.status.toLowerCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <CreateBrandDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          workspaceId={currentWorkspace?.id || ''}
+          onSuccess={loadBrands}
+        />
+
+        <UpgradeDialog
+          open={showUpgradeDialog}
+          onOpenChange={setShowUpgradeDialog}
+          currentPlan={currentWorkspace?.plan || 'FREE'}
+          feature="brands"
+        />
+      </div>
+    </CursorProvider>
+  )
+}
+

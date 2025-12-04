@@ -1,29 +1,19 @@
-# Docker Compose configuration for development environment
-# Services: Postgres, Redis, Adminer
-#
-# Usage:
-#   docker compose up -d    # Start all services in detached mode
-#   docker compose down     # Stop and remove all services
+version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: brint-postgres
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: brint_dev
+      POSTGRES_DB: brint_alt
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - brint-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -32,27 +22,31 @@ services:
       - "6379:6379"
     networks:
       - brint-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  adminer:
-    image: adminer:latest
-    container_name: brint-adminer
+  minio:
+    image: minio/minio:latest
+    container_name: brint-minio
     ports:
-      - "8080:8080"
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
     networks:
       - brint-network
-    depends_on:
-      postgres:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  postgres_data:
+  minio_data:
 
 networks:
   brint-network:
     driver: bridge
-
-volumes:
-  postgres_data:
-

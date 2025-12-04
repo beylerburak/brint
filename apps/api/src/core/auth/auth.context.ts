@@ -41,19 +41,25 @@ export default fp(async function authContextPlugin(app: FastifyInstance) {
     // Default to null (public request)
     request.auth = null;
 
-    const authHeader = request.headers['authorization'];
+    let token: string | undefined;
 
-    // No authorization header - request remains public
-    if (!authHeader || typeof authHeader !== 'string') {
-      return;
+    // Try to get token from Authorization header first
+    const authHeader = request.headers['authorization'];
+    if (authHeader && typeof authHeader === 'string') {
+      // Parse Bearer token
+      const [scheme, headerToken] = authHeader.split(' ');
+      if (headerToken && scheme.toLowerCase() === 'bearer') {
+        token = headerToken;
+      }
     }
 
-    // Parse Bearer token
-    const [scheme, token] = authHeader.split(' ');
+    // If no header token, try to get from cookie
+    if (!token) {
+      token = request.cookies?.access_token;
+    }
 
-    if (!token || scheme.toLowerCase() !== 'bearer') {
-      // Invalid format - log but don't fail
-      request.log.debug({ authHeader }, 'Invalid Authorization header format');
+    // No token found - request remains public
+    if (!token) {
       return;
     }
 
@@ -88,8 +94,13 @@ export default fp(async function authContextPlugin(app: FastifyInstance) {
         },
       };
     } catch (err) {
-      // Invalid/expired token - log but don't fail (no 401 at this stage)
-      request.log.warn({ err }, 'Failed to verify access token');
+      // Invalid/expired token - clear cookies and log
+      request.log.warn({ err }, 'Failed to verify access token - clearing cookies');
+      
+      // Clear invalid cookies
+      reply.clearCookie('access_token', { path: '/' });
+      reply.clearCookie('refresh_token', { path: '/' });
+      
       request.auth = null;
     }
   });

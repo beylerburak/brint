@@ -7,7 +7,8 @@
 
 import { prisma } from '../../lib/prisma.js';
 import { WorkspaceEntity } from './workspace.entity.js';
-import { Prisma } from '@prisma/client';
+import { Prisma, WorkspacePlan } from '@prisma/client';
+import { APP_CONFIG } from '../../config/app-config.js';
 
 export class WorkspaceRepository {
   /**
@@ -51,12 +52,26 @@ export class WorkspaceRepository {
   async createWorkspace(data: {
     name: string;
     slug: string;
+    ownerUserId: string;
+    avatarUrl?: string | null;
+    timezone?: string;
+    locale?: string;
+    baseCurrency?: string;
+    plan?: WorkspacePlan;
+    settings?: Record<string, any>;
   }): Promise<WorkspaceEntity> {
     try {
       const workspace = await prisma.workspace.create({
         data: {
           name: data.name,
           slug: data.slug,
+          ownerUserId: data.ownerUserId,
+          avatarUrl: data.avatarUrl ?? null,
+          timezone: data.timezone ?? APP_CONFIG.defaults.timezone,
+          locale: data.locale ?? APP_CONFIG.defaults.locale,
+          baseCurrency: data.baseCurrency ?? APP_CONFIG.defaults.baseCurrency,
+          plan: data.plan ?? (APP_CONFIG.defaults.plan as WorkspacePlan),
+          settings: data.settings ?? {},
         },
       });
 
@@ -84,6 +99,12 @@ export class WorkspaceRepository {
     userName?: string | null;
     workspaceName: string;
     workspaceSlug: string;
+    avatarUrl?: string | null;
+    timezone?: string;
+    locale?: string;
+    baseCurrency?: string;
+    plan?: WorkspacePlan;
+    settings?: Record<string, any>;
   }): Promise<{
     user: { id: string; email: string; name: string | null };
     workspace: WorkspaceEntity;
@@ -104,11 +125,18 @@ export class WorkspaceRepository {
         });
       }
 
-      // Create workspace
+      // Create workspace with APP_CONFIG defaults
       const workspace = await tx.workspace.create({
         data: {
           name: params.workspaceName,
           slug: params.workspaceSlug,
+          ownerUserId: user.id,
+          avatarUrl: params.avatarUrl ?? null,
+          timezone: params.timezone ?? APP_CONFIG.defaults.timezone,
+          locale: params.locale ?? APP_CONFIG.defaults.locale,
+          baseCurrency: params.baseCurrency ?? APP_CONFIG.defaults.baseCurrency,
+          plan: params.plan ?? (APP_CONFIG.defaults.plan as WorkspacePlan),
+          settings: params.settings ?? {},
         },
       });
 
@@ -117,7 +145,7 @@ export class WorkspaceRepository {
         data: {
           userId: user.id,
           workspaceId: workspace.id,
-          role: 'owner',
+          role: 'OWNER',
         },
       });
 

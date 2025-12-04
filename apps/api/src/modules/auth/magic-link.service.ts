@@ -166,10 +166,26 @@ export const magicLinkService = {
       ipAddress: context?.ipAddress ?? null,
     });
 
+    // Fetch all workspace memberships for JWT payload
+    const memberships = await prisma.workspaceMember.findMany({
+      where: { userId: user.id },
+      select: {
+        workspaceId: true,
+        role: true,
+      },
+    });
+
+    const workspaces = memberships.map((m) => ({
+      id: m.workspaceId,
+      role: m.role,
+    }));
+
     // Generate tokens
     const accessToken = tokenService.signAccessToken({
       sub: user.id,
-      wid: workspace.id,
+      email: user.email,
+      workspaces,
+      hasCompletedOnboarding: !!user.onboardingCompletedAt,
     });
 
     const refreshToken = tokenService.signRefreshToken({

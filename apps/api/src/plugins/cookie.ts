@@ -5,9 +5,10 @@ import { appConfig } from '../config/index.js';
 
 export default fp(async function cookiePlugin(app: FastifyInstance) {
   await app.register(cookie, {
+    secret: process.env.COOKIE_SECRET || 'cookie-secret-change-in-production',
     parseOptions: {
       httpOnly: true,
-      sameSite: 'lax', // OAuth redirect için 'strict' sıkıntılı olabilir
+      sameSite: 'lax',
       secure: appConfig.env === 'production',
       path: '/',
     },

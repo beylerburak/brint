@@ -1,12 +1,18 @@
 import jwt from 'jsonwebtoken';
 import { authConfig } from '../../config/index.js';
+import type { WorkspaceRole } from '@prisma/client';
+
+export type WorkspaceClaim = {
+  id: string;
+  role: WorkspaceRole;
+};
 
 export type AccessTokenPayload = {
   sub: string; // userId
-  wid?: string; // workspaceId
-  bid?: string; // brandId (ileride)
+  email: string;
+  workspaces: WorkspaceClaim[];
+  hasCompletedOnboarding: boolean;
   type: 'access';
-  // İleride role/permissions eklenebilir
 };
 
 export type RefreshTokenPayload = {

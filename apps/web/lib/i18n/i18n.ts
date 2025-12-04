@@ -15,9 +15,7 @@ export default getRequestConfig(async ({ locale }) => {
 
   return {
     locale: validLocale,
-    messages: {
-      common: messages,
-    },
+    messages,
   };
 });
 

@@ -10,87 +10,144 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum WorkspacePlan {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+}
+
+enum TimezonePreference {
+  WORKSPACE // Use workspace timezone
+  LOCAL // Use user's own timezone
+}
+
+enum DateFormat {
+  DMY // 31.12.2025
+  MDY // 12/31/2025
+  YMD // 2025-12-31
+}
+
+enum TimeFormat {
+  H24 // 23:45
+  H12 // 11:45 PM
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT // pdf, docx, ppt, etc.
+  FONT // otf, ttf, woff, woff2
+  ARCHIVE // zip, rar, 7z
+  OTHER
+}
+
+enum MediaStatus {
+  PENDING // record created, upload in progress or not started
+  PROCESSING // original uploaded, variants being generated
+  READY // everything done, safe to use in UI/publish
+  FAILED // processing failed
+}
+
+enum BrandStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model User {
-  id            String            @id @default(cuid())
-  email         String            @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String?   @unique
+  password      String? // bcrypt hash - optional for OAuth users
   name          String?
   emailVerified DateTime?
   avatarUrl     String?
-  googleId      String?           @unique
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  avatarMediaId String? // Reference to Media for avatar
+  googleId      String?   @unique
+
+  // Timezone and formatting preferences
+  timezonePreference TimezonePreference @default(WORKSPACE)
+  timezone           String? // User's own timezone (IANA), used when timezonePreference = LOCAL
+  locale             String? // e.g. "tr-TR"
+  dateFormat         DateFormat         @default(DMY)
+  timeFormat         TimeFormat         @default(H24)
+
+  // Contact / phone
+  phoneNumber     String?
+  phoneVerifiedAt DateTime?
+
+  // Onboarding lifecycle
+  onboardingCompletedAt DateTime? // null => onboarding incomplete
+
+  // Generic user settings (e.g. notifications, theme)
+  settings Json?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   workspaceMembers WorkspaceMember[]
-  sessions      Session[]
+  ownedWorkspaces  Workspace[]
+  sessions         Session[]
+  media            Media[]
+  avatarMedia      Media?            @relation("UserAvatar", fields: [avatarMediaId], references: [id])
 
   @@map("users")
 }
 
 model Workspace {
-  id        String            @id @default(cuid())
-  name      String
-  slug      String            @unique
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  // Owner relation
+  ownerUserId String
+  owner       User   @relation(fields: [ownerUserId], references: [id])
+
+  // Visual / branding
+  avatarUrl String?
+
+  // Config / localization
+  timezone     String @default("Europe/Istanbul")
+  locale       String @default("tr-TR")
+  baseCurrency String @default("TRY")
+
+  // Subscription-lite / plan
+  plan WorkspacePlan @default(FREE)
+
+  // Generic settings for per-workspace configuration
+  settings Json?
+
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
-  roles     Role[]
   brands    Brand[]
+  media     Media[]
 
   @@map("workspaces")
 }
 
 model WorkspaceMember {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String
   workspaceId String
-  role        String   // ileride enum'a çevrilebilir: 'owner' | 'admin' | 'member' vb.
-  createdAt   DateTime @default(now())
-  user      User      @relation(fields: [userId], references: [id])
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  role        WorkspaceRole @default(EDITOR)
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
 }
 
-model Role {
-  id           String   @id @default(cuid())
-  workspaceId  String?  // null ise global role, doluysa workspace-specific role
-  key          String   // örn: "workspace-owner", "content-manager"
-  name         String
-  description  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
-  rolePermissions RolePermission[]
-
-  @@map("roles")
-  @@unique([workspaceId, key]) // aynı workspace içinde aynı key iki kez olmasın, global roller için workspaceId null
-}
-
-model Permission {
-  id          String   @id @default(cuid())
-  key         String   @unique // örn: "workspace:settings.view"
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  rolePermissions RolePermission[]
-
-  @@map("permissions")
-}
-
-model RolePermission {
-  id           String   @id @default(cuid())
-  roleId       String
-  permissionId String
-  createdAt    DateTime @default(now())
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@map("role_permissions")
-  @@unique([roleId, permissionId])
-}
-
 model Session {
-  id           String   @id            // refresh token payload'daki `tid` ile birebir
+  id           String   @id // refresh token payload'daki `tid` ile birebir
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt    DateTime
@@ -99,22 +156,83 @@ model Session {
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
 
-  @@map("sessions")
   @@index([userId, expiresAt])
+  @@map("sessions")
 }
 
 model Brand {
-  id          String    @id @default(cuid())
+  id          String @id @default(cuid())
   workspaceId String
-  name        String
-  slug        String
-  description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  name String
+  slug String @unique
+
+  description String?
+  industry    String?
+  country     String?
+  city        String?
+
+  primaryLocale String?
+  timezone      String?
+
+  status BrandStatus @default(ACTIVE)
+
+  logoMediaId String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  logoMedia Media?    @relation("BrandLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+  media     Media[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
   @@map("brands")
-  @@unique([workspaceId, slug])
 }
 
+model Media {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String?
+  ownerUserId String
+
+  kind   MediaKind
+  status MediaStatus @default(PENDING)
+
+  originalFilename String
+  extension        String
+  mimeType         String
+  sizeBytes        Int
+
+  // IMAGE-specific
+  width  Int?
+  height Int?
+
+  // VIDEO-specific
+  durationMs Int?
+
+  storageProvider String @default("S3")
+  bucket          String
+  baseKey         String // e.g. "media/{workspaceId}/{mediaId}/original.jpg"
+
+  variants Json? // variant metadata (flexible schema)
+
+  isPublic Boolean @default(false)
+
+  title       String?
+  alt         String?
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  brand       Brand?    @relation(fields: [brandId], references: [id])
+  owner       User      @relation(fields: [ownerUserId], references: [id])
+  userAvatars User[]    @relation("UserAvatar")
+  brandLogos  Brand[]   @relation("BrandLogo")
+
+  @@index([workspaceId])
+  @@index([brandId])
+  @@map("media")
+}

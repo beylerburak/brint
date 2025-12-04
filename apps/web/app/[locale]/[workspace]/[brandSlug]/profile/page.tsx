@@ -512,137 +512,165 @@ export default function BrandProfilePage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>Brand Identity</CardTitle>
+            {/* Brand Identity Section */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Brand Identity</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Tagline</p>
+                    <p className="text-sm">
+                      {brand.description || "Empowering digital experiences"}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Mission</p>
+                    <p className="text-sm">
+                      Create meaningful digital experiences that connect brands with audiences.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Vision</p>
+                    <p className="text-sm">
+                      Leading digital experience studio known for transformative narratives.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact & Quick Facts Row */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">Contact Channels</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Tagline</p>
-                    <p className="text-sm text-muted-foreground">
-                      {brand.description || "Empowering digital experiences through innovation"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium mb-2">Mission</p>
-                    <p className="text-sm text-muted-foreground">
-                      To create meaningful digital experiences that connect brands with their audiences through innovative technology and creative storytelling.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium mb-2">Vision</p>
-                    <p className="text-sm text-muted-foreground">
-                      Becoming the leading digital experience studio in the region, known for transformative brand narratives and cutting-edge technology solutions.
-                    </p>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm group hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <IconPhone className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span>+90 212 555 0123</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">Yönetim</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm group hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <IconMail className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span>hello@{brand.slug}.com</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">Genel</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm group hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <IconExternalLink className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <a href="#" className="text-primary hover:underline">
+                          www.{brand.slug}.com
+                        </a>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">Kurumsal</Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>AI Summary</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">Quick Facts</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {brand.name} is a {brand.industry || 'technology'} brand focused on innovation and user experience. The brand emphasizes authenticity, creativity, and technical excellence in all communications.
-                  </p>
-                  <p className="text-xs text-muted-foreground italic">
-                    Generated by AI • Updated 2 days ago
-                  </p>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Primary Language</span>
+                      <span className="font-medium">{brand.primaryLocale || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Timezone</span>
+                      <span className="font-medium">{brand.timezone || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Industry</span>
+                      <span className="font-medium capitalize">{brand.industry || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Location</span>
+                      <span className="font-medium">
+                        {brand.city && brand.country 
+                          ? `${brand.city}, ${brand.country}` 
+                          : 'Not set'}
+                      </span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact & Channels</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <IconPhone className="h-4 w-4 text-muted-foreground" />
-                    <span>+90 212 555 0123</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <IconMail className="h-4 w-4 text-muted-foreground" />
-                    <span>hello@{brand.slug}.com</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm sm:col-span-2">
-                    <IconExternalLink className="h-4 w-4 text-muted-foreground" />
-                    <a href="#" className="text-primary hover:underline">
-                      www.{brand.slug}.com
-                    </a>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Facts</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Primary Language</p>
-                    <p className="text-sm font-medium">{brand.primaryLocale || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Timezone</p>
-                    <p className="text-sm font-medium">{brand.timezone || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Industry</p>
-                    <p className="text-sm font-medium capitalize">{brand.industry || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Location</p>
-                    <p className="text-sm font-medium">
-                      {brand.city && brand.country 
-                        ? `${brand.city}, ${brand.country}` 
-                        : 'Not set'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Audience & Positioning Tab */}
           <TabsContent value="audience" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Primary Personas</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Primary Personas</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPlus className="h-3.5 w-3.5" />
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <h4 className="font-medium">Tech-Savvy Professional</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Age 28-45, urban professional seeking efficiency and innovation
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
+                    <div className="flex items-start justify-between">
+                      <h4 className="font-medium text-sm">Tech-Savvy Professional</h4>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Age 28-45 • Urban professional seeking efficiency
                     </p>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium">Pain Points:</p>
-                      <ul className="text-xs text-muted-foreground list-disc list-inside">
-                        <li>Time constraints</li>
-                        <li>Information overload</li>
-                        <li>Need for reliable solutions</li>
-                      </ul>
+                      <p className="text-xs font-medium">Pain Points</p>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline" className="text-xs">Time constraints</Badge>
+                        <Badge variant="outline" className="text-xs">Info overload</Badge>
+                        <Badge variant="outline" className="text-xs">Reliability</Badge>
+                      </div>
                     </div>
                   </div>
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <h4 className="font-medium">Creative Entrepreneur</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Age 25-40, building their brand, values authenticity
+
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
+                    <div className="flex items-start justify-between">
+                      <h4 className="font-medium text-sm">Creative Entrepreneur</h4>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Age 25-40 • Building brand, values authenticity
                     </p>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium">Pain Points:</p>
-                      <ul className="text-xs text-muted-foreground list-disc list-inside">
-                        <li>Limited budget</li>
-                        <li>Need for quick results</li>
-                        <li>Desire for customization</li>
-                      </ul>
+                      <p className="text-xs font-medium">Pain Points</p>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline" className="text-xs">Limited budget</Badge>
+                        <Badge variant="outline" className="text-xs">Quick results</Badge>
+                        <Badge variant="outline" className="text-xs">Customization</Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -651,28 +679,31 @@ export default function BrandProfilePage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle>Positioning</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">Positioning</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs font-medium mb-1">Category</p>
-                    <p className="text-sm text-muted-foreground">Digital Experience Studio</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Category</span>
+                    <Badge variant="secondary">Digital Experience Studio</Badge>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium mb-2">Unique Selling Points</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">Unique Selling Points</p>
+                    <ul className="text-sm space-y-1.5">
                       <li className="flex items-start gap-2">
                         <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                        <span>Cutting-edge technology integration</span>
+                        <span>Cutting-edge technology</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                        <span>Human-centered design approach</span>
+                        <span>Human-centered design</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                        <span>End-to-end brand solutions</span>
+                        <span>End-to-end solutions</span>
                       </li>
                     </ul>
                   </div>
@@ -680,22 +711,40 @@ export default function BrandProfilePage() {
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>Competitors</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">Competitors</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <div className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">Acme Digital</p>
-                      <p className="text-xs text-muted-foreground">Focus on enterprise, less creative</p>
+                    <div className="flex items-start justify-between p-2 rounded-lg bg-muted/30">
+                      <div>
+                        <p className="text-sm font-medium">Acme Digital</p>
+                        <p className="text-xs text-muted-foreground">Enterprise focus, less creative</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <div className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">Creative Studio X</p>
-                      <p className="text-xs text-muted-foreground">Strong design, weaker tech stack</p>
+                    <div className="flex items-start justify-between p-2 rounded-lg bg-muted/30">
+                      <div>
+                        <p className="text-sm font-medium">Creative Studio X</p>
+                        <p className="text-xs text-muted-foreground">Strong design, weaker tech</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <div className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">Tech Solutions Co</p>
-                      <p className="text-xs text-muted-foreground">Tech-focused, lacks brand strategy</p>
+                    <div className="flex items-start justify-between p-2 rounded-lg bg-muted/30">
+                      <div>
+                        <p className="text-sm font-medium">Tech Solutions Co</p>
+                        <p className="text-xs text-muted-foreground">Tech focus, lacks strategy</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -706,105 +755,116 @@ export default function BrandProfilePage() {
           {/* Voice & Tone Tab */}
           <TabsContent value="voice" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Tone Characteristics</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Tone Characteristics</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
+                </Button>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Formal - Informal */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Formal</span>
-                    <span className="font-medium">75%</span>
-                    <span className="text-muted-foreground">Informal</span>
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Formal - Informal */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Formal</span>
+                      <span className="font-medium">75%</span>
+                      <span className="text-muted-foreground">Informal</span>
+                    </div>
+                    <Slider defaultValue={[75]} max={100} step={1} disabled />
+                    <p className="text-xs text-muted-foreground">Approachable but professional</p>
                   </div>
-                  <Slider defaultValue={[75]} max={100} step={1} disabled />
-                  <p className="text-xs text-muted-foreground">Slightly informal, approachable but professional</p>
-                </div>
 
-                {/* Serious - Playful */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Serious</span>
-                    <span className="font-medium">60%</span>
-                    <span className="text-muted-foreground">Playful</span>
+                  {/* Serious - Playful */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Serious</span>
+                      <span className="font-medium">60%</span>
+                      <span className="text-muted-foreground">Playful</span>
+                    </div>
+                    <Slider defaultValue={[60]} max={100} step={1} disabled />
+                    <p className="text-xs text-muted-foreground">Balanced with humor</p>
                   </div>
-                  <Slider defaultValue={[60]} max={100} step={1} disabled />
-                  <p className="text-xs text-muted-foreground">Balanced with occasional humor</p>
-                </div>
 
-                {/* Simple - Complex */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Simple</span>
-                    <span className="font-medium">70%</span>
-                    <span className="text-muted-foreground">Complex</span>
+                  {/* Simple - Complex */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Simple</span>
+                      <span className="font-medium">70%</span>
+                      <span className="text-muted-foreground">Complex</span>
+                    </div>
+                    <Slider defaultValue={[70]} max={100} step={1} disabled />
+                    <p className="text-xs text-muted-foreground">Clear with depth</p>
                   </div>
-                  <Slider defaultValue={[70]} max={100} step={1} disabled />
-                  <p className="text-xs text-muted-foreground">Clear communication with depth when needed</p>
-                </div>
 
-                {/* Warm - Neutral */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Warm</span>
-                    <span className="font-medium">80%</span>
-                    <span className="text-muted-foreground">Neutral</span>
+                  {/* Warm - Neutral */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Warm</span>
+                      <span className="font-medium">80%</span>
+                      <span className="text-muted-foreground">Neutral</span>
+                    </div>
+                    <Slider defaultValue={[80]} max={100} step={1} disabled />
+                    <p className="text-xs text-muted-foreground">Friendly and empathetic</p>
                   </div>
-                  <Slider defaultValue={[80]} max={100} step={1} disabled />
-                  <p className="text-xs text-muted-foreground">Friendly and empathetic tone</p>
                 </div>
               </CardContent>
             </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle>Do Say ✅</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <IconCheck className="h-4 w-4 text-green-600" />
+                    Do Say
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>&quot;Let&apos;s create something amazing together&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>&quot;We understand your challenges&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>&quot;Innovation meets practicality&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>&quot;Your vision, our expertise&quot;</span>
-                    </li>
+                    {[
+                      "Let's create something amazing together",
+                      "We understand your challenges",
+                      "Innovation meets practicality",
+                      "Your vision, our expertise"
+                    ].map((phrase, i) => (
+                      <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20 text-sm group hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors">
+                        <span>&quot;{phrase}&quot;</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <IconX className="h-3 w-3" />
+                        </Button>
+                      </li>
+                    ))}
                   </ul>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>Don&apos;t Say ❌</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <IconX className="h-4 w-4 text-red-600" />
+                    Don&apos;t Say
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                      <span>&quot;Industry-disrupting revolutionary&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                      <span>&quot;Best in the world&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                      <span>&quot;Cheap and affordable&quot;</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                      <span>&quot;Trust us blindly&quot;</span>
-                    </li>
+                    {[
+                      "Industry-disrupting revolutionary",
+                      "Best in the world",
+                      "Cheap and affordable",
+                      "Trust us blindly"
+                    ].map((phrase, i) => (
+                      <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
+                        <span>&quot;{phrase}&quot;</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <IconX className="h-3 w-3" />
+                        </Button>
+                      </li>
+                    ))}
                   </ul>
                 </CardContent>
               </Card>
@@ -814,94 +874,94 @@ export default function BrandProfilePage() {
           {/* Content Rules Tab */}
           <TabsContent value="rules" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Allowed Topics</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Allowed Topics</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPlus className="h-3.5 w-3.5" />
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Product Updates</Badge>
-                  <Badge variant="secondary">Industry Insights</Badge>
-                  <Badge variant="secondary">Client Success Stories</Badge>
-                  <Badge variant="secondary">Technology Trends</Badge>
-                  <Badge variant="secondary">Team Culture</Badge>
-                  <Badge variant="secondary">Design Tips</Badge>
-                  <Badge variant="secondary">Innovation</Badge>
-                  <Badge variant="secondary">Sustainability</Badge>
+                  {[
+                    "Product Updates", "Industry Insights", "Client Success Stories",
+                    "Technology Trends", "Team Culture", "Design Tips",
+                    "Innovation", "Sustainability"
+                  ].map((topic, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                      {topic}
+                      <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                        <IconX className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Forbidden Topics & Brand Safety</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Forbidden Topics & Safety</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPlus className="h-3.5 w-3.5" />
+                </Button>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Topics to Avoid</p>
-                    <ul className="text-sm text-muted-foreground space-y-1.5">
-                      <li className="flex items-start gap-2">
-                        <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                        <span>Political opinions or endorsements</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                        <span>Religious discussions</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                        <span>Negative competitor comparisons</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <IconX className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-                        <span>Unverified claims or statistics</span>
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <p className="text-sm font-medium mb-2">Crisis Guidelines</p>
-                    <ul className="text-sm text-muted-foreground space-y-1.5">
-                      <li>• Pause promotional content during major disasters</li>
-                      <li>• No humor during sensitive situations</li>
-                      <li>• Coordinate all crisis responses with leadership</li>
-                    </ul>
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Topics to Avoid</p>
+                  {[
+                    "Political opinions or endorsements",
+                    "Religious discussions",
+                    "Negative competitor comparisons",
+                    "Unverified claims or statistics"
+                  ].map((topic, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
+                      <span className="flex items-center gap-2">
+                        <IconX className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                        {topic}
+                      </span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <IconX className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-2 border-t">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Crisis Guidelines</p>
+                  <ul className="text-xs text-muted-foreground space-y-1.5">
+                    <li>• Pause promotional content during disasters</li>
+                    <li>• No humor during sensitive situations</li>
+                    <li>• Coordinate crisis responses with leadership</li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-amber-500/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
                   ⚖️ Legal Constraints
                 </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPlus className="h-3.5 w-3.5" />
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 text-sm">
-                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 border border-amber-200 dark:border-amber-900/50">
-                    <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                      Disclosure Requirements
-                    </p>
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      All paid partnerships must include #ad or #sponsored hashtag
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 border border-amber-200 dark:border-amber-900/50">
-                    <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                      Copyright Compliance
-                    </p>
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      Only use licensed images, music, and content. Credit creators when required.
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 border border-amber-200 dark:border-amber-900/50">
-                    <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                      Data Privacy
-                    </p>
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      Follow GDPR/KVKK guidelines. Never share client data without consent.
-                    </p>
-                  </div>
+                <div className="space-y-2">
+                  {[
+                    { title: "Disclosure Requirements", desc: "All paid partnerships must include #ad or #sponsored" },
+                    { title: "Copyright Compliance", desc: "Only use licensed content. Credit creators when required." },
+                    { title: "Data Privacy", desc: "Follow GDPR/KVKK. Never share client data without consent." }
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start justify-between p-3 rounded-lg bg-background border border-amber-200 dark:border-amber-900/50 group hover:shadow-sm transition-shadow">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium mb-0.5">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <IconPencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -910,115 +970,111 @@ export default function BrandProfilePage() {
           {/* Assets & AI Config Tab */}
           <TabsContent value="assets" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Brand Colors</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs font-medium mb-2">Primary Colors</p>
-                    <div className="flex gap-2">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="h-12 w-12 rounded-lg bg-[#2563eb] border" />
-                        <span className="text-xs text-muted-foreground">#2563eb</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="h-12 w-12 rounded-lg bg-[#1e293b] border" />
-                        <span className="text-xs text-muted-foreground">#1e293b</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="h-12 w-12 rounded-lg bg-[#f8fafc] border" />
-                        <span className="text-xs text-muted-foreground">#f8fafc</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-2">Accent Colors</p>
-                    <div className="flex gap-2">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="h-12 w-12 rounded-lg bg-[#10b981] border" />
-                        <span className="text-xs text-muted-foreground">#10b981</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="h-12 w-12 rounded-lg bg-[#f59e0b] border" />
-                        <span className="text-xs text-muted-foreground">#f59e0b</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Visual Style Guidelines</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-sm space-y-2">
-                  <li className="flex items-start gap-2">
-                    <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    <span>Prefer authentic photos over stock images</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    <span>Use minimalist, clean compositions</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    <span>Include human elements when possible</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    <span>Maintain consistent lighting and tone</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Content Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Default Language</p>
-                    <p className="text-sm">{brand.primaryLocale || 'en-US'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Content Length</p>
-                    <p className="text-sm">50-280 characters</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Preferred Platforms</p>
-                    <div className="flex gap-1 flex-wrap">
-                      <Badge variant="outline" className="text-xs">Instagram</Badge>
-                      <Badge variant="outline" className="text-xs">LinkedIn</Badge>
-                      <Badge variant="outline" className="text-xs">Twitter</Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">CTA Style</p>
-                    <p className="text-sm text-muted-foreground">Soft, invitational</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Test Playground</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Generate sample content using your brand profile settings.
-                </p>
-                <Button variant="outline" size="sm" disabled>
-                  <IconSparkles className="h-4 w-4" />
-                  Coming Soon
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-semibold">Brand Colors</CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 px-2">
+                  <IconPencil className="h-3.5 w-3.5" />
                 </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Primary Colors</p>
+                    <div className="flex gap-2">
+                      {[
+                        { color: '#2563eb', name: 'Primary Blue' },
+                        { color: '#1e293b', name: 'Dark Slate' },
+                        { color: '#f8fafc', name: 'Light' }
+                      ].map((item, i) => (
+                        <button key={i} className="group relative">
+                          <div 
+                            className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="block text-xs text-muted-foreground mt-1">{item.color}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Accent Colors</p>
+                    <div className="flex gap-2">
+                      {[
+                        { color: '#10b981', name: 'Success' },
+                        { color: '#f59e0b', name: 'Warning' }
+                      ].map((item, i) => (
+                        <button key={i} className="group relative">
+                          <div 
+                            className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="block text-xs text-muted-foreground mt-1">{item.color}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">Visual Guidelines</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <ul className="text-sm space-y-2">
+                    {[
+                      "Authentic photos over stock",
+                      "Minimalist compositions",
+                      "Include human elements",
+                      "Consistent lighting"
+                    ].map((rule, i) => (
+                      <li key={i} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                        <IconCheck className="h-4 w-4 text-green-600 shrink-0" />
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">AI Configuration</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Default Language</span>
+                      <span className="font-medium">{brand.primaryLocale || 'en-US'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Content Length</span>
+                      <span className="font-medium">50-280 chars</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">CTA Style</span>
+                      <span className="font-medium">Soft, invitational</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">Preferred Platforms</p>
+                      <div className="flex gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-xs">Instagram</Badge>
+                        <Badge variant="outline" className="text-xs">LinkedIn</Badge>
+                        <Badge variant="outline" className="text-xs">Twitter</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </TabsContents>
       </Tabs>

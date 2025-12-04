@@ -20,19 +20,29 @@ export function RouteTransition() {
       const segments = pathname.split('/').filter(Boolean)
       const prevSegments = prevPathname.split('/').filter(Boolean)
       
-      // Check if transitioning between workspace and brand (or vice versa)
-      // Without locale: workspace=2, brand=3
-      // With locale: workspace=3, brand=4
-      const isBrandTransition = 
-        (segments.length === 3 && prevSegments.length === 2) || // workspace → brand (no locale)
-        (segments.length === 2 && prevSegments.length === 3) || // brand → workspace (no locale)
-        (segments.length === 4 && prevSegments.length === 3) || // workspace → brand (with locale)
-        (segments.length === 3 && prevSegments.length === 4)    // brand → workspace (with locale)
+      // Known workspace pages that are NOT brand slugs
+      const workspacePages = ['brands', 'home', 'settings', 'team', 'analytics']
+      
+      // Determine if current and previous paths are brand pages
+      // Brand page: /{locale?}/{workspace}/{brandSlug}/...
+      // Workspace page: /{locale?}/{workspace}/{workspacePage}
+      
+      const hasLocale = ['en', 'tr'].includes(segments[0])
+      const workspaceIndex = hasLocale ? 1 : 0
+      const thirdSegmentIndex = hasLocale ? 2 : 1
+      
+      const currentThirdSegment = segments[thirdSegmentIndex]
+      const prevThirdSegment = prevSegments[thirdSegmentIndex]
+      
+      const isCurrentBrandPage = currentThirdSegment && !workspacePages.includes(currentThirdSegment)
+      const isPrevBrandPage = prevThirdSegment && !workspacePages.includes(prevThirdSegment)
+      
+      // Only transition when crossing workspace ↔ brand boundary
+      const isBrandTransition = isCurrentBrandPage !== isPrevBrandPage
 
       if (isBrandTransition) {
         // Determine transition direction
-        const goingToBrand = segments.length > prevSegments.length
-        setTransitionType(goingToBrand ? 'toBrand' : 'toWorkspace')
+        setTransitionType(isCurrentBrandPage ? 'toBrand' : 'toWorkspace')
         setIsTransitioning(true)
         
         // Show transition for 2.5 seconds
@@ -49,8 +59,13 @@ export function RouteTransition() {
 
   const getBrandSlug = () => {
     const segments = pathname.split('/').filter(Boolean)
-    // Brand slug is the 3rd segment (or 4th if locale present)
-    return segments[2] || segments[3] || ''
+    const hasLocale = ['en', 'tr'].includes(segments[0])
+    const thirdSegmentIndex = hasLocale ? 2 : 1
+    const brandSlug = segments[thirdSegmentIndex]
+    
+    // Only return if it's not a workspace page
+    const workspacePages = ['brands', 'home', 'settings', 'team', 'analytics']
+    return brandSlug && !workspacePages.includes(brandSlug) ? brandSlug : ''
   }
 
   const getLoadingMessage = () => {

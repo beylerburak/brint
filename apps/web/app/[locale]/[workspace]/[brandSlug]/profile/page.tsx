@@ -4,13 +4,22 @@ import { useParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { 
+  Tabs, 
+  TabsList, 
+  TabsHighlight,
+  TabsHighlightItem,
+  TabsTrigger, 
+  TabsContents,
+  TabsContent 
+} from "@/components/animate-ui/primitives/animate/tabs"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IconPencil, IconExternalLink, IconPhone, IconMail, IconSparkles, IconPlus, IconCheck, IconX, IconUpload, IconLayoutDashboard, IconUsers, IconMessageCircle, IconShieldCheck, IconPalette } from "@tabler/icons-react"
 import { Slider } from "@/components/ui/slider"
+import { CountingNumber } from "@/components/animate-ui/primitives/texts/counting-number"
 import {
   Dialog,
   DialogContent,
@@ -52,6 +61,7 @@ export default function BrandProfilePage() {
   const [isUploading, setIsUploading] = useState(false)
   const [previewLogoUrl, setPreviewLogoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
+  const [progressValue, setProgressValue] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -59,6 +69,14 @@ export default function BrandProfilePage() {
       loadBrand()
     }
   }, [currentWorkspace?.id, brandSlug])
+
+  // Animate progress value on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setProgressValue(73)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   const loadBrand = async (skipLoading = false) => {
     if (!currentWorkspace?.id) return
@@ -371,37 +389,54 @@ export default function BrandProfilePage() {
       {/* Tabs with Edit Button */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
         <div className="flex items-center justify-between gap-4">
-          <TabsList className="gap-1">
-            <TabsTrigger value="overview" className="data-[state=inactive]:text-muted-foreground gap-2">
-              <IconLayoutDashboard className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="audience" className="data-[state=inactive]:text-muted-foreground gap-2">
-              <IconUsers className="h-4 w-4" />
-              Audience & Positioning
-            </TabsTrigger>
-            <TabsTrigger value="voice" className="data-[state=inactive]:text-muted-foreground gap-2">
-              <IconMessageCircle className="h-4 w-4" />
-              Voice & Tone
-            </TabsTrigger>
-            <TabsTrigger value="rules" className="data-[state=inactive]:text-muted-foreground gap-2">
-              <IconShieldCheck className="h-4 w-4" />
-              Content Rules
-            </TabsTrigger>
-            <TabsTrigger value="assets" className="data-[state=inactive]:text-muted-foreground gap-2">
-              <IconPalette className="h-4 w-4" />
-              Assets & AI Config
-            </TabsTrigger>
+          <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1">
+            <TabsHighlight className="bg-background shadow-sm rounded-md">
+              <TabsHighlightItem value="overview">
+                <TabsTrigger value="overview" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
+                  <IconLayoutDashboard className="h-4 w-4" />
+                  Overview
+                </TabsTrigger>
+              </TabsHighlightItem>
+              
+              <TabsHighlightItem value="audience">
+                <TabsTrigger value="audience" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
+                  <IconUsers className="h-4 w-4" />
+                  Audience & Positioning
+                </TabsTrigger>
+              </TabsHighlightItem>
+              
+              <TabsHighlightItem value="voice">
+                <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
+                  <IconMessageCircle className="h-4 w-4" />
+                  Voice & Tone
+                </TabsTrigger>
+              </TabsHighlightItem>
+              
+              <TabsHighlightItem value="rules">
+                <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
+                  <IconShieldCheck className="h-4 w-4" />
+                  Content Rules
+                </TabsTrigger>
+              </TabsHighlightItem>
+              
+              <TabsHighlightItem value="assets">
+                <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">
+                  <IconPalette className="h-4 w-4" />
+                  Assets & AI Config
+                </TabsTrigger>
+              </TabsHighlightItem>
+            </TabsHighlight>
           </TabsList>
+          
           <Button size="sm">
             <IconPencil className="h-4 w-4" />
             Edit Profile
           </Button>
         </div>
 
-        <div className="mt-2 space-y-4">
+        <TabsContents className="mt-2">
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4 m-0">
+          <TabsContent value="overview" className="space-y-4">
             {/* Optimization Score - Outer Container */}
             <div className="relative rounded-3xl bg-gradient-to-br from-white/80 via-purple-50/30 to-white/80 dark:from-background dark:via-purple-950/10 dark:to-background p-2 pb-4 shadow-sm">
               {/* Purple glow effect at bottom */}
@@ -416,35 +451,47 @@ export default function BrandProfilePage() {
                         <h3 className="text-lg font-semibold">Brand Optimization Score</h3>
                       </div>
                       <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-                        73%
+                        <CountingNumber 
+                          number={73} 
+                          delay={0.3}
+                          transition={{ stiffness: 100, damping: 30 }}
+                        />
+                        %
                       </div>
                     </div>
 
                     {/* Progress Bar */}
                     <div className="space-y-2">
-                      <div className="relative h-3 rounded-full overflow-visible">
-                        {/* Gradient filled portion */}
-                        <div 
-                          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500"
-                          style={{ width: '73%' }}
-                        />
-                        
-                        {/* Circular indicator at the end */}
-                        <div 
-                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white shadow-lg flex items-center justify-center z-10"
-                          style={{ left: '73%' }}
-                        >
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                      <div className="relative h-3 w-full">
+                        {/* Progress bar container with overflow hidden */}
+                        <div className="absolute inset-0 rounded-full overflow-hidden">
+                          {/* Animated gradient bar */}
+                          <div 
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 transition-all duration-1000 ease-out"
+                            style={{ width: `${progressValue}%` }}
+                          />
+                          
+                          {/* Dotted remaining portion - responsive */}
+                          <div 
+                            className="absolute inset-y-0 left-0 right-0 rounded-full flex items-center justify-start gap-1 px-2 overflow-hidden transition-all duration-1000"
+                            style={{ paddingLeft: `calc(${progressValue}% + 8px)` }}
+                          >
+                            {Array.from({ length: 100 }).map((_, i) => (
+                              <div key={i} className="w-0.5 h-2 bg-muted-foreground/20 rounded-full flex-shrink-0" />
+                            ))}
+                          </div>
                         </div>
-                        
-                        {/* Dotted remaining portion - responsive */}
+
+                        {/* Circular indicator at the end - outside overflow container */}
                         <div 
-                          className="absolute inset-y-0 rounded-full flex items-center justify-start gap-1 px-2 overflow-hidden"
-                          style={{ left: '73%', right: 0 }}
+                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white shadow-lg flex items-center justify-center z-10 transition-all duration-1000 ease-out border border-muted-foreground/10"
+                          style={{ 
+                            left: `${progressValue}%`,
+                            opacity: progressValue > 0 ? 1 : 0,
+                            scale: progressValue > 0 ? 1 : 0.5
+                          }}
                         >
-                          {Array.from({ length: 50 }).map((_, i) => (
-                            <div key={i} className="w-0.5 h-2 bg-muted-foreground/20 rounded-full flex-shrink-0" />
-                          ))}
+                          <div className="w-3 h-3 rounded-full bg-red-500" />
                         </div>
                       </div>
                     </div>
@@ -563,7 +610,7 @@ export default function BrandProfilePage() {
           </TabsContent>
 
           {/* Audience & Positioning Tab */}
-          <TabsContent value="audience" className="space-y-4 m-0">
+          <TabsContent value="audience" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Primary Personas</CardTitle>
@@ -657,7 +704,7 @@ export default function BrandProfilePage() {
           </TabsContent>
 
           {/* Voice & Tone Tab */}
-          <TabsContent value="voice" className="space-y-4 m-0">
+          <TabsContent value="voice" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Tone Characteristics</CardTitle>
@@ -765,7 +812,7 @@ export default function BrandProfilePage() {
           </TabsContent>
 
           {/* Content Rules Tab */}
-          <TabsContent value="rules" className="space-y-4 m-0">
+          <TabsContent value="rules" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Allowed Topics</CardTitle>
@@ -861,7 +908,7 @@ export default function BrandProfilePage() {
           </TabsContent>
 
           {/* Assets & AI Config Tab */}
-          <TabsContent value="assets" className="space-y-4 m-0">
+          <TabsContent value="assets" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Brand Colors</CardTitle>
@@ -973,7 +1020,7 @@ export default function BrandProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
-        </div>
+        </TabsContents>
       </Tabs>
 
       {/* Avatar Crop Dialog */}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,10 @@ const PLAN_LIMITS = {
 
 export default function BrandsPage() {
   const t = useTranslations('brands')
+  const router = useRouter()
   const params = useParams()
+  const locale = params?.locale as string || 'en'
+  const workspaceSlug = params?.workspace as string
   const { currentWorkspace } = useWorkspace()
   const [brands, setBrands] = useState<Brand[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -182,13 +185,16 @@ export default function BrandsPage() {
         </Button>
       </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {brands.map((brand) => (
             <div key={brand.id} className="relative">
               <CursorFollow>
                 {t('goToBrandStudio')}
               </CursorFollow>
-              <div className="rounded-lg border p-4 hover:bg-accent/50 transition-colors cursor-pointer">
+              <div 
+                className="rounded-lg border p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => router.push(`/${locale}/${workspaceSlug}/${brand.slug}/home`)}
+              >
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                 <Avatar className="h-10 w-10 rounded-lg">

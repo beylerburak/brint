@@ -92,6 +92,19 @@
         "notNow": "Not Now",
         "upgradeTo": "Upgrade to {plan}"
       },
+      "brandNav": {
+        "home": "Home",
+        "profile": "Profile",
+        "tasks": "Tasks",
+        "calendar": "Calendar",
+        "analytics": "Analytics",
+        "socialAccounts": "Social Accounts",
+        "contacts": "Contacts"
+      },
+      "transition": {
+        "loadingBrand": "Loading {brand} brand studio...",
+        "loadingWorkspace": "Returning to workspace..."
+      },
        "pageTitle": {
          "home": "Home",
          "brands": "Brands",

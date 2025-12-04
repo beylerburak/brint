@@ -92,6 +92,19 @@
         "notNow": "Şimdi Değil",
         "upgradeTo": "{plan} Planına Geç"
       },
+      "brandNav": {
+        "home": "Ana Sayfa",
+        "profile": "Profil",
+        "tasks": "Görevler",
+        "calendar": "Takvim",
+        "analytics": "Analitik",
+        "socialAccounts": "Sosyal Hesaplar",
+        "contacts": "Kişiler"
+      },
+      "transition": {
+        "loadingBrand": "{brand} marka stüdyosu yükleniyor...",
+        "loadingWorkspace": "Çalışma alanına dönülüyor..."
+      },
        "pageTitle": {
          "home": "Ana Sayfa",
          "brands": "Markalar",

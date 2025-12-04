@@ -62,6 +62,14 @@ enum BrandStatus {
   ARCHIVED
 }
 
+enum BrandContactType {
+  PHONE
+  WHATSAPP
+  EMAIL
+  ADDRESS
+  WEBSITE
+}
+
 enum ActivityEntityType {
   WORKSPACE
   BRAND
@@ -216,11 +224,85 @@ model Brand {
   media        Media[]
   activityLogs ActivityLog[]
 
+  /// Yeni relations
+  contactChannels BrandContactChannel[]
+  profile         BrandProfile?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
   @@map("brands")
+}
+
+model BrandContactChannel {
+  id      String @id @default(cuid())
+  brandId String
+
+  /// İletişim tipi:
+  /// PHONE, WHATSAPP, EMAIL, ADDRESS, WEBSITE
+  type BrandContactType
+
+  /// Kullanıcıya gösterilecek label:
+  /// "Yönetim", "Genel", "Kurumsal" vb.
+  label String?
+
+  /// Asıl değer:
+  /// PHONE/WHATSAPP -> "+90 5xx..."
+  /// EMAIL          -> "info@..."
+  /// ADDRESS        -> ".... Mah., ... Sok., .../İstanbul"
+  /// WEBSITE        -> "https://..."
+  value String
+
+  /// UI'da öne çıkarılacak kanal mı?
+  isPrimary Boolean @default(false)
+
+  /// Sıralama için
+  order Int @default(0)
+
+  /// Tipine göre ekstra metadata:
+  /// ADDRESS -> { "city": "İstanbul", "country": "TR", "googleMapsUrl": "..." }
+  /// PHONE   -> { "countryCode": "+90" }
+  /// WEBSITE -> { "kind": "corporate" | "landing" }
+  metaJson Json?
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brandId, type])
+  @@map("brand_contact_channels")
+}
+
+model BrandProfile {
+  id      String @id @default(cuid())
+  brandId String @unique
+
+  /// Şema versiyonu (ileride data yapısını değiştirirsen işe yarar)
+  version String @default("v1")
+
+  /// Brand Profile'ın asıl JSON verisi
+  data Json
+
+  /// Overview'deki skor için:
+  optimizationScore          Int?
+  optimizationScoreUpdatedAt DateTime?
+
+  /// AI için kısa ve detaylı özetler
+  aiSummaryShort    String?
+  aiSummaryDetailed String?
+
+  lastEditedByUserId String?
+  lastEditedAt       DateTime  @default(now())
+  lastAiRefreshAt    DateTime?
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("brand_profiles")
 }
 
 model Media {

@@ -4,6 +4,15 @@
  * Centralized HTTP client for backend API calls
  */
 
+import type {
+  BrandDetailDto,
+  BrandProfileDto,
+  BrandContactChannelDto,
+  CreateBrandContactChannelInput,
+  UpdateBrandContactChannelInput,
+  UpdateBrandProfileInput,
+} from './brand-types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export class ApiError extends Error {
@@ -207,6 +216,159 @@ export const apiClient = {
   }> {
     return fetchApi('/me/onboarding/complete', {
       method: 'POST',
+    });
+  },
+
+  // ============================================================================
+  // Brand API Methods
+  // ============================================================================
+
+  /**
+   * Get brand details by ID (includes profile and contact channels)
+   */
+  async getBrand(workspaceId: string, brandId: string): Promise<{ success: true; brand: BrandDetailDto }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}`);
+  },
+
+  /**
+   * List brands in workspace
+   */
+  async listBrands(workspaceId: string, options?: { status?: 'ACTIVE' | 'ARCHIVED' }): Promise<{ 
+    success: true; 
+    brands: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      industry: string | null;
+      country: string | null;
+      city: string | null;
+      primaryLocale: string | null;
+      timezone: string | null;
+      status: 'ACTIVE' | 'ARCHIVED';
+      logoMediaId: string | null;
+      logoUrl: string | null;
+      mediaCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    total: number;
+  }> {
+    const params = new URLSearchParams();
+    if (options?.status) params.append('status', options.status);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/workspaces/${workspaceId}/brands${query}`);
+  },
+
+  /**
+   * Update brand basic info
+   */
+  async updateBrand(
+    workspaceId: string,
+    brandId: string,
+    data: {
+      name?: string;
+      description?: string | null;
+      industry?: string | null;
+      country?: string | null;
+      city?: string | null;
+      primaryLocale?: string | null;
+      timezone?: string | null;
+      status?: 'ACTIVE' | 'ARCHIVED';
+      logoMediaId?: string | null;
+    }
+  ): Promise<{ success: true; brand: any }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ============================================================================
+  // Brand Profile API Methods
+  // ============================================================================
+
+  /**
+   * Update brand profile
+   */
+  async updateBrandProfile(
+    workspaceId: string, 
+    brandId: string, 
+    input: UpdateBrandProfileInput
+  ): Promise<{ success: true; profile: BrandProfileDto }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/profile`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  },
+
+  // ============================================================================
+  // Brand Contact Channel API Methods
+  // ============================================================================
+
+  /**
+   * List contact channels for a brand
+   */
+  async listBrandContactChannels(
+    workspaceId: string, 
+    brandId: string
+  ): Promise<{ success: true; contactChannels: BrandContactChannelDto[] }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts`);
+  },
+
+  /**
+   * Create a new contact channel
+   */
+  async createBrandContactChannel(
+    workspaceId: string,
+    brandId: string,
+    input: CreateBrandContactChannelInput
+  ): Promise<{ success: true; contactChannel: BrandContactChannelDto }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  /**
+   * Update a contact channel
+   */
+  async updateBrandContactChannel(
+    workspaceId: string,
+    brandId: string,
+    channelId: string,
+    input: UpdateBrandContactChannelInput
+  ): Promise<{ success: true; contactChannel: BrandContactChannelDto }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  /**
+   * Delete a contact channel
+   */
+  async deleteBrandContactChannel(
+    workspaceId: string,
+    brandId: string,
+    channelId: string
+  ): Promise<{ success: true; message: string }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Reorder contact channels
+   */
+  async reorderBrandContactChannels(
+    workspaceId: string,
+    brandId: string,
+    orders: { id: string; order: number }[]
+  ): Promise<{ success: true; message: string }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ orders }),
     });
   },
 };

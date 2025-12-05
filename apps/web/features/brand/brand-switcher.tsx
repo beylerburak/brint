@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ChevronDown } from "lucide-react"
 import { useWorkspace } from "@/contexts/workspace-context"
+import { apiClient } from "@/lib/api-client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -36,9 +37,21 @@ export function BrandSwitcher() {
 
   // Load brands
   React.useEffect(() => {
-    if (currentWorkspace?.id) {
-      loadBrands()
+    const loadBrands = async () => {
+      if (!currentWorkspace?.id) return
+
+      setIsLoading(true)
+      try {
+        const response = await apiClient.listBrands(currentWorkspace.id)
+        setBrands(response.brands)
+      } catch (error) {
+        console.error('Failed to load brands:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
+
+    loadBrands()
   }, [currentWorkspace?.id])
 
   // Listen for logo preview updates from profile page
@@ -56,26 +69,6 @@ export function BrandSwitcher() {
       window.removeEventListener('brand-logo-preview' as any, handleLogoPreview as any)
     }
   }, [])
-
-  const loadBrands = async () => {
-    if (!currentWorkspace?.id) return
-
-    setIsLoading(true)
-    try {
-      const response = await fetch(
-        `http://localhost:3001/workspaces/${currentWorkspace.id}/brands`,
-        { credentials: 'include' }
-      )
-      const data = await response.json()
-      if (data.success) {
-        setBrands(data.brands)
-      }
-    } catch (error) {
-      console.error('Failed to load brands:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const currentBrand = brands.find(b => b.slug === currentBrandSlug)
 

@@ -20,6 +20,8 @@ import {
   updateBrandContactChannel,
   deleteBrandContactChannel,
   reorderBrandContactChannels,
+  calculateAndGetBrandOptimizationScore,
+  updateBrandOptimizationScore,
 } from './brand.service.js';
 import {
   BrandProfileDataSchema,
@@ -235,6 +237,17 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
+    // Helper to safely convert to ISO string (handles both Date objects and strings from cache)
+    const toISOString = (value: Date | string | null | undefined): string | null => {
+      if (!value) return null;
+      if (value instanceof Date) return value.toISOString();
+      if (typeof value === 'string') {
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date.toISOString();
+      }
+      return null;
+    };
+
     return reply.status(200).send({
       success: true,
       brand: {
@@ -251,8 +264,8 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
         logoMediaId: brand.logoMediaId,
         logoUrl,
         mediaCount: brand._count.media,
-        createdAt: brand.createdAt.toISOString(),
-        updatedAt: brand.updatedAt.toISOString(),
+        createdAt: toISOString(brand.createdAt) || new Date().toISOString(),
+        updatedAt: toISOString(brand.updatedAt) || new Date().toISOString(),
         // Contact channels
         contactChannels: brand.contactChannels.map((ch) => ({
           id: ch.id,
@@ -269,12 +282,12 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
               id: brand.profile.id,
               version: brand.profile.version,
               optimizationScore: brand.profile.optimizationScore,
-              optimizationScoreUpdatedAt: brand.profile.optimizationScoreUpdatedAt?.toISOString() ?? null,
+              optimizationScoreUpdatedAt: toISOString(brand.profile.optimizationScoreUpdatedAt),
               aiSummaryShort: brand.profile.aiSummaryShort,
               aiSummaryDetailed: brand.profile.aiSummaryDetailed,
               data: profileData,
-              lastEditedAt: brand.profile.lastEditedAt.toISOString(),
-              lastAiRefreshAt: brand.profile.lastAiRefreshAt?.toISOString() ?? null,
+              lastEditedAt: toISOString(brand.profile.lastEditedAt) || new Date().toISOString(),
+              lastAiRefreshAt: toISOString(brand.profile.lastAiRefreshAt),
             }
           : null,
       },
@@ -694,6 +707,92 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
         error: {
           code: 'REORDER_FAILED',
           message: 'Failed to reorder contact channels',
+        },
+      });
+    }
+  });
+
+  // ============================================================================
+  // Brand Optimization Score Routes
+  // ============================================================================
+
+  // GET /workspaces/:workspaceId/brands/:brandId/optimization-score - Calculate optimization score
+  app.get('/workspaces/:workspaceId/brands/:brandId/optimization-score', {
+    preHandler: requireWorkspaceRoleFor('brand:view'),
+    schema: {
+      tags: ['Brand Optimization'],
+      summary: 'Calculate brand optimization score',
+      description: 'Calculate and return the brand optimization score without saving it. Shows detailed breakdown and improvement suggestions. Requires VIEWER role.',
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, brandId } = request.params as { workspaceId: string; brandId: string };
+
+    try {
+      const result = await calculateAndGetBrandOptimizationScore(brandId, workspaceId);
+
+      return reply.status(200).send({
+        success: true,
+        optimizationScore: result,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'BRAND_NOT_FOUND') {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'BRAND_NOT_FOUND',
+            message: 'Brand not found',
+          },
+        });
+      }
+
+      request.log.error({ error, workspaceId, brandId }, 'Optimization score calculation failed');
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'CALCULATION_FAILED',
+          message: 'Failed to calculate optimization score',
+        },
+      });
+    }
+  });
+
+  // POST /workspaces/:workspaceId/brands/:brandId/optimization-score/refresh - Calculate and save optimization score
+  app.post('/workspaces/:workspaceId/brands/:brandId/optimization-score/refresh', {
+    preHandler: requireWorkspaceRoleFor('brand:update'),
+    schema: {
+      tags: ['Brand Optimization'],
+      summary: 'Refresh brand optimization score',
+      description: 'Calculate and save the brand optimization score to the profile. Requires ADMIN role.',
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, brandId } = request.params as { workspaceId: string; brandId: string };
+    const userId = request.auth?.userId;
+
+    try {
+      const result = await updateBrandOptimizationScore(brandId, workspaceId, userId);
+
+      return reply.status(200).send({
+        success: true,
+        message: 'Optimization score refreshed successfully',
+        optimizationScore: result,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'BRAND_NOT_FOUND') {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'BRAND_NOT_FOUND',
+            message: 'Brand not found',
+          },
+        });
+      }
+
+      request.log.error({ error, workspaceId, brandId }, 'Optimization score refresh failed');
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'REFRESH_FAILED',
+          message: 'Failed to refresh optimization score',
         },
       });
     }

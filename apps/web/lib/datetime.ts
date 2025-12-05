@@ -90,3 +90,100 @@ export function formatTimeForInput(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
+/**
+ * Format date according to user preference
+ */
+export function formatDateByPreference(
+  date: Date | string,
+  dateFormat: DateFormat = DateFormat.MDY
+): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  
+  switch (dateFormat) {
+    case DateFormat.DMY:
+      return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
+    case DateFormat.YMD:
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    case DateFormat.MDY:
+    default:
+      return `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+  }
+}
+
+/**
+ * Format time according to user preference
+ */
+export function formatTimeByPreference(
+  date: Date | string,
+  timeFormat: TimeFormat = TimeFormat.H24
+): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const hours24 = d.getHours();
+  const minutes = d.getMinutes();
+  const minutesStr = String(minutes).padStart(2, '0');
+  
+  if (timeFormat === TimeFormat.H12) {
+    const hours12 = hours24 % 12 || 12;
+    const period = hours24 >= 12 ? 'PM' : 'AM';
+    return `${hours12}:${minutesStr} ${period}`;
+  } else {
+    // H24
+    return `${String(hours24).padStart(2, '0')}:${minutesStr}`;
+  }
+}
+
+/**
+ * Format date and time together according to user preferences
+ */
+export function formatDateTimeByPreference(
+  date: Date | string,
+  dateFormat: DateFormat = DateFormat.MDY,
+  timeFormat: TimeFormat = TimeFormat.H24,
+  separator: string = ' '
+): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const formattedDate = formatDateByPreference(d, dateFormat);
+  const formattedTime = formatTimeByPreference(d, timeFormat);
+  
+  return `${formattedDate}${separator}${formattedTime}`;
+}
+
+/**
+ * Format date in short format (without year if current year)
+ */
+export function formatDateShort(
+  date: Date | string,
+  locale: string = 'en-US'
+): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+  };
+  
+  // Add year if different from current year
+  if (d.getFullYear() !== now.getFullYear()) {
+    options.year = 'numeric';
+  }
+  
+  return d.toLocaleDateString(locale, options);
+}
+
+/**
+ * Format time in short format
+ */
+export function formatTimeShort(
+  date: Date | string,
+  timeFormat: TimeFormat = TimeFormat.H24
+): string {
+  return formatTimeByPreference(date, timeFormat);
+}
+

@@ -47,10 +47,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [workspaceSlug, workspaces]);
 
-  const loadUserData = async () => {
+  const loadUserData = async (skipCache = false) => {
     try {
       setIsLoadingUser(true);
-      const response = await apiClient.getMe();
+      const response = await apiClient.getMe({ skipCache });
       setUser(response.user);
       setWorkspaces(response.workspaces);
     } catch (error) {
@@ -102,7 +102,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = async () => {
-    await loadUserData();
+    // Force refresh bypasses cache
+    await loadUserData(true);
   };
 
   const refreshWorkspace = async (workspaceId: string) => {

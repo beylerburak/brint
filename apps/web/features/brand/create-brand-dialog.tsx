@@ -29,6 +29,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { Area } from "react-easy-crop"
 import { Slider } from "@/components/ui/slider"
+import { apiClient } from "@/lib/api-client"
 
 type CreateBrandDialogProps = {
   open: boolean
@@ -329,6 +330,9 @@ export function CreateBrandDialog({
         }
         throw new Error('Failed to create brand')
       }
+
+      // Clear brands cache after successful creation
+      apiClient.clearBrandsCache(workspaceId)
 
       toast.success(t('brandCreated'))
       onSuccess()

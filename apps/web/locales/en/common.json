@@ -502,7 +502,353 @@
           "infoNoteEx4": "Great customer service, limited portfolio",
           "infoTip": "Tip: Focus on key differentiators that help you position yourself better.",
           "gotIt": "Got it"
+        },
+        "voice": {
+          "toneCharacteristics": {
+            "title": "Tone Characteristics",
+            "formal": "Formal",
+            "informal": "Informal",
+            "serious": "Serious",
+            "playful": "Playful",
+            "simple": "Simple",
+            "complex": "Complex",
+            "warm": "Warm",
+            "neutral": "Neutral",
+            "infoDialog": {
+              "title": "Tone Characteristics Guide",
+              "whatAre": "What are Tone Characteristics?",
+              "description": "These sliders define your brand's communication style. Each scale represents a spectrum between two extremes.",
+              "formalInformal": {
+                "title": "Formal ↔️ Informal",
+                "left": "Left (0%): Very formal, professional language",
+                "right": "Right (100%): Casual, conversational tone",
+                "middle": "Middle (50%): Balanced, approachable yet professional"
+              },
+              "seriousPlayful": {
+                "title": "Serious ↔️ Playful",
+                "left": "Left (0%): Serious, business-focused",
+                "right": "Right (100%): Fun, humorous, lighthearted",
+                "middle": "Middle (50%): Balanced with occasional humor"
+              },
+              "simpleComplex": {
+                "title": "Simple ↔️ Complex",
+                "left": "Left (0%): Simple, easy to understand",
+                "right": "Right (100%): Technical, detailed, sophisticated",
+                "middle": "Middle (50%): Clear with some depth"
+              },
+              "warmNeutral": {
+                "title": "Warm ↔️ Neutral",
+                "left": "Left (0%): Warm, friendly, empathetic",
+                "right": "Right (100%): Neutral, matter-of-fact, objective",
+                "middle": "Middle (50%): Balanced warmth"
+              }
+            },
+            "editDialog": {
+              "title": "Edit Tone Characteristics",
+              "description": "Adjust the tone sliders to define your brand's communication style."
+            }
+          },
+          "doSay": {
+            "title": "Do Say",
+            "emptyState": "No phrases defined yet.",
+            "infoDialog": {
+              "title": "\"Do Say\" Phrases Guide",
+              "whatAre": "What are \"Do Say\" Phrases?",
+              "description": "These are approved phrases, expressions, and language patterns your brand should use in communications.",
+              "howToWrite": {
+                "title": "How to Write Them",
+                "point1": "Use complete phrases or sentences",
+                "point2": "Focus on your brand's authentic voice",
+                "point3": "Include calls-to-action you prefer",
+                "point4": "Add value-driven statements"
+              },
+              "examples": {
+                "title": "Examples",
+                "example1": "\"Let's create something amazing together\"",
+                "example2": "\"We understand your challenges\"",
+                "example3": "\"Innovation meets practicality\"",
+                "example4": "\"Your success is our priority\"",
+                "example5": "\"Quality without compromise\""
+              }
+            },
+            "editDialog": {
+              "title": "Edit \"Do Say\" Phrases",
+              "description": "Manage phrases and expressions your brand should use.",
+              "emptyState": "No phrases yet. Add some below.",
+              "addNewLabel": "Add New Phrase",
+              "placeholder": "e.g., Let's create something amazing"
+            }
+          },
+          "dontSay": {
+            "title": "Don't Say",
+            "emptyState": "No phrases defined yet.",
+            "infoDialog": {
+              "title": "\"Don't Say\" Phrases Guide",
+              "whatAre": "What are \"Don't Say\" Phrases?",
+              "description": "These are phrases, claims, or language patterns your brand should avoid to maintain authenticity and credibility.",
+              "whatToAvoid": {
+                "title": "What to Avoid",
+                "point1": "Overused or cliché expressions",
+                "point2": "Unverifiable claims",
+                "point3": "Aggressive or pushy language",
+                "point4": "Off-brand terminology"
+              },
+              "examples": {
+                "title": "Examples",
+                "example1": "\"Industry-disrupting revolutionary\"",
+                "example2": "\"Best in the world\"",
+                "example3": "\"Cheap and affordable\"",
+                "example4": "\"Trust us blindly\"",
+                "example5": "\"You won't find better anywhere\""
+              },
+              "whyMatters": {
+                "title": "Why This Matters",
+                "description": "Avoiding these phrases helps AI generate content that sounds genuine and maintains your brand's credibility."
+              }
+            },
+            "editDialog": {
+              "title": "Edit \"Don't Say\" Phrases",
+              "description": "Manage phrases and expressions your brand should avoid.",
+              "emptyState": "No phrases yet. Add some below.",
+              "addNewLabel": "Add New Phrase",
+              "placeholder": "e.g., Best in the world"
+            }
+          }
+        },
+        "rules": {
+          "allowedTopics": {
+            "title": "Allowed Topics",
+            "emptyState": "No allowed topics defined yet.",
+            "infoDialog": {
+              "title": "Allowed Topics Guide",
+              "whatAre": "What are Allowed Topics?",
+              "description": "These are content themes and subjects your brand is comfortable discussing publicly. They guide AI content generation.",
+              "howToDefine": {
+                "title": "How to Define Them",
+                "point1": "Keep topics broad but clear",
+                "point2": "Focus on your expertise areas",
+                "point3": "Include industry-relevant themes",
+                "point4": "Consider your audience interests"
+              },
+              "examples": {
+                "title": "Examples",
+                "example1": "Product Updates",
+                "example2": "Industry Insights",
+                "example3": "Client Success Stories",
+                "example4": "Technology Trends",
+                "example5": "Team Culture",
+                "example6": "Design Tips",
+                "example7": "Innovation",
+                "example8": "Sustainability"
+              }
+            },
+            "editDialog": {
+              "title": "Edit Allowed Topics",
+              "description": "Manage topics your brand can talk about.",
+              "emptyState": "No topics yet. Add some below.",
+              "addNewLabel": "Add New Topic",
+              "placeholder": "e.g., Product Updates"
+            }
+          },
+          "forbiddenTopics": {
+            "title": "Forbidden Topics & Safety",
+            "topicsToAvoid": "Topics to Avoid",
+            "emptyState": "No forbidden topics defined yet.",
+            "crisisGuidelines": "Crisis Guidelines",
+            "crisisEmptyState": "No crisis guidelines defined yet.",
+            "infoDialog": {
+              "title": "Forbidden Topics & Crisis Guide",
+              "forbiddenTopicsTitle": "Forbidden Topics",
+              "forbiddenTopicsDescription": "Topics your brand should never discuss to protect reputation and avoid controversy.",
+              "forbiddenTopicsExamplesTitle": "Examples:",
+              "forbiddenTopicsExample1": "Political opinions or endorsements",
+              "forbiddenTopicsExample2": "Religious discussions",
+              "forbiddenTopicsExample3": "Negative competitor comparisons",
+              "forbiddenTopicsExample4": "Unverified claims or statistics",
+              "forbiddenTopicsExample5": "Controversial social issues",
+              "crisisGuidelinesTitle": "Crisis Guidelines",
+              "crisisGuidelinesDescription": "Rules for how your brand should behave during sensitive situations or crises.",
+              "crisisGuidelinesExamplesTitle": "Examples:",
+              "crisisGuidelinesExample1": "Pause promotional content during disasters",
+              "crisisGuidelinesExample2": "No humor during sensitive situations",
+              "crisisGuidelinesExample3": "Coordinate crisis responses with leadership",
+              "crisisGuidelinesExample4": "Monitor social sentiment before posting",
+              "whyMattersTitle": "Why This Matters",
+              "whyMattersDescription": "These rules protect your brand from PR disasters and ensure AI-generated content stays within safe boundaries."
+            },
+            "editDialog": {
+              "title": "Edit Forbidden Topics & Crisis Guidelines",
+              "description": "Manage topics to avoid and crisis response guidelines.",
+              "topicsToAvoidLabel": "Topics to Avoid",
+              "topicsEmptyState": "No forbidden topics yet.",
+              "topicsPlaceholder": "Add a forbidden topic...",
+              "crisisGuidelinesLabel": "Crisis Guidelines",
+              "crisisEmptyState": "No crisis guidelines yet.",
+              "crisisPlaceholder": "Add a crisis guideline..."
+            }
+          },
+          "legalConstraints": {
+            "title": "Legal Constraints",
+            "emptyState": "No legal constraints defined yet.",
+            "infoDialog": {
+              "title": "Legal Constraints Guide",
+              "whatAre": "What are Legal Constraints?",
+              "description": "Legal requirements, compliance rules, and regulations your brand must follow in communications.",
+              "whatToInclude": {
+                "title": "What to Include",
+                "point1": "Industry-specific regulations",
+                "point2": "Disclosure requirements",
+                "point3": "Copyright and licensing rules",
+                "point4": "Data privacy requirements",
+                "point5": "Advertising standards"
+              },
+              "exampleTitle": "Example: Disclosure Requirements",
+              "exampleTitleLabel": "Title:",
+              "exampleTitleValue": "Disclosure Requirements",
+              "exampleDescLabel": "Description:",
+              "exampleDescValue": "All paid partnerships must include #ad or #sponsored hashtag as per FTC guidelines",
+              "moreExamples": {
+                "title": "More Examples",
+                "copyrightLabel": "Copyright:",
+                "copyrightValue": "Only use licensed content, credit creators when required",
+                "gdprLabel": "GDPR/KVKK:",
+                "gdprValue": "Never share client data without consent",
+                "medicalLabel": "Medical Claims:",
+                "medicalValue": "Avoid health claims without FDA approval"
+              }
+            },
+            "editDialog": {
+              "titleAdd": "Add Legal Constraint",
+              "titleEdit": "Edit Legal Constraint",
+              "descriptionAdd": "Add a new legal or compliance requirement.",
+              "descriptionEdit": "Update legal constraint details.",
+              "titleLabel": "Title *",
+              "titlePlaceholder": "e.g., Disclosure Requirements",
+              "descriptionLabel": "Description *",
+              "descriptionPlaceholder": "Describe the legal requirement or constraint...",
+              "add": "Add",
+              "update": "Update"
+            }
+          }
+        },
+        "assets": {
+          "brandColors": {
+            "title": "Brand Colors",
+            "primaryColors": "Primary Colors",
+            "primaryEmptyState": "No primary colors defined yet.",
+            "accentColors": "Accent Colors",
+            "accentEmptyState": "No accent colors defined yet.",
+            "infoDialog": {
+              "title": "Brand Colors Guide",
+              "primaryColorsTitle": "Primary Colors",
+              "primaryColorsDescription": "Your main brand colors. These should be used most frequently in your visual identity.",
+              "primaryColorsExamples": "Examples: #2563eb (blue), #1e293b (dark slate)",
+              "primaryColorsTipLabel": "Tip:",
+              "primaryColorsTipValue": "2-3 primary colors is ideal",
+              "accentColorsTitle": "Accent Colors",
+              "accentColorsDescription": "Supporting colors for highlights, CTAs, and special elements.",
+              "accentColorsExamples": "Examples: #10b981 (success green), #f59e0b (warning orange)",
+              "accentColorsTipLabel": "Tip:",
+              "accentColorsTipValue": "1-2 accent colors is usually enough",
+              "howToUseTitle": "How to Use",
+              "howToUse1": "Click existing colors to edit them",
+              "howToUse2": "Use color picker to add new colors",
+              "howToUse3": "Click X button (on hover) to remove",
+              "howToUse4": "Colors are shown in both dialog and main view"
+            },
+            "editDialog": {
+              "title": "Edit Brand Colors",
+              "description": "Manage your brand's primary and accent colors.",
+              "primaryColorsLabel": "Primary Colors",
+              "addPrimaryColor": "Add Primary Color",
+              "accentColorsLabel": "Accent Colors",
+              "addAccentColor": "Add Accent Color"
+            }
+          },
+          "visualGuidelines": {
+            "title": "Visual Guidelines",
+            "emptyState": "No visual guidelines defined yet.",
+            "infoDialog": {
+              "title": "Visual Guidelines Guide",
+              "whatAre": "What are Visual Guidelines?",
+              "description": "Rules and preferences for visual content like photos, graphics, and design elements.",
+              "whatToInclude": {
+                "title": "What to Include",
+                "point1": "Photography style preferences",
+                "point2": "Composition rules",
+                "point3": "Image treatment preferences",
+                "point4": "Typography guidelines",
+                "point5": "Layout principles"
+              },
+              "examples": {
+                "title": "Examples",
+                "example1": "Authentic photos over stock imagery",
+                "example2": "Minimalist, clean compositions",
+                "example3": "Include human elements when possible",
+                "example4": "Consistent lighting and color grading",
+                "example5": "Use sans-serif fonts for headings",
+                "example6": "Maintain whitespace for breathing room"
+              },
+              "tipsTitle": "Tips",
+              "tipsDescription": "Keep guidelines actionable and specific. Avoid vague instructions like \"look professional\" - be concrete."
+            },
+            "editDialog": {
+              "title": "Edit Visual Guidelines",
+              "description": "Manage visual style guidelines for your brand.",
+              "emptyState": "No guidelines yet. Add some below.",
+              "addNewLabel": "Add New Guideline",
+              "placeholder": "e.g., Authentic photos over stock"
+            }
+          },
+          "aiConfiguration": {
+            "title": "AI Configuration",
+            "defaultLanguage": "Default Language",
+            "contentLength": "Content Length",
+            "ctaStyle": "CTA Style",
+            "preferredPlatforms": "Preferred Platforms",
+            "platformsEmptyState": "No platforms defined yet.",
+            "infoDialog": {
+              "title": "AI Configuration Guide",
+              "defaultLanguageTitle": "Default Language",
+              "defaultLanguageDescription": "Primary language for AI-generated content.",
+              "defaultLanguageExample": "Example: en-US, tr-TR",
+              "contentLengthTitle": "Content Length",
+              "contentLengthDescription": "Preferred length range for AI-generated content.",
+              "contentLengthCharsExample": "Characters example: Min 50, Max 280 (Twitter-friendly)",
+              "contentLengthWordsExample": "Words example: Min 20, Max 50 (short blog intro)",
+              "contentLengthTip": "Choose characters for social media, words for articles.",
+              "ctaStyleTitle": "CTA Style",
+              "ctaStyleDescription": "How your calls-to-action should sound.",
+              "ctaStyleExamples": "Examples: Soft, invitational, Direct and urgent, Educational, helpful",
+              "preferredPlatformsTitle": "Preferred Platforms",
+              "preferredPlatformsDescription": "Social media or content platforms you primarily use.",
+              "preferredPlatformsExamples": "Examples: Instagram, LinkedIn, Twitter, Facebook, TikTok, YouTube, Blog",
+              "preferredPlatformsTip": "This helps AI tailor content format and style to each platform."
+            },
+            "editDialog": {
+              "title": "Edit AI Configuration",
+              "description": "Configure AI settings for content generation.",
+              "defaultLanguageLabel": "Default Language",
+              "defaultLanguagePlaceholder": "e.g., en-US, tr-TR",
+              "contentLengthLabel": "Content Length",
+              "minLabel": "Min",
+              "maxLabel": "Max",
+              "unitLabel": "Unit",
+              "charactersOption": "Characters",
+              "wordsOption": "Words",
+              "ctaStyleLabel": "CTA Style",
+              "ctaStylePlaceholder": "e.g., Soft, invitational",
+              "preferredPlatformsLabel": "Preferred Platforms",
+              "preferredPlatformsPlaceholder": "e.g., Instagram, LinkedIn"
+            }
+          }
         }
+      },
+      "common": {
+        "gotIt": "Got it",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving..."
       },
       "transition": {
         "loadingBrand": "Loading {brand} brand studio...",

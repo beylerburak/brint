@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
+import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -93,23 +94,15 @@ export default function BrandsPage() {
 
   useEffect(() => {
     if (currentWorkspace?.id) {
-      loadBrands()
+      loadBrands(currentWorkspace.id)
     }
   }, [currentWorkspace?.id])
 
-  const loadBrands = async () => {
-    if (!currentWorkspace?.id) return
-
+  const loadBrands = async (workspaceId: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch(
-        `http://localhost:3001/workspaces/${currentWorkspace.id}/brands`,
-        { credentials: 'include' }
-      )
-      const data = await response.json()
-      if (data.success) {
-        setBrands(data.brands)
-      }
+      const response = await apiClient.listBrands(workspaceId)
+      setBrands(response.brands)
     } catch (error) {
       console.error('Failed to load brands:', error)
     } finally {
@@ -151,7 +144,7 @@ export default function BrandsPage() {
           open={showCreateDialog}
           onOpenChange={setShowCreateDialog}
           workspaceId={currentWorkspace?.id || ''}
-          onSuccess={loadBrands}
+          onSuccess={() => currentWorkspace?.id && loadBrands(currentWorkspace.id)}
         />
       </>
     )
@@ -232,7 +225,7 @@ export default function BrandsPage() {
           open={showCreateDialog}
           onOpenChange={setShowCreateDialog}
           workspaceId={currentWorkspace?.id || ''}
-          onSuccess={loadBrands}
+          onSuccess={() => currentWorkspace?.id && loadBrands(currentWorkspace.id)}
         />
 
         <UpgradeDialog

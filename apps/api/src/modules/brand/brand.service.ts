@@ -19,6 +19,8 @@ import {
   CreateBrandContactChannelSchema,
   UpdateBrandContactChannelSchema,
 } from './domain/brand-profile.schema.js';
+import { calculateBrandOptimizationScore } from './utils/brand-optimization-score.js';
+import { cacheService, CacheKeys } from '../../core/cache/cache.service.js';
 
 /**
  * Helper to convert nullable JSON to Prisma-compatible format
@@ -116,6 +118,9 @@ export async function createBrand(
 
   logger.info({ brandId: brand.id, slug: brand.slug }, 'Brand created');
 
+  // Invalidate brands list cache
+  await cacheService.delete(CacheKeys.patterns.allBrands(workspaceId));
+
   // Log activity
   await logActivity(
     buildBrandActivity({
@@ -172,6 +177,10 @@ export async function updateBrand(
 
   logger.info({ brandId }, 'Brand updated');
 
+  // Invalidate brand and brands list cache
+  await cacheService.delete(CacheKeys.brand(brandId));
+  await cacheService.delete(CacheKeys.patterns.allBrands(workspaceId));
+
   // Log activity
   await logActivity(
     buildBrandActivity({
@@ -220,6 +229,10 @@ export async function deleteBrand(
 
   logger.info({ brandId }, 'Brand deleted');
 
+  // Invalidate brand and brands list cache
+  await cacheService.delete(CacheKeys.patterns.allBrandData(brandId));
+  await cacheService.delete(CacheKeys.patterns.allBrands(workspaceId));
+
   // Log activity
   await logActivity(
     buildBrandActivity({
@@ -240,8 +253,19 @@ export async function deleteBrand(
 
 /**
  * Get brand by ID with full details including profile and contact channels
+ * Uses Redis cache with 5 minute TTL
  */
 export async function getBrandById(brandId: string, workspaceId: string) {
+  const cacheKey = CacheKeys.brand(brandId);
+
+  // Try cache first
+  const cached = await cacheService.get<any>(cacheKey);
+  if (cached) {
+    logger.debug({ brandId }, 'Brand loaded from Redis cache');
+    return cached;
+  }
+
+  // Cache miss - fetch from database
   const brand = await prisma.brand.findFirst({
     where: {
       id: brandId,
@@ -268,6 +292,11 @@ export async function getBrandById(brandId: string, workspaceId: string) {
       },
     },
   });
+
+  // Cache the result (5 minutes TTL)
+  if (brand) {
+    await cacheService.set(cacheKey, brand, 300);
+  }
 
   return brand;
 }
@@ -308,6 +337,7 @@ export async function getBrandBySlug(slug: string, workspaceId: string) {
 
 /**
  * List brands in workspace
+ * Uses Redis cache with 3 minute TTL
  */
 export async function listBrands(
   workspaceId: string,
@@ -317,6 +347,20 @@ export async function listBrands(
     offset?: number;
   }
 ) {
+  // Only cache if no pagination (limit/offset)
+  const shouldCache = !options?.limit && !options?.offset;
+  const cacheKey = CacheKeys.brandsList(workspaceId, options?.status);
+
+  if (shouldCache) {
+    // Try cache first
+    const cached = await cacheService.get<any[]>(cacheKey);
+    if (cached) {
+      logger.debug({ workspaceId, status: options?.status }, 'Brands list loaded from Redis cache');
+      return cached;
+    }
+  }
+
+  // Cache miss or pagination - fetch from database
   const brands = await prisma.brand.findMany({
     where: {
       workspaceId,
@@ -336,6 +380,11 @@ export async function listBrands(
     skip: options?.offset,
   });
 
+  // Cache the result (3 minutes TTL) - only if no pagination
+  if (shouldCache) {
+    await cacheService.set(cacheKey, brands, 180);
+  }
+
   return brands;
 }
 
@@ -346,6 +395,7 @@ export async function listBrands(
 /**
  * Update brand profile data
  * Creates profile if it doesn't exist (upsert)
+ * Automatically calculates and saves optimization score after update
  */
 export async function updateBrandProfile(input: {
   brandId: string;
@@ -389,23 +439,122 @@ export async function updateBrandProfile(input: {
 
   logger.info({ brandId: input.brandId, profileId: profile.id }, 'Brand profile updated');
 
-  // Log activity
-  await logActivity(
-    buildBrandActivity({
-      workspaceId: input.workspaceId,
-      brandId: input.brandId,
-      entityId: input.brandId,
-      eventKey: 'brand.profile_updated',
-      message: 'Brand profile updated',
-      actorType: ActivityActorType.USER,
-      actorUserId: input.editorUserId,
-      context: 'brand_profile',
-      payload: {
+  // Automatically calculate and update optimization score
+  let finalScore: number | null = profile.optimizationScore;
+  let scoreChange: number | null = null;
+  
+  try {
+    // Get brand with full details for score calculation
+    const brand = await getBrandById(input.brandId, input.workspaceId);
+    
+    if (brand) {
+      // Generate logoUrl if logo exists
+      let logoUrl: string | null = null;
+      if (brand.logoMedia) {
+        const { getMediaVariantUrlAsync } = await import('../../core/storage/s3-url.js');
+        logoUrl = await getMediaVariantUrlAsync(
+          brand.logoMedia.bucket,
+          brand.logoMedia.variants,
+          'small',
+          brand.logoMedia.isPublic
+        );
+      }
+
+      // Prepare brand data for score calculation
+      const brandData = {
+        ...brand,
+        logoUrl,
+        profile: {
+          ...brand.profile,
+          data: dataToSave, // Use the newly saved data
+        },
+      };
+
+      // Calculate optimization score
+      const scoreResult = calculateBrandOptimizationScore(brandData);
+      
+      // Calculate score change
+      const previousScore = existing?.optimizationScore;
+      if (previousScore !== null && previousScore !== undefined) {
+        scoreChange = scoreResult.score - previousScore;
+      }
+
+      // Update profile with new score
+      await prisma.brandProfile.update({
+        where: { brandId: input.brandId },
+        data: {
+          optimizationScore: scoreResult.score,
+          optimizationScoreUpdatedAt: new Date(),
+        },
+      });
+
+      logger.info(
+        { brandId: input.brandId, score: scoreResult.score, change: scoreChange },
+        'Optimization score auto-calculated and updated'
+      );
+
+      finalScore = scoreResult.score;
+
+      // Invalidate brand cache (profile updated)
+      await cacheService.delete(CacheKeys.brand(input.brandId));
+
+      // Log activity with optimization score update
+      await logActivity(
+        buildBrandActivity({
+          workspaceId: input.workspaceId,
+          brandId: input.brandId,
+          entityId: input.brandId,
+          eventKey: 'brand.profile_updated',
+          message: `Brand profile updated (optimization score: ${scoreResult.score}%)`,
+          actorType: ActivityActorType.USER,
+          actorUserId: input.editorUserId,
+          context: 'brand_profile',
+          payload: {
+            brandId: input.brandId,
+            optimizationScore: scoreResult.score,
+            previousScore: previousScore ?? null,
+            scoreChange: scoreChange,
+            autoCalculated: true,
+          },
+        })
+      );
+
+      // Return updated profile with new score
+      return {
+        ...profile,
+        optimizationScore: scoreResult.score,
+        optimizationScoreUpdatedAt: new Date(),
+      };
+    }
+  } catch (error) {
+    logger.error(
+      { error, brandId: input.brandId },
+      'Failed to auto-calculate optimization score, continuing anyway'
+    );
+    // Don't fail the whole profile update if score calculation fails
+    
+    // Invalidate brand cache anyway
+    await cacheService.delete(CacheKeys.brand(input.brandId));
+    
+    // Log activity without optimization score
+    await logActivity(
+      buildBrandActivity({
+        workspaceId: input.workspaceId,
         brandId: input.brandId,
-        hasOptimizationScore: profile.optimizationScore != null,
-      },
-    })
-  );
+        entityId: input.brandId,
+        eventKey: 'brand.profile_updated',
+        message: 'Brand profile updated',
+        actorType: ActivityActorType.USER,
+        actorUserId: input.editorUserId,
+        context: 'brand_profile',
+        payload: {
+          brandId: input.brandId,
+          optimizationScore: finalScore,
+          autoCalculationFailed: true,
+        },
+      })
+    );
+  }
 
   return profile;
 }
@@ -463,6 +612,9 @@ export async function createBrandContactChannel(
   });
 
   logger.info({ channelId: channel.id, brandId }, 'Brand contact channel created');
+
+  // Invalidate brand cache (contact channels updated)
+  await cacheService.delete(CacheKeys.brand(brandId));
 
   // Log activity
   await logActivity(
@@ -527,6 +679,9 @@ export async function updateBrandContactChannel(
 
   logger.info({ channelId }, 'Brand contact channel updated');
 
+  // Invalidate brand cache (contact channels updated)
+  await cacheService.delete(CacheKeys.brand(brandId));
+
   // Log activity
   await logActivity(
     buildBrandActivity({
@@ -576,6 +731,9 @@ export async function deleteBrandContactChannel(
 
   logger.info({ channelId }, 'Brand contact channel deleted');
 
+  // Invalidate brand cache (contact channels updated)
+  await cacheService.delete(CacheKeys.brand(brandId));
+
   // Log activity
   await logActivity(
     buildBrandActivity({
@@ -615,5 +773,127 @@ export async function reorderBrandContactChannels(
   );
 
   logger.info({ brandId }, 'Brand contact channels reordered');
+}
+
+// ============================================================================
+// Brand Optimization Score Functions
+// ============================================================================
+
+/**
+ * Calculate optimization score for a brand
+ */
+export async function calculateAndGetBrandOptimizationScore(
+  brandId: string,
+  workspaceId: string
+) {
+  logger.info({ brandId }, 'Calculating brand optimization score');
+
+  // Get brand with full details
+  const brand = await getBrandById(brandId, workspaceId);
+
+  if (!brand) {
+    throw new Error('BRAND_NOT_FOUND');
+  }
+
+  // Generate logoUrl if logo exists
+  let logoUrl: string | null = null;
+  if (brand.logoMedia) {
+    const { getMediaVariantUrlAsync } = await import('../../core/storage/s3-url.js');
+    logoUrl = await getMediaVariantUrlAsync(
+      brand.logoMedia.bucket,
+      brand.logoMedia.variants,
+      'small',
+      brand.logoMedia.isPublic
+    );
+  }
+
+  // Prepare brand data for score calculation
+  const brandData = {
+    id: brand.id,
+    name: brand.name,
+    slug: brand.slug,
+    description: brand.description,
+    industry: brand.industry,
+    country: brand.country,
+    city: brand.city,
+    primaryLocale: brand.primaryLocale,
+    timezone: brand.timezone,
+    status: brand.status,
+    logoMediaId: brand.logoMediaId,
+    logoUrl,
+    mediaCount: brand._count.media,
+    createdAt: brand.createdAt,
+    updatedAt: brand.updatedAt,
+    contactChannels: brand.contactChannels,
+    profile: brand.profile,
+  };
+
+  // Calculate optimization score
+  const result = calculateBrandOptimizationScore(brandData);
+
+  logger.info({ brandId, score: result.score }, 'Brand optimization score calculated');
+
+  return result;
+}
+
+/**
+ * Calculate and save optimization score to profile
+ */
+export async function updateBrandOptimizationScore(
+  brandId: string,
+  workspaceId: string,
+  userId?: string
+) {
+  logger.info({ brandId }, 'Updating brand optimization score');
+
+  // Calculate score
+  const result = await calculateAndGetBrandOptimizationScore(brandId, workspaceId);
+
+  // Update profile with new score
+  const existingProfile = await prisma.brandProfile.findUnique({
+    where: { brandId },
+  });
+
+  if (existingProfile) {
+    await prisma.brandProfile.update({
+      where: { brandId },
+      data: {
+        optimizationScore: result.score,
+        optimizationScoreUpdatedAt: new Date(),
+      },
+    });
+
+    logger.info({ brandId, score: result.score }, 'Brand optimization score updated in profile');
+
+    // Invalidate brand cache (optimization score updated)
+    await cacheService.delete(CacheKeys.brand(brandId));
+
+    // Log activity
+    await logActivity(
+      buildBrandActivity({
+        workspaceId,
+        brandId,
+        entityId: brandId,
+        eventKey: 'brand.optimization_score_refreshed',
+        message: `Optimization score refreshed: ${result.score}%`,
+        actorType: userId ? ActivityActorType.USER : ActivityActorType.SYSTEM,
+        actorUserId: userId,
+        context: 'brand_profile',
+        payload: {
+          score: result.score,
+          percentage: result.percentage,
+          previousScore: existingProfile.optimizationScore,
+          breakdown: result.breakdown.map(b => ({
+            section: b.section,
+            score: b.score,
+            maxScore: b.maxScore,
+            issueCount: b.issues.length,
+          })),
+        },
+      })
+    );
+  }
+
+  return result;
 }
 

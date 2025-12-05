@@ -59,6 +59,7 @@ import type {
   BrandContactType,
   CreateBrandContactChannelInput 
 } from "@/lib/brand-types"
+import { formatDateShort, formatTimeShort, DateFormat, TimeFormat } from "@/lib/datetime"
 import {
   ColorPicker,
   ColorPickerContent,
@@ -322,7 +323,7 @@ export default function BrandProfilePage() {
   const t = useTranslations()
   const params = useParams()
   const brandSlug = params?.brandSlug as string
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, user } = useWorkspace()
   const isMobile = useIsMobile()
   const [brand, setBrand] = useState<BrandDetailDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -532,6 +533,7 @@ export default function BrandProfilePage() {
   const [previewLogoUrl, setPreviewLogoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
   const [progressValue, setProgressValue] = useState(0)
+  const [isRefreshingScore, setIsRefreshingScore] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Tab order for swipe navigation
@@ -562,43 +564,38 @@ export default function BrandProfilePage() {
   const aiConfig = profile.aiConfig ?? {}
 
   // Load brand with profile and contact channels
-  const loadBrand = useCallback(async (skipLoading = false) => {
-    if (!currentWorkspace?.id) return
+  useEffect(() => {
+    const loadBrand = async () => {
+      if (!currentWorkspace?.id || !brandSlug) return
 
-    if (!skipLoading) {
       setIsLoading(true)
-    }
-    try {
-      // First get brand list to find brand ID by slug
-      const listResponse = await apiClient.listBrands(currentWorkspace.id)
-      const foundBrandBasic = listResponse.brands.find((b) => b.slug === brandSlug)
-      
-      if (!foundBrandBasic) {
-        console.error('Brand not found')
-        return
-      }
+      try {
+        // First get brand list to find brand ID by slug
+        const listResponse = await apiClient.listBrands(currentWorkspace.id)
+        const foundBrandBasic = listResponse.brands.find((b) => b.slug === brandSlug)
+        
+        if (!foundBrandBasic) {
+          console.error('Brand not found')
+          setIsLoading(false)
+          return
+        }
 
-      // Then get full brand details with profile and contacts
-      const detailResponse = await apiClient.getBrand(currentWorkspace.id, foundBrandBasic.id)
-      if (detailResponse.success) {
-        setBrand(detailResponse.brand)
-        setContactChannels(detailResponse.brand.contactChannels ?? [])
-      }
-    } catch (error) {
-      console.error('Failed to load brand:', error)
-      toast.error('Failed to load brand details')
-    } finally {
-      if (!skipLoading) {
+        // Then get full brand details with profile and contacts
+        const detailResponse = await apiClient.getBrand(currentWorkspace.id, foundBrandBasic.id)
+        if (detailResponse.success) {
+          setBrand(detailResponse.brand)
+          setContactChannels(detailResponse.brand.contactChannels ?? [])
+        }
+      } catch (error) {
+        console.error('Failed to load brand:', error)
+        toast.error('Failed to load brand details')
+      } finally {
         setIsLoading(false)
       }
     }
-  }, [currentWorkspace?.id, brandSlug])
 
-  useEffect(() => {
-    if (currentWorkspace?.id && brandSlug) {
-      loadBrand()
-    }
-  }, [currentWorkspace?.id, brandSlug, loadBrand])
+    loadBrand()
+  }, [currentWorkspace?.id, brandSlug])
 
   // Animate progress value on mount (using optimization score)
   useEffect(() => {
@@ -607,6 +604,36 @@ export default function BrandProfilePage() {
     }, 300)
     return () => clearTimeout(timer)
   }, [optimizationScore])
+
+  // Refresh optimization score handler
+  const handleRefreshOptimizationScore = async () => {
+    if (!currentWorkspace?.id || !brand?.id) return
+    
+    setIsRefreshingScore(true)
+    try {
+      const response = await apiClient.refreshBrandOptimizationScore(
+        currentWorkspace.id,
+        brand.id
+      )
+      
+      // Update local state with new score
+      setBrand(prev => prev ? {
+        ...prev,
+        profile: prev.profile ? {
+          ...prev.profile,
+          optimizationScore: response.optimizationScore.score,
+          optimizationScoreUpdatedAt: new Date().toISOString(),
+        } : null
+      } : null)
+      
+      toast.success(`Optimization score updated: ${response.optimizationScore.score}%`)
+    } catch (error) {
+      console.error('Failed to refresh optimization score:', error)
+      toast.error('Failed to refresh optimization score')
+    } finally {
+      setIsRefreshingScore(false)
+    }
+  }
 
   // Contact Channel CRUD handlers
   const handleAddContact = () => {
@@ -2160,36 +2187,26 @@ export default function BrandProfilePage() {
               <TabsHighlightItem value="voice">
                 <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
                   <IconMessageCircle className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "voice") && <span>Voice</span>}
+                  {(!isMobile || activeTab === "voice") && <span>{t('brandProfile.tabs.voice')}</span>}
             </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="rules">
                 <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
                   <IconShieldCheck className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "rules") && <span>Rules</span>}
+                  {(!isMobile || activeTab === "rules") && <span>{t('brandProfile.tabs.rules')}</span>}
             </TabsTrigger>
               </TabsHighlightItem>
               
               <TabsHighlightItem value="assets">
                 <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
                   <IconPalette className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "assets") && <span>Assets</span>}
-                </TabsTrigger>
+                  {(!isMobile || activeTab === "assets") && <span>{t('brandProfile.tabs.assets')}</span>}
+            </TabsTrigger>
               </TabsHighlightItem>
             </TabsHighlight>
           </TabsList>
           </div>
-          
-          <Button 
-            size="sm" 
-            className="shrink-0"
-            disabled={isProfileSaving}
-            onClick={() => toast.info('Edit mode coming soon. Individual sections can be edited via their pencil icons.')}
-          >
-            <IconPencil className="h-4 w-4" />
-            <span className="hidden sm:inline ml-2">{isProfileSaving ? 'Saving...' : 'Edit Profile'}</span>
-          </Button>
         </div>
 
         <motion.div 
@@ -2219,8 +2236,17 @@ export default function BrandProfilePage() {
                 <CardContent className="px-6 py-4">
                   <div className="space-y-2">
                     <div className="flex items-start justify-between">
-                      <div>
+                      <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold">{t('brandProfile.overview.optimizationScore')}</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={handleRefreshOptimizationScore}
+                          disabled={isRefreshingScore}
+                        >
+                          <IconSparkles className={`h-4 w-4 ${isRefreshingScore ? 'animate-spin' : ''}`} />
+                        </Button>
                       </div>
                       <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
                         {optimizationScore !== null ? (
@@ -2284,10 +2310,10 @@ export default function BrandProfilePage() {
                   {optimizationScoreUpdatedAt ? (
                     <>
                       <span className="text-orange-500 font-medium">
-                        {new Date(optimizationScoreUpdatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {formatDateShort(optimizationScoreUpdatedAt, user?.locale || 'en-US')}
                       </span>
                       <span className="text-purple-500">
-                        {t('brandProfile.overview.at')} {new Date(optimizationScoreUpdatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {t('brandProfile.overview.at')} {formatTimeShort(optimizationScoreUpdatedAt, user?.timeFormat === 'H12' ? TimeFormat.H12 : TimeFormat.H24)}
                       </span>
                     </>
                   ) : (
@@ -2783,7 +2809,7 @@ export default function BrandProfilePage() {
           <TabsContent value="voice" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">Tone Characteristics</CardTitle>
+                <CardTitle className="text-base font-semibold">{t('brandProfile.voice.toneCharacteristics.title')}</CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenToneDialog}>
                   <IconPencil className="h-3.5 w-3.5" />
                 </Button>
@@ -2793,9 +2819,9 @@ export default function BrandProfilePage() {
                 {/* Formal - Informal */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Formal</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.formal')}</span>
                       <span className="font-medium">{Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">Informal</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.informal')}</span>
                   </div>
                     <Slider value={[Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)]} max={100} step={1} disabled />
                 </div>
@@ -2803,9 +2829,9 @@ export default function BrandProfilePage() {
                 {/* Serious - Playful */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Serious</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.serious')}</span>
                       <span className="font-medium">{Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">Playful</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.playful')}</span>
                   </div>
                     <Slider value={[Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)]} max={100} step={1} disabled />
                 </div>
@@ -2813,9 +2839,9 @@ export default function BrandProfilePage() {
                 {/* Simple - Complex */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Simple</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.simple')}</span>
                       <span className="font-medium">{Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">Complex</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.complex')}</span>
                   </div>
                     <Slider value={[Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)]} max={100} step={1} disabled />
                 </div>
@@ -2823,9 +2849,9 @@ export default function BrandProfilePage() {
                 {/* Warm - Neutral */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Warm</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.warm')}</span>
                       <span className="font-medium">{Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">Neutral</span>
+                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.neutral')}</span>
                   </div>
                     <Slider value={[Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)]} max={100} step={1} disabled />
                   </div>
@@ -2838,7 +2864,7 @@ export default function BrandProfilePage() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <IconCheck className="h-4 w-4 text-green-600" />
-                    Do Say
+                    {t('brandProfile.voice.doSay.title')}
                   </CardTitle>
                   <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDoSayDialog}>
                     <IconPencil className="h-3.5 w-3.5" />
@@ -2857,7 +2883,7 @@ export default function BrandProfilePage() {
                       ))}
                   </ul>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">No phrases defined yet.</p>
+                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.doSay.emptyState')}</p>
                   )}
                 </CardContent>
               </Card>
@@ -2866,7 +2892,7 @@ export default function BrandProfilePage() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <IconX className="h-4 w-4 text-red-600" />
-                    Don&apos;t Say
+                    {t('brandProfile.voice.dontSay.title')}
                   </CardTitle>
                   <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDontSayDialog}>
                     <IconPencil className="h-3.5 w-3.5" />
@@ -2885,7 +2911,7 @@ export default function BrandProfilePage() {
                       ))}
                   </ul>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">No phrases defined yet.</p>
+                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.dontSay.emptyState')}</p>
                   )}
                 </CardContent>
               </Card>
@@ -2896,7 +2922,7 @@ export default function BrandProfilePage() {
           <TabsContent value="rules" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">Allowed Topics</CardTitle>
+                <CardTitle className="text-base font-semibold">{t('brandProfile.rules.allowedTopics.title')}</CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAllowedTopicsDialog}>
                   <IconPencil className="h-3.5 w-3.5" />
                 </Button>
@@ -2914,21 +2940,21 @@ export default function BrandProfilePage() {
                     ))}
                 </div>
                 ) : (
-                  <p className="text-xs italic text-muted-foreground text-center py-4">No allowed topics defined yet.</p>
+                  <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.allowedTopics.emptyState')}</p>
                 )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">Forbidden Topics & Safety</CardTitle>
+                <CardTitle className="text-base font-semibold">{t('brandProfile.rules.forbiddenTopics.title')}</CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenForbiddenTopicsDialog}>
                   <IconPencil className="h-3.5 w-3.5" />
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Topics to Avoid</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.topicsToAvoid')}</p>
                   {(rules.forbiddenTopics ?? []).length > 0 ? (
                     (rules.forbiddenTopics ?? []).map((topic, i) => (
                       <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
@@ -2942,11 +2968,11 @@ export default function BrandProfilePage() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs italic text-muted-foreground">No forbidden topics defined yet.</p>
+                    <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.emptyState')}</p>
                   )}
                   </div>
                   <div className="pt-2 border-t">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Crisis Guidelines</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">{t('brandProfile.rules.forbiddenTopics.crisisGuidelines')}</p>
                   {(rules.crisisGuidelines ?? []).length > 0 ? (
                     <ul className="text-xs text-muted-foreground space-y-1.5">
                       {(rules.crisisGuidelines ?? []).map((guideline, i) => (
@@ -2954,7 +2980,7 @@ export default function BrandProfilePage() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground">No crisis guidelines defined yet.</p>
+                    <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.crisisEmptyState')}</p>
                   )}
                 </div>
               </CardContent>
@@ -2963,7 +2989,7 @@ export default function BrandProfilePage() {
             <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  ⚖️ Legal Constraints
+                  ⚖️ {t('brandProfile.rules.legalConstraints.title')}
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenLegalConstraintDialog()}>
                   <IconPlus className="h-3.5 w-3.5" />
@@ -2990,7 +3016,7 @@ export default function BrandProfilePage() {
                     ))}
                 </div>
                 ) : (
-                  <p className="text-xs italic text-muted-foreground text-center py-4">No legal constraints defined yet.</p>
+                  <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.legalConstraints.emptyState')}</p>
                 )}
               </CardContent>
             </Card>
@@ -3000,7 +3026,7 @@ export default function BrandProfilePage() {
           <TabsContent value="assets" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">Brand Colors</CardTitle>
+                <CardTitle className="text-base font-semibold">{t('brandProfile.assets.brandColors.title')}</CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBrandColorsDialog}>
                   <IconPencil className="h-3.5 w-3.5" />
                 </Button>
@@ -3008,7 +3034,7 @@ export default function BrandProfilePage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Primary Colors</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.primaryColors')}</p>
                     {(assets.brandColors?.primary ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {(assets.brandColors?.primary ?? []).map((color, i) => (
@@ -3047,11 +3073,11 @@ export default function BrandProfilePage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs italic text-muted-foreground">No primary colors defined yet.</p>
+                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.primaryEmptyState')}</p>
                     )}
                       </div>
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Accent Colors</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.accentColors')}</p>
                     {(assets.brandColors?.accent ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {(assets.brandColors?.accent ?? []).map((color, i) => (
@@ -3090,7 +3116,7 @@ export default function BrandProfilePage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs italic text-muted-foreground">No accent colors defined yet.</p>
+                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.accentEmptyState')}</p>
                     )}
                   </div>
                 </div>
@@ -3100,7 +3126,7 @@ export default function BrandProfilePage() {
             <div className="grid gap-4 md:grid-cols-2">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">Visual Guidelines</CardTitle>
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.assets.visualGuidelines.title')}</CardTitle>
                   <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenVisualGuidelinesDialog}>
                     <IconPencil className="h-3.5 w-3.5" />
                   </Button>
@@ -3116,14 +3142,14 @@ export default function BrandProfilePage() {
                       ))}
                 </ul>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">No visual guidelines defined yet.</p>
+                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.assets.visualGuidelines.emptyState')}</p>
                   )}
               </CardContent>
             </Card>
 
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">AI Configuration</CardTitle>
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.assets.aiConfiguration.title')}</CardTitle>
                   <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAiConfigDialog}>
                     <IconPencil className="h-3.5 w-3.5" />
                   </Button>
@@ -3131,23 +3157,23 @@ export default function BrandProfilePage() {
               <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Default Language</span>
-                      <span className="font-medium">{aiConfig.defaultLanguage || brand.primaryLocale || 'Not set'}</span>
+                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.defaultLanguage')}</span>
+                      <span className="font-medium">{aiConfig.defaultLanguage || brand.primaryLocale || t('brandProfile.overview.notSet')}</span>
                   </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Content Length</span>
+                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.contentLength')}</span>
                       <span className="font-medium">
                         {aiConfig.contentLength 
                           ? `${aiConfig.contentLength.min ?? '?'}-${aiConfig.contentLength.max ?? '?'} ${aiConfig.contentLength.unit ?? 'chars'}`
-                          : 'Not set'}
+                          : t('brandProfile.overview.notSet')}
                       </span>
                   </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">CTA Style</span>
-                      <span className="font-medium">{aiConfig.ctaStyle || 'Not set'}</span>
+                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.ctaStyle')}</span>
+                      <span className="font-medium">{aiConfig.ctaStyle || t('brandProfile.overview.notSet')}</span>
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">Preferred Platforms</p>
+                      <p className="text-xs text-muted-foreground">{t('brandProfile.assets.aiConfiguration.preferredPlatforms')}</p>
                       {(aiConfig.preferredPlatforms ?? []).length > 0 ? (
                     <div className="flex gap-1 flex-wrap">
                           {(aiConfig.preferredPlatforms ?? []).map((platform, i) => (
@@ -3155,7 +3181,7 @@ export default function BrandProfilePage() {
                           ))}
                     </div>
                       ) : (
-                        <p className="text-xs italic text-muted-foreground">No platforms defined yet.</p>
+                        <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.aiConfiguration.platformsEmptyState')}</p>
                       )}
                   </div>
                 </div>
@@ -3636,51 +3662,51 @@ export default function BrandProfilePage() {
       <Dialog open={showToneInfo} onOpenChange={setShowToneInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Tone Characteristics Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.voice.toneCharacteristics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are Tone Characteristics?</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.toneCharacteristics.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                These sliders define your brand&apos;s communication style. Each scale represents a spectrum between two extremes.
+                {t('brandProfile.voice.toneCharacteristics.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-3">
               <div>
-                <h4 className="font-medium text-xs mb-1">Formal ↔️ Informal</h4>
+                <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>Left (0%):</strong> Very formal, professional language<br/>
-                  <strong>Right (100%):</strong> Casual, conversational tone<br/>
-                  <strong>Middle (50%):</strong> Balanced, approachable yet professional
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.left')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.middle')}</strong>
                 </p>
               </div>
               
               <div>
-                <h4 className="font-medium text-xs mb-1">Serious ↔️ Playful</h4>
+                <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>Left (0%):</strong> Serious, business-focused<br/>
-                  <strong>Right (100%):</strong> Fun, humorous, lighthearted<br/>
-                  <strong>Middle (50%):</strong> Balanced with occasional humor
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.left')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.middle')}</strong>
                 </p>
               </div>
               
               <div>
-                <h4 className="font-medium text-xs mb-1">Simple ↔️ Complex</h4>
+                <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>Left (0%):</strong> Simple, easy to understand<br/>
-                  <strong>Right (100%):</strong> Technical, detailed, sophisticated<br/>
-                  <strong>Middle (50%):</strong> Clear with some depth
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.left')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.middle')}</strong>
                 </p>
               </div>
               
               <div>
-                <h4 className="font-medium text-xs mb-1">Warm ↔️ Neutral</h4>
+                <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>Left (0%):</strong> Warm, friendly, empathetic<br/>
-                  <strong>Right (100%):</strong> Neutral, matter-of-fact, objective<br/>
-                  <strong>Middle (50%):</strong> Balanced warmth
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.left')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.middle')}</strong>
                 </p>
               </div>
             </div>
@@ -3688,7 +3714,7 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button onClick={() => setShowToneInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3698,42 +3724,42 @@ export default function BrandProfilePage() {
       <Dialog open={showDoSayInfo} onOpenChange={setShowDoSayInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>&quot;Do Say&quot; Phrases Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.voice.doSay.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are &quot;Do Say&quot; Phrases?</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                These are approved phrases, expressions, and language patterns your brand should use in communications.
+                {t('brandProfile.voice.doSay.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">How to Write Them</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.howToWrite.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Use complete phrases or sentences</li>
-                <li>• Focus on your brand&apos;s authentic voice</li>
-                <li>• Include calls-to-action you prefer</li>
-                <li>• Add value-driven statements</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.howToWrite.point1')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.howToWrite.point2')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.howToWrite.point3')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.howToWrite.point4')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Examples</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• &quot;Let&apos;s create something amazing together&quot;</li>
-                <li>• &quot;We understand your challenges&quot;</li>
-                <li>• &quot;Innovation meets practicality&quot;</li>
-                <li>• &quot;Your success is our priority&quot;</li>
-                <li>• &quot;Quality without compromise&quot;</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.examples.example1')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.examples.example2')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.examples.example3')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.examples.example4')}</li>
+                <li>• {t('brandProfile.voice.doSay.infoDialog.examples.example5')}</li>
               </ul>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowDoSayInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3743,49 +3769,49 @@ export default function BrandProfilePage() {
       <Dialog open={showDontSayInfo} onOpenChange={setShowDontSayInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>&quot;Don&apos;t Say&quot; Phrases Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.voice.dontSay.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are &quot;Don&apos;t Say&quot; Phrases?</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                These are phrases, claims, or language patterns your brand should avoid to maintain authenticity and credibility.
+                {t('brandProfile.voice.dontSay.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">What to Avoid</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Overused or cliché expressions</li>
-                <li>• Unverifiable claims</li>
-                <li>• Aggressive or pushy language</li>
-                <li>• Off-brand terminology</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.point1')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.point2')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.point3')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.point4')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Examples</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• &quot;Industry-disrupting revolutionary&quot;</li>
-                <li>• &quot;Best in the world&quot;</li>
-                <li>• &quot;Cheap and affordable&quot;</li>
-                <li>• &quot;Trust us blindly&quot;</li>
-                <li>• &quot;You won&apos;t find better anywhere&quot;</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example1')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example2')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example3')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example4')}</li>
+                <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example5')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Why This Matters</h4>
+              <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whyMatters.title')}</h4>
               <p className="text-xs text-muted-foreground">
-                Avoiding these phrases helps AI generate content that sounds genuine and maintains your brand&apos;s credibility.
+                {t('brandProfile.voice.dontSay.infoDialog.whyMatters.description')}
               </p>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowDontSayInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3795,50 +3821,50 @@ export default function BrandProfilePage() {
       <Dialog open={showBrandColorsInfo} onOpenChange={setShowBrandColorsInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Brand Colors Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.assets.brandColors.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">Primary Colors</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.primaryColorsTitle')}</h4>
               <p className="text-muted-foreground">
-                Your main brand colors. These should be used most frequently in your visual identity.
+                {t('brandProfile.assets.brandColors.infoDialog.primaryColorsDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Examples: <code className="px-1 py-0.5 bg-muted rounded">#2563eb</code> (blue), <code className="px-1 py-0.5 bg-muted rounded">#1e293b</code> (dark slate)
+                {t('brandProfile.assets.brandColors.infoDialog.primaryColorsExamples')}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                <strong>Tip:</strong> 2-3 primary colors is ideal
+                <strong>{t('brandProfile.assets.brandColors.infoDialog.primaryColorsTipLabel')}</strong> {t('brandProfile.assets.brandColors.infoDialog.primaryColorsTipValue')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Accent Colors</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.accentColorsTitle')}</h4>
               <p className="text-muted-foreground">
-                Supporting colors for highlights, CTAs, and special elements.
+                {t('brandProfile.assets.brandColors.infoDialog.accentColorsDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Examples: <code className="px-1 py-0.5 bg-muted rounded">#10b981</code> (success green), <code className="px-1 py-0.5 bg-muted rounded">#f59e0b</code> (warning orange)
+                {t('brandProfile.assets.brandColors.infoDialog.accentColorsExamples')}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                <strong>Tip:</strong> 1-2 accent colors is usually enough
+                <strong>{t('brandProfile.assets.brandColors.infoDialog.accentColorsTipLabel')}</strong> {t('brandProfile.assets.brandColors.infoDialog.accentColorsTipValue')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">How to Use</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.howToUseTitle')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Click existing colors to edit them</li>
-                <li>• Use color picker to add new colors</li>
-                <li>• Click X button (on hover) to remove</li>
-                <li>• Colors are shown in both dialog and main view</li>
+                <li>• {t('brandProfile.assets.brandColors.infoDialog.howToUse1')}</li>
+                <li>• {t('brandProfile.assets.brandColors.infoDialog.howToUse2')}</li>
+                <li>• {t('brandProfile.assets.brandColors.infoDialog.howToUse3')}</li>
+                <li>• {t('brandProfile.assets.brandColors.infoDialog.howToUse4')}</li>
               </ul>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowBrandColorsInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3848,51 +3874,51 @@ export default function BrandProfilePage() {
       <Dialog open={showVisualGuidelinesInfo} onOpenChange={setShowVisualGuidelinesInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Visual Guidelines Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.assets.visualGuidelines.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are Visual Guidelines?</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                Rules and preferences for visual content like photos, graphics, and design elements.
+                {t('brandProfile.assets.visualGuidelines.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">What to Include</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Photography style preferences</li>
-                <li>• Composition rules</li>
-                <li>• Image treatment preferences</li>
-                <li>• Typography guidelines</li>
-                <li>• Layout principles</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point1')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point2')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point3')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point4')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point5')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Examples</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• Authentic photos over stock imagery</li>
-                <li>• Minimalist, clean compositions</li>
-                <li>• Include human elements when possible</li>
-                <li>• Consistent lighting and color grading</li>
-                <li>• Use sans-serif fonts for headings</li>
-                <li>• Maintain whitespace for breathing room</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example1')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example2')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example3')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example4')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example5')}</li>
+                <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example6')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Tips</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.tipsTitle')}</h4>
               <p className="text-xs text-muted-foreground">
-                Keep guidelines actionable and specific. Avoid vague instructions like &quot;look professional&quot; - be concrete.
+                {t('brandProfile.assets.visualGuidelines.infoDialog.tipsDescription')}
               </p>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowVisualGuidelinesInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3902,61 +3928,61 @@ export default function BrandProfilePage() {
       <Dialog open={showAiConfigInfo} onOpenChange={setShowAiConfigInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>AI Configuration Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.assets.aiConfiguration.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">Default Language</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.defaultLanguageTitle')}</h4>
               <p className="text-muted-foreground">
-                Primary language for AI-generated content.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.defaultLanguageDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Example: <code className="px-1 py-0.5 bg-muted rounded">en-US</code>, <code className="px-1 py-0.5 bg-muted rounded">tr-TR</code>
+                {t('brandProfile.assets.aiConfiguration.infoDialog.defaultLanguageExample')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Content Length</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthTitle')}</h4>
               <p className="text-muted-foreground">
-                Preferred length range for AI-generated content.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                <strong>Characters example:</strong> Min 50, Max 280 (Twitter-friendly)<br/>
-                <strong>Words example:</strong> Min 20, Max 50 (short blog intro)
+                <strong>{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthCharsExample')}</strong><br/>
+                <strong>{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthWordsExample')}</strong>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Choose <strong>characters</strong> for social media, <strong>words</strong> for articles.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthTip')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">CTA Style</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.ctaStyleTitle')}</h4>
               <p className="text-muted-foreground">
-                How your calls-to-action should sound.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.ctaStyleDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Examples: <code className="px-1 py-0.5 bg-muted rounded">Soft, invitational</code>, <code className="px-1 py-0.5 bg-muted rounded">Direct and urgent</code>, <code className="px-1 py-0.5 bg-muted rounded">Educational, helpful</code>
+                {t('brandProfile.assets.aiConfiguration.infoDialog.ctaStyleExamples')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Preferred Platforms</h4>
+              <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.preferredPlatformsTitle')}</h4>
               <p className="text-muted-foreground">
-                Social media or content platforms you primarily use.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.preferredPlatformsDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Examples: Instagram, LinkedIn, Twitter, Facebook, TikTok, YouTube, Blog
+                {t('brandProfile.assets.aiConfiguration.infoDialog.preferredPlatformsExamples')}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                This helps AI tailor content format and style to each platform.
+                {t('brandProfile.assets.aiConfiguration.infoDialog.preferredPlatformsTip')}
               </p>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowAiConfigInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3966,45 +3992,45 @@ export default function BrandProfilePage() {
       <Dialog open={showAllowedTopicsInfo} onOpenChange={setShowAllowedTopicsInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Allowed Topics Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.rules.allowedTopics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are Allowed Topics?</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                These are content themes and subjects your brand is comfortable discussing publicly. They guide AI content generation.
+                {t('brandProfile.rules.allowedTopics.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">How to Define Them</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Keep topics broad but clear</li>
-                <li>• Focus on your expertise areas</li>
-                <li>• Include industry-relevant themes</li>
-                <li>• Consider your audience interests</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.point1')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.point2')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.point3')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.point4')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Examples</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• Product Updates</li>
-                <li>• Industry Insights</li>
-                <li>• Client Success Stories</li>
-                <li>• Technology Trends</li>
-                <li>• Team Culture</li>
-                <li>• Design Tips</li>
-                <li>• Innovation</li>
-                <li>• Sustainability</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example1')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example2')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example3')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example4')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example5')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example6')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example7')}</li>
+                <li>• {t('brandProfile.rules.allowedTopics.infoDialog.examples.example8')}</li>
               </ul>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowAllowedTopicsInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4014,54 +4040,54 @@ export default function BrandProfilePage() {
       <Dialog open={showForbiddenTopicsInfo} onOpenChange={setShowForbiddenTopicsInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Forbidden Topics & Crisis Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.rules.forbiddenTopics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">Forbidden Topics</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsTitle')}</h4>
               <p className="text-muted-foreground">
-                Topics your brand should never discuss to protect reputation and avoid controversy.
+                {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsDescription')}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Examples:
+                {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExamplesTitle')}
               </p>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• Political opinions or endorsements</li>
-                <li>• Religious discussions</li>
-                <li>• Negative competitor comparisons</li>
-                <li>• Unverified claims or statistics</li>
-                <li>• Controversial social issues</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample1')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample2')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample3')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample4')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample5')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Crisis Guidelines</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesTitle')}</h4>
               <p className="text-muted-foreground">
-                Rules for how your brand should behave during sensitive situations or crises.
+                {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesDescription')}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Examples:
+                {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExamplesTitle')}
               </p>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                <li>• Pause promotional content during disasters</li>
-                <li>• No humor during sensitive situations</li>
-                <li>• Coordinate crisis responses with leadership</li>
-                <li>• Monitor social sentiment before posting</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExample1')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExample2')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExample3')}</li>
+                <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExample4')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Why This Matters</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.whyMattersTitle')}</h4>
               <p className="text-xs text-muted-foreground">
-                These rules protect your brand from PR disasters and ensure AI-generated content stays within safe boundaries.
+                {t('brandProfile.rules.forbiddenTopics.infoDialog.whyMattersDescription')}
               </p>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowForbiddenTopicsInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4071,51 +4097,51 @@ export default function BrandProfilePage() {
       <Dialog open={showLegalConstraintInfo} onOpenChange={setShowLegalConstraintInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Legal Constraints Guide</DialogTitle>
+            <DialogTitle>{t('brandProfile.rules.legalConstraints.infoDialog.title')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
-              <h4 className="font-medium">What are Legal Constraints?</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.whatAre')}</h4>
               <p className="text-muted-foreground">
-                Legal requirements, compliance rules, and regulations your brand must follow in communications.
+                {t('brandProfile.rules.legalConstraints.infoDialog.description')}
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">What to Include</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Industry-specific regulations</li>
-                <li>• Disclosure requirements</li>
-                <li>• Copyright and licensing rules</li>
-                <li>• Data privacy requirements</li>
-                <li>• Advertising standards</li>
+                <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point1')}</li>
+                <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point2')}</li>
+                <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point3')}</li>
+                <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point4')}</li>
+                <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point5')}</li>
               </ul>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">Example: Disclosure Requirements</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.exampleTitle')}</h4>
               <p className="text-xs text-muted-foreground">
-                <strong>Title:</strong> <code className="px-1 py-0.5 bg-muted rounded">Disclosure Requirements</code>
+                <strong>{t('brandProfile.rules.legalConstraints.infoDialog.exampleTitleLabel')}</strong> <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.rules.legalConstraints.infoDialog.exampleTitleValue')}</code>
               </p>
               <p className="text-xs text-muted-foreground">
-                <strong>Description:</strong> <code className="px-1 py-0.5 bg-muted rounded">All paid partnerships must include #ad or #sponsored hashtag as per FTC guidelines</code>
+                <strong>{t('brandProfile.rules.legalConstraints.infoDialog.exampleDescLabel')}</strong> <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.rules.legalConstraints.infoDialog.exampleDescValue')}</code>
               </p>
             </div>
             
             <div className="space-y-2">
-              <h4 className="font-medium">More Examples</h4>
+              <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li><strong>Copyright:</strong> Only use licensed content, credit creators when required</li>
-                <li><strong>GDPR/KVKK:</strong> Never share client data without consent</li>
-                <li><strong>Medical Claims:</strong> Avoid health claims without FDA approval</li>
+                <li><strong>{t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.copyrightLabel')}</strong> {t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.copyrightValue')}</li>
+                <li><strong>{t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.gdprLabel')}</strong> {t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.gdprValue')}</li>
+                <li><strong>{t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.medicalLabel')}</strong> {t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.medicalValue')}</li>
               </ul>
             </div>
           </div>
           
           <DialogFooter>
             <Button onClick={() => setShowLegalConstraintInfo(false)}>
-              Got it
+              {t('common.gotIt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5279,13 +5305,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit Tone Characteristics</DialogTitle>
+              <DialogTitle>{t('brandProfile.voice.toneCharacteristics.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowToneInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Adjust the tone sliders to define your brand&apos;s communication style.
+              {t('brandProfile.voice.toneCharacteristics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5293,9 +5319,9 @@ export default function BrandProfilePage() {
             {/* Formal - Informal */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Formal</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.formal')}</span>
                 <span className="font-medium">{Math.round(toneForm.formalInformal * 100)}%</span>
-                <span className="text-muted-foreground">Informal</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.informal')}</span>
               </div>
               <Slider 
                 value={[toneForm.formalInformal * 100]} 
@@ -5308,9 +5334,9 @@ export default function BrandProfilePage() {
             {/* Serious - Playful */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Serious</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.serious')}</span>
                 <span className="font-medium">{Math.round(toneForm.seriousPlayful * 100)}%</span>
-                <span className="text-muted-foreground">Playful</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.playful')}</span>
               </div>
               <Slider 
                 value={[toneForm.seriousPlayful * 100]} 
@@ -5323,9 +5349,9 @@ export default function BrandProfilePage() {
             {/* Simple - Complex */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Simple</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.simple')}</span>
                 <span className="font-medium">{Math.round(toneForm.simpleComplex * 100)}%</span>
-                <span className="text-muted-foreground">Complex</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.complex')}</span>
               </div>
               <Slider 
                 value={[toneForm.simpleComplex * 100]} 
@@ -5338,9 +5364,9 @@ export default function BrandProfilePage() {
             {/* Warm - Neutral */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Warm</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.warm')}</span>
                 <span className="font-medium">{Math.round(toneForm.warmNeutral * 100)}%</span>
-                <span className="text-muted-foreground">Neutral</span>
+                <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.neutral')}</span>
               </div>
               <Slider 
                 value={[toneForm.warmNeutral * 100]} 
@@ -5353,10 +5379,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowToneDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveTone} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5367,13 +5393,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit &quot;Do Say&quot; Phrases</DialogTitle>
+              <DialogTitle>{t('brandProfile.voice.doSay.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowDoSayInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage phrases and expressions your brand should use.
+              {t('brandProfile.voice.doSay.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5393,16 +5419,16 @@ export default function BrandProfilePage() {
                 </div>
               ))}
               {doSayForm.doSay.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No phrases yet. Add some below.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.voice.doSay.editDialog.emptyState')}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="dosay-phrase">Add New Phrase</Label>
+              <Label htmlFor="dosay-phrase">{t('brandProfile.voice.doSay.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
                 <Input
                   id="dosay-phrase"
-                  placeholder="e.g., Let's create something amazing"
+                  placeholder={t('brandProfile.voice.doSay.editDialog.placeholder')}
                   value={doSayForm.newPhrase}
                   onChange={(e) => setDoSayForm(prev => ({ ...prev, newPhrase: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDoSay())}
@@ -5417,10 +5443,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDoSayDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveDoSay} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5431,13 +5457,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit &quot;Don&apos;t Say&quot; Phrases</DialogTitle>
+              <DialogTitle>{t('brandProfile.voice.dontSay.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowDontSayInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage phrases and expressions your brand should avoid.
+              {t('brandProfile.voice.dontSay.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5457,16 +5483,16 @@ export default function BrandProfilePage() {
                 </div>
               ))}
               {dontSayForm.dontSay.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No phrases yet. Add some below.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.voice.dontSay.editDialog.emptyState')}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="dontsay-phrase">Add New Phrase</Label>
+              <Label htmlFor="dontsay-phrase">{t('brandProfile.voice.dontSay.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
                 <Input
                   id="dontsay-phrase"
-                  placeholder="e.g., Best in the world"
+                  placeholder={t('brandProfile.voice.dontSay.editDialog.placeholder')}
                   value={dontSayForm.newPhrase}
                   onChange={(e) => setDontSayForm(prev => ({ ...prev, newPhrase: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDontSay())}
@@ -5481,10 +5507,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDontSayDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveDontSay} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5495,13 +5521,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit Allowed Topics</DialogTitle>
+              <DialogTitle>{t('brandProfile.rules.allowedTopics.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAllowedTopicsInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage topics your brand can talk about.
+              {t('brandProfile.rules.allowedTopics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5521,16 +5547,16 @@ export default function BrandProfilePage() {
                 ))}
               </div>
               {allowedTopicsForm.topics.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No topics yet. Add some below.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.rules.allowedTopics.editDialog.emptyState')}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="allowed-topic">Add New Topic</Label>
+              <Label htmlFor="allowed-topic">{t('brandProfile.rules.allowedTopics.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
                 <Input
                   id="allowed-topic"
-                  placeholder="e.g., Product Updates"
+                  placeholder={t('brandProfile.rules.allowedTopics.editDialog.placeholder')}
                   value={allowedTopicsForm.newTopic}
                   onChange={(e) => setAllowedTopicsForm(prev => ({ ...prev, newTopic: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAllowedTopic())}
@@ -5545,10 +5571,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAllowedTopicsDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveAllowedTopics} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5559,20 +5585,20 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit Forbidden Topics & Crisis Guidelines</DialogTitle>
+              <DialogTitle>{t('brandProfile.rules.forbiddenTopics.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowForbiddenTopicsInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage topics to avoid and crisis response guidelines.
+              {t('brandProfile.rules.forbiddenTopics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             {/* Forbidden Topics */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Topics to Avoid</Label>
+              <Label className="text-sm font-medium">{t('brandProfile.rules.forbiddenTopics.editDialog.topicsToAvoidLabel')}</Label>
               <div className="space-y-2">
                 {forbiddenTopicsForm.topics.map((topic, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
@@ -5591,12 +5617,12 @@ export default function BrandProfilePage() {
                   </div>
                 ))}
                 {forbiddenTopicsForm.topics.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No forbidden topics yet.</p>
+                  <p className="text-xs text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.editDialog.topicsEmptyState')}</p>
                 )}
               </div>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Add a forbidden topic..."
+                  placeholder={t('brandProfile.rules.forbiddenTopics.editDialog.topicsPlaceholder')}
                   value={forbiddenTopicsForm.newTopic}
                   onChange={(e) => setForbiddenTopicsForm(prev => ({ ...prev, newTopic: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddForbiddenTopic())}
@@ -5610,7 +5636,7 @@ export default function BrandProfilePage() {
             
             {/* Crisis Guidelines */}
             <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-medium">Crisis Guidelines</Label>
+              <Label className="text-sm font-medium">{t('brandProfile.rules.forbiddenTopics.editDialog.crisisGuidelinesLabel')}</Label>
               <div className="space-y-2">
                 {forbiddenTopicsForm.crisisGuidelines.map((guideline, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm group hover:bg-muted transition-colors">
@@ -5626,12 +5652,12 @@ export default function BrandProfilePage() {
                   </div>
                 ))}
                 {forbiddenTopicsForm.crisisGuidelines.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No crisis guidelines yet.</p>
+                  <p className="text-xs text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.editDialog.crisisEmptyState')}</p>
                 )}
               </div>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Add a crisis guideline..."
+                  placeholder={t('brandProfile.rules.forbiddenTopics.editDialog.crisisPlaceholder')}
                   value={forbiddenTopicsForm.newGuideline}
                   onChange={(e) => setForbiddenTopicsForm(prev => ({ ...prev, newGuideline: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCrisisGuideline())}
@@ -5646,10 +5672,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowForbiddenTopicsDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveForbiddenTopics} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5660,22 +5686,22 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>{editingLegalConstraint ? 'Edit Legal Constraint' : 'Add Legal Constraint'}</DialogTitle>
+              <DialogTitle>{editingLegalConstraint ? t('brandProfile.rules.legalConstraints.editDialog.titleEdit') : t('brandProfile.rules.legalConstraints.editDialog.titleAdd')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowLegalConstraintInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              {editingLegalConstraint ? 'Update legal constraint details.' : 'Add a new legal or compliance requirement.'}
+              {editingLegalConstraint ? t('brandProfile.rules.legalConstraints.editDialog.descriptionEdit') : t('brandProfile.rules.legalConstraints.editDialog.descriptionAdd')}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
-              <Label htmlFor="legal-title">Title *</Label>
+              <Label htmlFor="legal-title">{t('brandProfile.rules.legalConstraints.editDialog.titleLabel')}</Label>
               <Input
                 id="legal-title"
-                placeholder="e.g., Disclosure Requirements"
+                placeholder={t('brandProfile.rules.legalConstraints.editDialog.titlePlaceholder')}
                 value={legalConstraintForm.title}
                 onChange={(e) => setLegalConstraintForm(prev => ({ ...prev, title: e.target.value }))}
                 maxLength={200}
@@ -5683,10 +5709,10 @@ export default function BrandProfilePage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="legal-description">Description *</Label>
+              <Label htmlFor="legal-description">{t('brandProfile.rules.legalConstraints.editDialog.descriptionLabel')}</Label>
               <Textarea
                 id="legal-description"
-                placeholder="Describe the legal requirement or constraint..."
+                placeholder={t('brandProfile.rules.legalConstraints.editDialog.descriptionPlaceholder')}
                 value={legalConstraintForm.description}
                 onChange={(e) => setLegalConstraintForm(prev => ({ ...prev, description: e.target.value }))}
                 rows={4}
@@ -5698,10 +5724,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowLegalConstraintDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveLegalConstraint} disabled={isProfileSaving || !legalConstraintForm.title.trim()}>
-              {isProfileSaving ? 'Saving...' : editingLegalConstraint ? 'Update' : 'Add'}
+              {isProfileSaving ? t('common.saving') : editingLegalConstraint ? t('brandProfile.rules.legalConstraints.editDialog.update') : t('brandProfile.rules.legalConstraints.editDialog.add')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5712,13 +5738,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit Brand Colors</DialogTitle>
+              <DialogTitle>{t('brandProfile.assets.brandColors.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowBrandColorsInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage your brand&apos;s primary and accent colors.
+              {t('brandProfile.assets.brandColors.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5726,7 +5752,7 @@ export default function BrandProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Primary Colors Column */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Primary Colors</Label>
+                <Label className="text-sm font-medium">{t('brandProfile.assets.brandColors.editDialog.primaryColorsLabel')}</Label>
                 <div className="flex flex-wrap gap-3 mb-3 min-h-[100px]">
                   {brandColorsForm.primary.map((color, idx) => (
                     <div key={idx} className="relative group">
@@ -5770,7 +5796,7 @@ export default function BrandProfilePage() {
                 </div>
                 
                 <div>
-                  <Label className="text-xs mb-2 block">Add Primary Color</Label>
+                  <Label className="text-xs mb-2 block">{t('brandProfile.assets.brandColors.editDialog.addPrimaryColor')}</Label>
                   <div className="flex items-center gap-2">
                     <ColorPicker value={brandColorsForm.newPrimary} onValueChange={(color) => setBrandColorsForm(prev => ({ ...prev, newPrimary: color }))}>
                       <ColorPickerTrigger asChild>
@@ -5797,7 +5823,7 @@ export default function BrandProfilePage() {
               
               {/* Accent Colors Column */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Accent Colors</Label>
+                <Label className="text-sm font-medium">{t('brandProfile.assets.brandColors.editDialog.accentColorsLabel')}</Label>
                 <div className="flex flex-wrap gap-3 mb-3 min-h-[100px]">
                   {brandColorsForm.accent.map((color, idx) => (
                     <div key={idx} className="relative group">
@@ -5841,7 +5867,7 @@ export default function BrandProfilePage() {
                 </div>
                 
                 <div>
-                  <Label className="text-xs mb-2 block">Add Accent Color</Label>
+                  <Label className="text-xs mb-2 block">{t('brandProfile.assets.brandColors.editDialog.addAccentColor')}</Label>
                   <div className="flex items-center gap-2">
                     <ColorPicker value={brandColorsForm.newAccent} onValueChange={(color) => setBrandColorsForm(prev => ({ ...prev, newAccent: color }))}>
                       <ColorPickerTrigger asChild>
@@ -5870,10 +5896,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBrandColorsDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveBrandColors} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5884,13 +5910,13 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit Visual Guidelines</DialogTitle>
+              <DialogTitle>{t('brandProfile.assets.visualGuidelines.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowVisualGuidelinesInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Manage visual style guidelines for your brand.
+              {t('brandProfile.assets.visualGuidelines.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -5911,16 +5937,16 @@ export default function BrandProfilePage() {
                 </div>
               ))}
               {visualGuidelinesForm.guidelines.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No guidelines yet. Add some below.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.assets.visualGuidelines.editDialog.emptyState')}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="visual-guideline">Add New Guideline</Label>
+              <Label htmlFor="visual-guideline">{t('brandProfile.assets.visualGuidelines.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
                 <Input
                   id="visual-guideline"
-                  placeholder="e.g., Authentic photos over stock"
+                  placeholder={t('brandProfile.assets.visualGuidelines.editDialog.placeholder')}
                   value={visualGuidelinesForm.newGuideline}
                   onChange={(e) => setVisualGuidelinesForm(prev => ({ ...prev, newGuideline: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVisualGuideline())}
@@ -5935,10 +5961,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowVisualGuidelinesDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveVisualGuidelines} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5949,32 +5975,32 @@ export default function BrandProfilePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-1">
-              <DialogTitle>Edit AI Configuration</DialogTitle>
+              <DialogTitle>{t('brandProfile.assets.aiConfiguration.editDialog.title')}</DialogTitle>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAiConfigInfo(true)}>
                 <IconInfoCircle className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription className="mt-0">
-              Configure AI settings for content generation.
+              {t('brandProfile.assets.aiConfiguration.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
-              <Label htmlFor="ai-language">Default Language</Label>
+              <Label htmlFor="ai-language">{t('brandProfile.assets.aiConfiguration.editDialog.defaultLanguageLabel')}</Label>
               <Input
                 id="ai-language"
-                placeholder="e.g., en-US, tr-TR"
+                placeholder={t('brandProfile.assets.aiConfiguration.editDialog.defaultLanguagePlaceholder')}
                 value={aiConfigForm.defaultLanguage}
                 onChange={(e) => setAiConfigForm(prev => ({ ...prev, defaultLanguage: e.target.value }))}
               />
             </div>
             
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Content Length</Label>
+              <Label className="text-sm font-medium">{t('brandProfile.assets.aiConfiguration.editDialog.contentLengthLabel')}</Label>
               <div className="grid gap-2 grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="ai-length-min" className="text-xs">Min</Label>
+                  <Label htmlFor="ai-length-min" className="text-xs">{t('brandProfile.assets.aiConfiguration.editDialog.minLabel')}</Label>
                   <Input
                     id="ai-length-min"
                     type="number"
@@ -5984,7 +6010,7 @@ export default function BrandProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ai-length-max" className="text-xs">Max</Label>
+                  <Label htmlFor="ai-length-max" className="text-xs">{t('brandProfile.assets.aiConfiguration.editDialog.maxLabel')}</Label>
                   <Input
                     id="ai-length-max"
                     type="number"
@@ -5995,7 +6021,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Unit</Label>
+                <Label className="text-xs">{t('brandProfile.assets.aiConfiguration.editDialog.unitLabel')}</Label>
                 <Select 
                   value={aiConfigForm.contentLengthUnit} 
                   onValueChange={(value: 'chars' | 'words') => setAiConfigForm(prev => ({ ...prev, contentLengthUnit: value }))}
@@ -6004,25 +6030,25 @@ export default function BrandProfilePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="chars">Characters</SelectItem>
-                    <SelectItem value="words">Words</SelectItem>
+                    <SelectItem value="chars">{t('brandProfile.assets.aiConfiguration.editDialog.charactersOption')}</SelectItem>
+                    <SelectItem value="words">{t('brandProfile.assets.aiConfiguration.editDialog.wordsOption')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="ai-cta">CTA Style</Label>
+              <Label htmlFor="ai-cta">{t('brandProfile.assets.aiConfiguration.editDialog.ctaStyleLabel')}</Label>
               <Input
                 id="ai-cta"
-                placeholder="e.g., Soft, invitational"
+                placeholder={t('brandProfile.assets.aiConfiguration.editDialog.ctaStylePlaceholder')}
                 value={aiConfigForm.ctaStyle}
                 onChange={(e) => setAiConfigForm(prev => ({ ...prev, ctaStyle: e.target.value }))}
               />
             </div>
             
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Preferred Platforms</Label>
+              <Label className="text-sm font-medium">{t('brandProfile.assets.aiConfiguration.editDialog.preferredPlatformsLabel')}</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {aiConfigForm.preferredPlatforms.map((platform, idx) => (
                   <Badge key={idx} variant="outline" className="gap-1 pr-1">
@@ -6038,7 +6064,7 @@ export default function BrandProfilePage() {
               </div>
               <div className="flex gap-2">
                 <Input
-                  placeholder="e.g., Instagram, LinkedIn"
+                  placeholder={t('brandProfile.assets.aiConfiguration.editDialog.preferredPlatformsPlaceholder')}
                   value={aiConfigForm.newPlatform}
                   onChange={(e) => setAiConfigForm(prev => ({ ...prev, newPlatform: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPlatform())}
@@ -6052,10 +6078,10 @@ export default function BrandProfilePage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAiConfigDialog(false)} disabled={isProfileSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveAiConfig} disabled={isProfileSaving}>
-              {isProfileSaving ? 'Saving...' : 'Save'}
+              {isProfileSaving ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

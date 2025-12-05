@@ -502,7 +502,353 @@
           "infoNoteEx4": "Harika müşteri hizmeti, sınırlı portföy",
           "infoTip": "İpucu: Kendinizi daha iyi konumlandırmanıza yardımcı olan temel farklılaştırıcılara odaklanın.",
           "gotIt": "Anladım"
+        },
+        "voice": {
+          "toneCharacteristics": {
+            "title": "Ses Tonu Özellikleri",
+            "formal": "Resmi",
+            "informal": "Samimi",
+            "serious": "Ciddi",
+            "playful": "Eğlenceli",
+            "simple": "Basit",
+            "complex": "Karmaşık",
+            "warm": "Sıcak",
+            "neutral": "Nötr",
+            "infoDialog": {
+              "title": "Ses Tonu Özellikleri Rehberi",
+              "whatAre": "Ses Tonu Özellikleri Nedir?",
+              "description": "Bu kaydırıcılar markanızın iletişim tarzını tanımlar. Her ölçek iki uç arasındaki spektrumu temsil eder.",
+              "formalInformal": {
+                "title": "Resmi ↔️ Samimi",
+                "left": "Sol (0%): Çok resmi, profesyonel dil",
+                "right": "Sağ (100%): Rahat, konuşma tarzı",
+                "middle": "Orta (50%): Dengeli, ulaşılabilir ama profesyonel"
+              },
+              "seriousPlayful": {
+                "title": "Ciddi ↔️ Eğlenceli",
+                "left": "Sol (0%): Ciddi, iş odaklı",
+                "right": "Sağ (100%): Eğlenceli, mizahi, neşeli",
+                "middle": "Orta (50%): Ara sıra mizah ile dengeli"
+              },
+              "simpleComplex": {
+                "title": "Basit ↔️ Karmaşık",
+                "left": "Sol (0%): Basit, anlaşılması kolay",
+                "right": "Sağ (100%): Teknik, detaylı, sofistike",
+                "middle": "Orta (50%): Biraz derinlikle net"
+              },
+              "warmNeutral": {
+                "title": "Sıcak ↔️ Nötr",
+                "left": "Sol (0%): Sıcak, arkadaşça, empatik",
+                "right": "Sağ (100%): Nötr, gerçekçi, objektif",
+                "middle": "Orta (50%): Dengeli sıcaklık"
+              }
+            },
+            "editDialog": {
+              "title": "Ses Tonu Özelliklerini Düzenle",
+              "description": "Markanızın iletişim tarzını tanımlamak için ses tonu kaydırıcılarını ayarlayın."
+            }
+          },
+          "doSay": {
+            "title": "Söyle",
+            "emptyState": "Henüz ifade tanımlanmadı.",
+            "infoDialog": {
+              "title": "\"Söyle\" İfadeleri Rehberi",
+              "whatAre": "\"Söyle\" İfadeleri Nedir?",
+              "description": "Bunlar markanızın iletişimlerinde kullanması gereken onaylanmış ifadeler, cümleler ve dil kalıplarıdır.",
+              "howToWrite": {
+                "title": "Nasıl Yazılır",
+                "point1": "Tam ifadeler veya cümleler kullanın",
+                "point2": "Markanızın özgün sesine odaklanın",
+                "point3": "Tercih ettiğiniz harekete geçirici mesajları ekleyin",
+                "point4": "Değer odaklı ifadeler ekleyin"
+              },
+              "examples": {
+                "title": "Örnekler",
+                "example1": "\"Birlikte harika bir şey yaratalım\"",
+                "example2": "\"Zorluklarınızı anlıyoruz\"",
+                "example3": "\"İnovasyon pratiklikle buluşuyor\"",
+                "example4": "\"Başarınız bizim önceliğimiz\"",
+                "example5": "\"Taviz vermeden kalite\""
+              }
+            },
+            "editDialog": {
+              "title": "\"Söyle\" İfadelerini Düzenle",
+              "description": "Markanızın kullanması gereken ifadeleri ve cümleleri yönetin.",
+              "emptyState": "Henüz ifade yok. Aşağıdan ekleyin.",
+              "addNewLabel": "Yeni İfade Ekle",
+              "placeholder": "örn., Birlikte harika bir şey yaratalım"
+            }
+          },
+          "dontSay": {
+            "title": "Söyleme",
+            "emptyState": "Henüz ifade tanımlanmadı.",
+            "infoDialog": {
+              "title": "\"Söyleme\" İfadeleri Rehberi",
+              "whatAre": "\"Söyleme\" İfadeleri Nedir?",
+              "description": "Bunlar markanızın özgünlüğünü ve güvenilirliğini korumak için kaçınması gereken ifadeler, iddialar veya dil kalıplarıdır.",
+              "whatToAvoid": {
+                "title": "Nelerden Kaçınmalı",
+                "point1": "Aşırı kullanılmış veya klişe ifadeler",
+                "point2": "Doğrulanamayan iddialar",
+                "point3": "Agresif veya zorlayıcı dil",
+                "point4": "Marka dışı terminoloji"
+              },
+              "examples": {
+                "title": "Örnekler",
+                "example1": "\"Endüstriyi altüst eden devrimci\"",
+                "example2": "\"Dünyanın en iyisi\"",
+                "example3": "\"Ucuz ve uygun fiyatlı\"",
+                "example4": "\"Bize körü körüne güvenin\"",
+                "example5": "\"Daha iyisini hiçbir yerde bulamazsınız\""
+              },
+              "whyMatters": {
+                "title": "Neden Önemli",
+                "description": "Bu ifadelerden kaçınmak, AI'ın gerçek ve markanızın güvenilirliğini koruyan içerik üretmesine yardımcı olur."
+              }
+            },
+            "editDialog": {
+              "title": "\"Söyleme\" İfadelerini Düzenle",
+              "description": "Markanızın kaçınması gereken ifadeleri ve cümleleri yönetin.",
+              "emptyState": "Henüz ifade yok. Aşağıdan ekleyin.",
+              "addNewLabel": "Yeni İfade Ekle",
+              "placeholder": "örn., Dünyanın en iyisi"
+            }
+          }
+        },
+        "rules": {
+          "allowedTopics": {
+            "title": "İzin Verilen Konular",
+            "emptyState": "Henüz izin verilen konu tanımlanmadı.",
+            "infoDialog": {
+              "title": "İzin Verilen Konular Rehberi",
+              "whatAre": "İzin Verilen Konular Nedir?",
+              "description": "Bunlar markanızın kamuoyunda rahatça tartışabileceği içerik temaları ve konulardır. AI içerik üretimini yönlendirirler.",
+              "howToDefine": {
+                "title": "Nasıl Tanımlanır",
+                "point1": "Konuları geniş ama net tutun",
+                "point2": "Uzmanlık alanlarınıza odaklanın",
+                "point3": "Sektörle ilgili temaları ekleyin",
+                "point4": "Hedef kitlenizin ilgilerini göz önünde bulundurun"
+              },
+              "examples": {
+                "title": "Örnekler",
+                "example1": "Ürün Güncellemeleri",
+                "example2": "Sektör İçgörüleri",
+                "example3": "Müşteri Başarı Hikayeleri",
+                "example4": "Teknoloji Trendleri",
+                "example5": "Takım Kültürü",
+                "example6": "Tasarım İpuçları",
+                "example7": "İnovasyon",
+                "example8": "Sürdürülebilirlik"
+              }
+            },
+            "editDialog": {
+              "title": "İzin Verilen Konuları Düzenle",
+              "description": "Markanızın konuşabileceği konuları yönetin.",
+              "emptyState": "Henüz konu yok. Aşağıdan ekleyin.",
+              "addNewLabel": "Yeni Konu Ekle",
+              "placeholder": "örn., Ürün Güncellemeleri"
+            }
+          },
+          "forbiddenTopics": {
+            "title": "Yasak Konular ve Güvenlik",
+            "topicsToAvoid": "Kaçınılacak Konular",
+            "emptyState": "Henüz yasak konu tanımlanmadı.",
+            "crisisGuidelines": "Kriz Yönergeleri",
+            "crisisEmptyState": "Henüz kriz yönergesi tanımlanmadı.",
+            "infoDialog": {
+              "title": "Yasak Konular ve Kriz Rehberi",
+              "forbiddenTopicsTitle": "Yasak Konular",
+              "forbiddenTopicsDescription": "Markanızın itibarını korumak ve tartışmalardan kaçınmak için asla tartışmaması gereken konular.",
+              "forbiddenTopicsExamplesTitle": "Örnekler:",
+              "forbiddenTopicsExample1": "Siyasi görüşler veya destekler",
+              "forbiddenTopicsExample2": "Dini tartışmalar",
+              "forbiddenTopicsExample3": "Olumsuz rakip karşılaştırmaları",
+              "forbiddenTopicsExample4": "Doğrulanmamış iddialar veya istatistikler",
+              "forbiddenTopicsExample5": "Tartışmalı sosyal konular",
+              "crisisGuidelinesTitle": "Kriz Yönergeleri",
+              "crisisGuidelinesDescription": "Hassas durumlar veya krizler sırasında markanızın nasıl davranması gerektiğine dair kurallar.",
+              "crisisGuidelinesExamplesTitle": "Örnekler:",
+              "crisisGuidelinesExample1": "Felaketler sırasında tanıtım içeriğini duraklat",
+              "crisisGuidelinesExample2": "Hassas durumlarda mizah yapma",
+              "crisisGuidelinesExample3": "Kriz yanıtlarını liderlikle koordine et",
+              "crisisGuidelinesExample4": "Gönderi yapmadan önce sosyal duyarlılığı izle",
+              "whyMattersTitle": "Neden Önemli",
+              "whyMattersDescription": "Bu kurallar markanızı PR felaketlerinden korur ve AI tarafından üretilen içeriğin güvenli sınırlar içinde kalmasını sağlar."
+            },
+            "editDialog": {
+              "title": "Yasak Konuları ve Kriz Yönergelerini Düzenle",
+              "description": "Kaçınılacak konuları ve kriz yanıt yönergelerini yönetin.",
+              "topicsToAvoidLabel": "Kaçınılacak Konular",
+              "topicsEmptyState": "Henüz yasak konu yok.",
+              "topicsPlaceholder": "Yasak konu ekle...",
+              "crisisGuidelinesLabel": "Kriz Yönergeleri",
+              "crisisEmptyState": "Henüz kriz yönergesi yok.",
+              "crisisPlaceholder": "Kriz yönergesi ekle..."
+            }
+          },
+          "legalConstraints": {
+            "title": "Yasal Kısıtlamalar",
+            "emptyState": "Henüz yasal kısıtlama tanımlanmadı.",
+            "infoDialog": {
+              "title": "Yasal Kısıtlamalar Rehberi",
+              "whatAre": "Yasal Kısıtlamalar Nedir?",
+              "description": "Markanızın iletişimlerinde uyması gereken yasal gereklilikler, uyumluluk kuralları ve düzenlemeler.",
+              "whatToInclude": {
+                "title": "Ne Eklenmeli",
+                "point1": "Sektöre özel düzenlemeler",
+                "point2": "Açıklama gereklilikleri",
+                "point3": "Telif hakkı ve lisanslama kuralları",
+                "point4": "Veri gizliliği gereksinimleri",
+                "point5": "Reklam standartları"
+              },
+              "exampleTitle": "Örnek: Açıklama Gereklilikleri",
+              "exampleTitleLabel": "Başlık:",
+              "exampleTitleValue": "Açıklama Gereklilikleri",
+              "exampleDescLabel": "Açıklama:",
+              "exampleDescValue": "Tüm ücretli ortaklıklar FTC yönergelerine uygun olarak #reklam veya #sponsorlu hashtag içermelidir",
+              "moreExamples": {
+                "title": "Diğer Örnekler",
+                "copyrightLabel": "Telif Hakkı:",
+                "copyrightValue": "Yalnızca lisanslı içerik kullanın, gerektiğinde içerik oluşturucuları belirtin",
+                "gdprLabel": "GDPR/KVKK:",
+                "gdprValue": "Müşteri verilerini onay olmadan asla paylaşmayın",
+                "medicalLabel": "Tıbbi İddialar:",
+                "medicalValue": "FDA onayı olmadan sağlık iddiaları yapmaktan kaçının"
+              }
+            },
+            "editDialog": {
+              "titleAdd": "Yasal Kısıtlama Ekle",
+              "titleEdit": "Yasal Kısıtlamayı Düzenle",
+              "descriptionAdd": "Yeni bir yasal veya uyumluluk gereksinimi ekleyin.",
+              "descriptionEdit": "Yasal kısıtlama detaylarını güncelleyin.",
+              "titleLabel": "Başlık *",
+              "titlePlaceholder": "örn., Açıklama Gereklilikleri",
+              "descriptionLabel": "Açıklama *",
+              "descriptionPlaceholder": "Yasal gereksinimi veya kısıtlamayı açıklayın...",
+              "add": "Ekle",
+              "update": "Güncelle"
+            }
+          }
+        },
+        "assets": {
+          "brandColors": {
+            "title": "Marka Renkleri",
+            "primaryColors": "Birincil Renkler",
+            "primaryEmptyState": "Henüz birincil renk tanımlanmadı.",
+            "accentColors": "Vurgu Renkleri",
+            "accentEmptyState": "Henüz vurgu rengi tanımlanmadı.",
+            "infoDialog": {
+              "title": "Marka Renkleri Rehberi",
+              "primaryColorsTitle": "Birincil Renkler",
+              "primaryColorsDescription": "Ana marka renkleriniz. Görsel kimliğinizde en sık kullanılması gerekenler.",
+              "primaryColorsExamples": "Örnekler: #2563eb (mavi), #1e293b (koyu gri)",
+              "primaryColorsTipLabel": "İpucu:",
+              "primaryColorsTipValue": "2-3 birincil renk idealdir",
+              "accentColorsTitle": "Vurgu Renkleri",
+              "accentColorsDescription": "Vurgular, CTA'lar ve özel öğeler için destekleyici renkler.",
+              "accentColorsExamples": "Örnekler: #10b981 (başarı yeşili), #f59e0b (uyarı turuncusu)",
+              "accentColorsTipLabel": "İpucu:",
+              "accentColorsTipValue": "1-2 vurgu rengi genellikle yeterlidir",
+              "howToUseTitle": "Nasıl Kullanılır",
+              "howToUse1": "Mevcut renklere tıklayarak düzenleyin",
+              "howToUse2": "Yeni renk eklemek için renk seçiciyi kullanın",
+              "howToUse3": "Kaldırmak için X düğmesine tıklayın (üzerine gelince)",
+              "howToUse4": "Renkler hem dialog'da hem de ana görünümde gösterilir"
+            },
+            "editDialog": {
+              "title": "Marka Renklerini Düzenle",
+              "description": "Markanızın birincil ve vurgu renklerini yönetin.",
+              "primaryColorsLabel": "Birincil Renkler",
+              "addPrimaryColor": "Birincil Renk Ekle",
+              "accentColorsLabel": "Vurgu Renkleri",
+              "addAccentColor": "Vurgu Rengi Ekle"
+            }
+          },
+          "visualGuidelines": {
+            "title": "Görsel Yönergeler",
+            "emptyState": "Henüz görsel yönerge tanımlanmadı.",
+            "infoDialog": {
+              "title": "Görsel Yönergeler Rehberi",
+              "whatAre": "Görsel Yönergeler Nedir?",
+              "description": "Fotoğraflar, grafikler ve tasarım öğeleri gibi görsel içerik için kurallar ve tercihler.",
+              "whatToInclude": {
+                "title": "Ne Eklenmeli",
+                "point1": "Fotoğraf stili tercihleri",
+                "point2": "Kompozisyon kuralları",
+                "point3": "Görüntü işleme tercihleri",
+                "point4": "Tipografi yönergeleri",
+                "point5": "Düzen prensipleri"
+              },
+              "examples": {
+                "title": "Örnekler",
+                "example1": "Stok görseller yerine özgün fotoğraflar",
+                "example2": "Minimalist, temiz kompozisyonlar",
+                "example3": "Mümkün olduğunda insan öğeleri dahil et",
+                "example4": "Tutarlı ışıklandırma ve renk düzeltme",
+                "example5": "Başlıklar için sans-serif fontlar kullan",
+                "example6": "Nefes alma alanı için boşluk koru"
+              },
+              "tipsTitle": "İpuçları",
+              "tipsDescription": "Yönergeleri uygulanabilir ve spesifik tutun. \"Profesyonel görün\" gibi belirsiz talimatlardan kaçının - somut olun."
+            },
+            "editDialog": {
+              "title": "Görsel Yönergeleri Düzenle",
+              "description": "Markanız için görsel stil yönergelerini yönetin.",
+              "emptyState": "Henüz yönerge yok. Aşağıdan ekleyin.",
+              "addNewLabel": "Yeni Yönerge Ekle",
+              "placeholder": "örn., Stok görseller yerine özgün fotoğraflar"
+            }
+          },
+          "aiConfiguration": {
+            "title": "AI Yapılandırması",
+            "defaultLanguage": "Varsayılan Dil",
+            "contentLength": "İçerik Uzunluğu",
+            "ctaStyle": "CTA Stili",
+            "preferredPlatforms": "Tercih Edilen Platformlar",
+            "platformsEmptyState": "Henüz platform tanımlanmadı.",
+            "infoDialog": {
+              "title": "AI Yapılandırması Rehberi",
+              "defaultLanguageTitle": "Varsayılan Dil",
+              "defaultLanguageDescription": "AI tarafından üretilen içerik için birincil dil.",
+              "defaultLanguageExample": "Örnek: en-US, tr-TR",
+              "contentLengthTitle": "İçerik Uzunluğu",
+              "contentLengthDescription": "AI tarafından üretilen içerik için tercih edilen uzunluk aralığı.",
+              "contentLengthCharsExample": "Karakter örneği: Min 50, Maks 280 (Twitter dostu)",
+              "contentLengthWordsExample": "Kelime örneği: Min 20, Maks 50 (kısa blog girişi)",
+              "contentLengthTip": "Sosyal medya için karakter, makaleler için kelime seçin.",
+              "ctaStyleTitle": "CTA Stili",
+              "ctaStyleDescription": "Harekete geçirici mesajlarınızın nasıl görünmesi gerektiği.",
+              "ctaStyleExamples": "Örnekler: Yumuşak, davetkar, Doğrudan ve acil, Eğitici, yardımcı",
+              "preferredPlatformsTitle": "Tercih Edilen Platformlar",
+              "preferredPlatformsDescription": "Öncelikli olarak kullandığınız sosyal medya veya içerik platformları.",
+              "preferredPlatformsExamples": "Örnekler: Instagram, LinkedIn, Twitter, Facebook, TikTok, YouTube, Blog",
+              "preferredPlatformsTip": "Bu, AI'ın her platforma göre içerik formatı ve stilini uyarlamasına yardımcı olur."
+            },
+            "editDialog": {
+              "title": "AI Yapılandırmasını Düzenle",
+              "description": "İçerik üretimi için AI ayarlarını yapılandırın.",
+              "defaultLanguageLabel": "Varsayılan Dil",
+              "defaultLanguagePlaceholder": "örn., en-US, tr-TR",
+              "contentLengthLabel": "İçerik Uzunluğu",
+              "minLabel": "Min",
+              "maxLabel": "Maks",
+              "unitLabel": "Birim",
+              "charactersOption": "Karakterler",
+              "wordsOption": "Kelimeler",
+              "ctaStyleLabel": "CTA Stili",
+              "ctaStylePlaceholder": "örn., Yumuşak, davetkar",
+              "preferredPlatformsLabel": "Tercih Edilen Platformlar",
+              "preferredPlatformsPlaceholder": "örn., Instagram, LinkedIn"
+            }
+          }
         }
+      },
+      "common": {
+        "gotIt": "Anladım",
+        "cancel": "İptal",
+        "save": "Kaydet",
+        "saving": "Kaydediliyor..."
       },
       "transition": {
         "loadingBrand": "{brand} marka stüdyosu yükleniyor...",

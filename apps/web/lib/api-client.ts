@@ -94,7 +94,7 @@ class ApiCache {
    */
   setPendingRequest<T>(key: string, promise: Promise<T>): void {
     this.pendingRequests.set(key, promise);
-    
+
     // Clean up when promise settles
     promise.finally(() => {
       this.pendingRequests.delete(key);
@@ -115,16 +115,16 @@ async function fetchApi<T>(
   options?: RequestInit & { skipAuthRedirect?: boolean }
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   // Only set Content-Type if there's a body
   const headers: Record<string, string> = {
     ...(options?.headers as Record<string, string>),
   };
-  
+
   if (options?.body) {
     headers['Content-Type'] = 'application/json';
   }
-  
+
   let response: Response;
   try {
     response = await fetch(url, {
@@ -135,19 +135,19 @@ async function fetchApi<T>(
   } catch (networkError) {
     // Network error (blocked, offline, CORS preflight failed, etc.)
     console.error('[API] Network error:', networkError);
-    
+
     // Clear potentially corrupted cookies
     if (typeof window !== 'undefined') {
       clearClientCookies();
     }
-    
+
     throw new ApiError('Network error - please refresh the page', 0, 'NETWORK_ERROR');
   }
 
   // Check if response has content
   const contentType = response.headers.get('content-type');
   const hasJsonContent = contentType?.includes('application/json');
-  
+
   let data: any;
   try {
     const responseText = await response.text();
@@ -166,15 +166,15 @@ async function fetchApi<T>(
     if (response.status === 401 && !options?.skipAuthRedirect) {
       console.warn('[API] 401 Unauthorized - clearing cookies and redirecting to login');
       clearClientCookies();
-      
+
       // Only redirect if in browser
       if (typeof window !== 'undefined') {
         window.location.href = '/';
       }
-      
+
       throw new ApiError('Session expired', 401, 'SESSION_EXPIRED');
     }
-    
+
     throw new ApiError(
       data.error?.message || 'API request failed',
       response.status,
@@ -331,34 +331,41 @@ export const apiClient = {
    * Logout user
    */
   async logout(): Promise<{ success: true; message: string }> {
-    const result = await fetchApi('/auth/logout', {
+    const result = await fetchApi<{ success: true; message: string }>('/auth/logout', {
       method: 'POST',
     });
-    
+
     // Clear all cache on logout
     this.clearAllCache();
-    
+
     return result;
   },
 
   /**
    * Complete onboarding
    */
-  async completeOnboarding(): Promise<{ 
-    success: true; 
-    user: { 
-      id: string; 
-      email: string; 
+  async completeOnboarding(): Promise<{
+    success: true;
+    user: {
+      id: string;
+      email: string;
       hasCompletedOnboarding: boolean;
-    } 
+    }
   }> {
-    const result = await fetchApi('/me/onboarding/complete', {
+    const result = await fetchApi<{
+      success: true;
+      user: {
+        id: string;
+        email: string;
+        hasCompletedOnboarding: boolean;
+      }
+    }>('/me/onboarding/complete', {
       method: 'POST',
     });
-    
+
     // Clear /me cache since user data changed
     this.clearMeCache();
-    
+
     return result;
   },
 
@@ -372,7 +379,7 @@ export const apiClient = {
    * @param options.skipCache - Skip cache and fetch fresh data
    */
   async getBrand(
-    workspaceId: string, 
+    workspaceId: string,
     brandId: string,
     options?: { skipCache?: boolean }
   ): Promise<{ success: true; brand: BrandDetailDto }> {
@@ -413,6 +420,56 @@ export const apiClient = {
   },
 
   /**
+   * Get brand details by slug
+   * Automatically cached per brand
+   * @param options.skipCache - Skip cache and fetch fresh data
+   */
+  async getBrandBySlug(
+    input: { workspaceId: string; slug: string },
+    options?: { skipCache?: boolean }
+  ): Promise<{ success: true; brand: BrandDetailDto }> {
+    const { workspaceId, slug } = input;
+    const cacheKey = `brand:slug:${slug}`;
+
+    // Check if we should skip cache
+    if (options?.skipCache) {
+      apiCache.clear(cacheKey);
+    }
+
+    // Return cached data if available
+    const cached = apiCache.get<{ success: true; brand: BrandDetailDto }>(cacheKey);
+    if (cached) {
+      console.log(`[API Cache] Returning cached brand slug ${slug}`);
+      return cached;
+    }
+
+    // Check if there's already a pending request
+    const pending = apiCache.getPendingRequest<{ success: true; brand: BrandDetailDto }>(cacheKey);
+    if (pending) {
+      console.log(`[API Cache] Waiting for pending brand slug request ${slug}`);
+      return pending;
+    }
+
+    // Make the request
+    console.log(`[API Cache] Fetching fresh brand slug ${slug}`);
+    const promise = fetchApi<{ success: true; brand: BrandDetailDto }>(`/workspaces/${workspaceId}/brands/slug/${slug}`);
+    apiCache.setPendingRequest(cacheKey, promise);
+
+    try {
+      const response = await promise;
+      apiCache.set(cacheKey, response);
+      // Also cache by ID if we got the brand back
+      if (response.brand?.id) {
+        apiCache.set(`brand:${response.brand.id}`, response);
+      }
+      return response;
+    } catch (error) {
+      apiCache.clear(cacheKey);
+      throw error;
+    }
+  },
+
+  /**
    * Clear brand cache
    */
   clearBrandCache(brandId: string): void {
@@ -425,10 +482,10 @@ export const apiClient = {
    * @param options.skipCache - Skip cache and fetch fresh data
    */
   async listBrands(
-    workspaceId: string, 
+    workspaceId: string,
     options?: { status?: 'ACTIVE' | 'ARCHIVED'; skipCache?: boolean }
-  ): Promise<{ 
-    success: true; 
+  ): Promise<{
+    success: true;
     brands: Array<{
       id: string;
       name: string;
@@ -456,17 +513,53 @@ export const apiClient = {
     }
 
     // Return cached data if available
-    const cached = apiCache.get<typeof this>(cacheKey);
-    if (cached) {
-      console.log(`[API Cache] Returning cached brands for workspace ${workspaceId}`);
-      return cached as any;
-    }
+    const cached = apiCache.get<{
+      success: true;
+      brands: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        industry: string | null;
+        country: string | null;
+        city: string | null;
+        primaryLocale: string | null;
+        timezone: string | null;
+        status: 'ACTIVE' | 'ARCHIVED';
+        logoMediaId: string | null;
+        logoUrl: string | null;
+        mediaCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      total: number;
+    }>(cacheKey);
 
     // Check if there's already a pending request
-    const pending = apiCache.getPendingRequest<typeof this>(cacheKey);
+    const pending = apiCache.getPendingRequest<{
+      success: true;
+      brands: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        industry: string | null;
+        country: string | null;
+        city: string | null;
+        primaryLocale: string | null;
+        timezone: string | null;
+        status: 'ACTIVE' | 'ARCHIVED';
+        logoMediaId: string | null;
+        logoUrl: string | null;
+        mediaCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      total: number;
+    }>(cacheKey);
     if (pending) {
       console.log(`[API Cache] Waiting for pending brands request for workspace ${workspaceId}`);
-      return pending as any;
+      return pending;
     }
 
     // Make the request
@@ -474,14 +567,34 @@ export const apiClient = {
     const params = new URLSearchParams();
     if (options?.status) params.append('status', options.status);
     const query = params.toString() ? `?${params.toString()}` : '';
-    
-    const promise = fetchApi(`/workspaces/${workspaceId}/brands${query}`);
+
+    const promise = fetchApi<{
+      success: true;
+      brands: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        industry: string | null;
+        country: string | null;
+        city: string | null;
+        primaryLocale: string | null;
+        timezone: string | null;
+        status: 'ACTIVE' | 'ARCHIVED';
+        logoMediaId: string | null;
+        logoUrl: string | null;
+        mediaCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      total: number;
+    }>(`/workspaces/${workspaceId}/brands${query}`);
     apiCache.setPendingRequest(cacheKey, promise);
 
     try {
       const response = await promise;
       apiCache.set(cacheKey, response);
-      return response as any;
+      return response;
     } catch (error) {
       apiCache.clear(cacheKey);
       throw error;
@@ -533,7 +646,7 @@ export const apiClient = {
       logoMediaId?: string | null;
     }
   ): Promise<{ success: true; brand: any }> {
-    const result = await fetchApi(`/workspaces/${workspaceId}/brands/${brandId}`, {
+    const result = await fetchApi<{ success: true; brand: any }>(`/workspaces/${workspaceId}/brands/${brandId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -549,7 +662,7 @@ export const apiClient = {
 
     // Clear brands list cache to reflect changes
     this.clearBrandsCache(workspaceId);
-    
+
     return result;
   },
 
@@ -562,11 +675,11 @@ export const apiClient = {
    * Automatically updates brand cache
    */
   async updateBrandProfile(
-    workspaceId: string, 
-    brandId: string, 
+    workspaceId: string,
+    brandId: string,
     input: UpdateBrandProfileInput
   ): Promise<{ success: true; profile: BrandProfileDto }> {
-    const result = await fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/profile`, {
+    const result = await fetchApi<{ success: true; profile: BrandProfileDto }>(`/workspaces/${workspaceId}/brands/${brandId}/profile`, {
       method: 'PUT',
       body: JSON.stringify(input),
     });
@@ -579,7 +692,7 @@ export const apiClient = {
       cachedBrand.brand.profile = result.profile;
       apiCache.set(brandCacheKey, cachedBrand);
     }
-    
+
     return result;
   },
 
@@ -591,7 +704,7 @@ export const apiClient = {
    * List contact channels for a brand
    */
   async listBrandContactChannels(
-    workspaceId: string, 
+    workspaceId: string,
     brandId: string
   ): Promise<{ success: true; contactChannels: BrandContactChannelDto[] }> {
     return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts`);
@@ -606,7 +719,7 @@ export const apiClient = {
     brandId: string,
     input: CreateBrandContactChannelInput
   ): Promise<{ success: true; contactChannel: BrandContactChannelDto }> {
-    const result = await fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts`, {
+    const result = await fetchApi<{ success: true; contactChannel: BrandContactChannelDto }>(`/workspaces/${workspaceId}/brands/${brandId}/contacts`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
@@ -633,7 +746,7 @@ export const apiClient = {
     channelId: string,
     input: UpdateBrandContactChannelInput
   ): Promise<{ success: true; contactChannel: BrandContactChannelDto }> {
-    const result = await fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
+    const result = await fetchApi<{ success: true; contactChannel: BrandContactChannelDto }>(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
       method: 'PATCH',
       body: JSON.stringify(input),
     });
@@ -662,7 +775,7 @@ export const apiClient = {
     brandId: string,
     channelId: string
   ): Promise<{ success: true; message: string }> {
-    const result = await fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
+    const result = await fetchApi<{ success: true; message: string }>(`/workspaces/${workspaceId}/brands/${brandId}/contacts/${channelId}`, {
       method: 'DELETE',
     });
 
@@ -686,7 +799,7 @@ export const apiClient = {
     brandId: string,
     orders: { id: string; order: number }[]
   ): Promise<{ success: true; message: string }> {
-    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/contacts/reorder`, {
+    return fetchApi<{ success: true; message: string }>(`/workspaces/${workspaceId}/brands/${brandId}/contacts/reorder`, {
       method: 'PUT',
       body: JSON.stringify({ orders }),
     });
@@ -796,7 +909,7 @@ export const apiClient = {
     if (params.limit) searchParams.append('limit', params.limit.toString());
 
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    
+
     return fetchApi(`/tasks${query}`, {
       headers: {
         'X-Workspace-Id': params.workspaceId,
@@ -964,9 +1077,9 @@ export const apiClient = {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
-    
+
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    
+
     return fetchApi(`/tasks/${taskId}/comments${query}`, {
       headers: {
         'X-Workspace-Id': workspaceId,
@@ -1023,7 +1136,7 @@ export const apiClient = {
     const searchParams = new URLSearchParams();
     if (brandId) searchParams.append('brandId', brandId);
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    
+
     return fetchApi(`/task-statuses${query}`, {
       headers: {
         'X-Workspace-Id': workspaceId,

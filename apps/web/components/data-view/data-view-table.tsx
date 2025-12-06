@@ -31,12 +31,12 @@ export const DataViewTable = memo(function DataViewTable({
 
   return (
     <div className={`w-full sm:px-6 px-0 flex-1 min-h-0 flex flex-col -mt-3 ${className}`}>
-      <DataTable 
+      <DataTable
         data={filteredData}
         onLoadMore={onLoadMore}
         hasMore={hasMore}
         isLoading={isLoading}
-        onRowClick={onTaskClick}
+        onRowClick={(row) => onTaskClick?.(row as unknown as TableTask)}
       />
     </div>
   )

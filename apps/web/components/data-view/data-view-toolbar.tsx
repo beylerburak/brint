@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { 
+import {
   InputGroup,
   InputGroupButton,
 } from "@/components/ui/input-group"
@@ -14,19 +14,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { 
-  Tabs, 
-  TabsList, 
+import {
+  Tabs,
+  TabsList,
   TabsHighlight,
   TabsHighlightItem,
   TabsTrigger,
 } from "@/components/animate-ui/primitives/animate/tabs"
-import { 
-  IconSearch, 
-  IconTable, 
-  IconLayoutKanban, 
-  IconFilter, 
-  IconFlag, 
+import {
+  IconSearch,
+  IconTable,
+  IconLayoutKanban,
+  IconFilter,
+  IconFlag,
   IconUser,
   IconListCheck,
   IconClock,
@@ -136,13 +136,13 @@ export function DataViewToolbar({
           </InputGroup>
 
           {/* Filter tabs - hidden on smaller screens, shown on xl+ */}
-          <Tabs value={filterTab} onValueChange={onFilterChange} className="flex-1 min-w-0 hidden xl:block">
+          <Tabs value={filterTab} onValueChange={(value) => onFilterChange(value as FilterTab)} className="flex-1 min-w-0 hidden xl:block">
             <div className="overflow-x-auto scrollbar-hide">
               <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1 min-w-max">
                 <TabsHighlight className="bg-background shadow-sm rounded-md">
                   <TabsHighlightItem value="todo">
-                    <TabsTrigger 
-                      value="todo" 
+                    <TabsTrigger
+                      value="todo"
                       disabled={viewMode === "kanban"}
                       className="relative z-10 inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -151,8 +151,8 @@ export function DataViewToolbar({
                     </TabsTrigger>
                   </TabsHighlightItem>
                   <TabsHighlightItem value="inProgress">
-                    <TabsTrigger 
-                      value="inProgress" 
+                    <TabsTrigger
+                      value="inProgress"
                       disabled={viewMode === "kanban"}
                       className="relative z-10 inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -161,8 +161,8 @@ export function DataViewToolbar({
                     </TabsTrigger>
                   </TabsHighlightItem>
                   <TabsHighlightItem value="overdue">
-                    <TabsTrigger 
-                      value="overdue" 
+                    <TabsTrigger
+                      value="overdue"
                       disabled={viewMode === "kanban"}
                       className="relative z-10 inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -171,8 +171,8 @@ export function DataViewToolbar({
                     </TabsTrigger>
                   </TabsHighlightItem>
                   <TabsHighlightItem value="completed">
-                    <TabsTrigger 
-                      value="completed" 
+                    <TabsTrigger
+                      value="completed"
                       disabled={viewMode === "kanban"}
                       className="relative z-10 inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -197,11 +197,11 @@ export function DataViewToolbar({
               <Button variant="outline" size="sm" className="xl:hidden gap-2 flex-shrink-0">
                 <IconList className="h-4 w-4" />
                 <span className="hidden md:inline">
-                  {filterTab === "all" ? tabLabels.all : 
-                   filterTab === "todo" ? tabLabels.todo :
-                   filterTab === "inProgress" ? tabLabels.inProgress :
-                   filterTab === "overdue" ? tabLabels.overdue :
-                   tabLabels.completed}
+                  {filterTab === "all" ? tabLabels.all :
+                    filterTab === "todo" ? tabLabels.todo :
+                      filterTab === "inProgress" ? tabLabels.inProgress :
+                        filterTab === "overdue" ? tabLabels.overdue :
+                          tabLabels.completed}
                 </span>
               </Button>
             </DropdownMenuTrigger>
@@ -210,28 +210,28 @@ export function DataViewToolbar({
                 <IconList className="h-4 w-4" />
                 <span>{tabLabels.all}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => onFilterChange("todo")}
                 disabled={viewMode === "kanban"}
               >
                 <IconListCheck className="h-4 w-4" />
                 <span>{tabLabels.todo}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => onFilterChange("inProgress")}
                 disabled={viewMode === "kanban"}
               >
                 <IconClock className="h-4 w-4" />
                 <span>{tabLabels.inProgress}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => onFilterChange("overdue")}
                 disabled={viewMode === "kanban"}
               >
                 <IconAlertCircle className="h-4 w-4" />
                 <span>{tabLabels.overdue}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => onFilterChange("completed")}
                 disabled={viewMode === "kanban"}
               >
@@ -259,7 +259,7 @@ export function DataViewToolbar({
               {filterLabels.priority}
             </Button>
           </div>
-          
+
           {/* Filter dropdown - visible on smaller screens */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -282,7 +282,7 @@ export function DataViewToolbar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
           {onNewTask && (
             <Button size="sm" className="flex-shrink-0" onClick={onNewTask}>
               <IconPlus className="h-4 w-4" />
@@ -296,12 +296,12 @@ export function DataViewToolbar({
       <div className="sm:hidden flex flex-col gap-3">
         {/* Top row: Tabs + Chevron */}
         <div className="flex items-center justify-between gap-0">
-          <Tabs value={filterTab} onValueChange={onFilterChange} className="flex-1 min-w-0 w-full">
+          <Tabs value={filterTab} onValueChange={(value) => onFilterChange(value as FilterTab)} className="flex-1 min-w-0 w-full">
             <TabsList className="relative flex items-center gap-0 rounded-lg bg-muted p-1 w-full">
               <TabsHighlight className="bg-background shadow-sm rounded-md w-full flex">
                 <TabsHighlightItem value="todo" className="flex-1 min-w-0">
-                  <TabsTrigger 
-                    value="todo" 
+                  <TabsTrigger
+                    value="todo"
                     disabled={viewMode === "kanban"}
                     className="relative z-10 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground w-full min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -310,8 +310,8 @@ export function DataViewToolbar({
                   </TabsTrigger>
                 </TabsHighlightItem>
                 <TabsHighlightItem value="inProgress" className="flex-1 min-w-0">
-                  <TabsTrigger 
-                    value="inProgress" 
+                  <TabsTrigger
+                    value="inProgress"
                     disabled={viewMode === "kanban"}
                     className="relative z-10 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground w-full min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -320,8 +320,8 @@ export function DataViewToolbar({
                   </TabsTrigger>
                 </TabsHighlightItem>
                 <TabsHighlightItem value="overdue" className="flex-1 min-w-0">
-                  <TabsTrigger 
-                    value="overdue" 
+                  <TabsTrigger
+                    value="overdue"
                     disabled={viewMode === "kanban"}
                     className="relative z-10 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground w-full min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -330,8 +330,8 @@ export function DataViewToolbar({
                   </TabsTrigger>
                 </TabsHighlightItem>
                 <TabsHighlightItem value="completed" className="flex-1 min-w-0">
-                  <TabsTrigger 
-                    value="completed" 
+                  <TabsTrigger
+                    value="completed"
                     disabled={viewMode === "kanban"}
                     className="relative z-10 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground w-full min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >

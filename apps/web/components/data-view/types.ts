@@ -39,6 +39,7 @@ export interface KanbanTask extends BaseTask {
   priorityColor: string
   user: string
   userSeed: string
+  dueDateDisplay?: string // Formatted display string for kanban cards (e.g., "in 5 days")
 }
 
 export interface SummaryStats {

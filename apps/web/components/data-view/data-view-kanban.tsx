@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useMemo } from "react"
+import { useRef, useMemo, createRef } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -92,7 +92,7 @@ function KanbanColumnContent({
               <div
                 draggable
                 onDragStart={(e) => {
-                  setDraggingCardId(task.id)
+                  setDraggingCardId(String(task.id))
                   e.dataTransfer.effectAllowed = "move"
                 }}
                 onDragEnd={() => {
@@ -100,19 +100,18 @@ function KanbanColumnContent({
                 }}
                 onClick={(e) => {
                   // Don't trigger click if dragging
-                  if (draggingCardId !== task.id) {
+                  if (draggingCardId !== String(task.id)) {
                     onTaskClick?.(task)
                   }
                 }}
-                className={`rounded-sm border bg-card p-3 flex items-start justify-between gap-3 hover:bg-accent hover:border-border transition-all cursor-grab active:cursor-grabbing ${
-                  draggingCardId === task.id
-                    ? "opacity-50 scale-95 !border-2 !border-primary rotate-1"
-                    : "cursor-pointer"
-                }`}
+                className={`rounded-sm border bg-card p-3 flex items-start justify-between gap-3 hover:bg-accent hover:border-border transition-all cursor-grab active:cursor-grabbing ${draggingCardId === String(task.id)
+                  ? "opacity-50 scale-95 !border-2 !border-primary rotate-1"
+                  : "cursor-pointer"
+                  }`}
               >
                 <div className="flex flex-col gap-1 flex-1 min-w-0">
                   <span className="text-sm font-medium line-clamp-2">{task.title}</span>
-                  <span className="text-xs text-muted-foreground">{task.dueDate}</span>
+                  <span className="text-xs text-muted-foreground">{task.dueDateDisplay || task.dueDate}</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <Badge variant="outline" className="text-muted-foreground px-1.5 h-5">
                       <IconFlagFilled className={`h-3.5 w-3.5 ${task.priorityColor}`} />
@@ -135,12 +134,12 @@ function KanbanColumnContent({
                       <AvatarFallback>
                         {task.assignedTo[0].name
                           ? task.assignedTo[0].name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)
-                          : task.assignedTo[0].email?.[0]?.toUpperCase() || "?"}
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .slice(0, 2)
+                          : (task.assignedTo[0] as any).email?.[0]?.toUpperCase() || "?"}
                       </AvatarFallback>
                     </Avatar>
                   ) : (
@@ -217,13 +216,13 @@ export function DataViewKanban({
 }: DataViewKanbanProps) {
   // Create refs for each column - use a Map to store refs
   const columnRefsMap = useMemo(() => {
-    return new Map<string, React.RefObject<HTMLDivElement>>()
+    return new Map<string, React.RefObject<HTMLDivElement | null>>()
   }, [])
 
   // Initialize refs for columns that don't have them yet
   columns.forEach((col) => {
     if (!columnRefsMap.has(col.id)) {
-      columnRefsMap.set(col.id, { current: null })
+      columnRefsMap.set(col.id, createRef<HTMLDivElement>())
     }
   })
 

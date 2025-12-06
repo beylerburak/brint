@@ -128,7 +128,7 @@ import {
 } from "@/components/data-table/data-table-action-bar"
 
 export const schema = z.object({
-  id: z.number(),
+  id: z.union([z.string(), z.number()]),
   taskNumber: z.number().optional(),
   header: z.string(),
   type: z.string(),
@@ -139,7 +139,7 @@ export const schema = z.object({
     id: z.string(),
     name: z.string().nullable(),
     avatarUrl: z.string().nullable(),
-  })),
+  })).optional(),
   commentCount: z.number().optional(),
 })
 
@@ -150,13 +150,13 @@ function formatDate(
   timeFormat: "H24" | "H12"
 ): string {
   const date = new Date(dateString)
-  
+
   const year = date.getFullYear()
   const month = date.getMonth() + 1
   const day = date.getDate()
   const hours = date.getHours()
   const minutes = date.getMinutes()
-  
+
   // Format time
   let timeStr = ""
   if (timeFormat === "H12") {
@@ -166,7 +166,7 @@ function formatDate(
   } else {
     timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
   }
-  
+
   // Format date based on preference
   let dateStr = ""
   if (dateFormat === "DMY") {
@@ -176,7 +176,7 @@ function formatDate(
   } else if (dateFormat === "YMD") {
     dateStr = `${year}/${month}/${day}`
   }
-  
+
   return `${dateStr} ${timeStr}`
 }
 
@@ -185,7 +185,7 @@ function getRelativeTime(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000)
-  
+
   const seconds = Math.abs(diffInSeconds)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
@@ -193,11 +193,11 @@ function getRelativeTime(dateString: string): string {
   const weeks = Math.floor(days / 7)
   const months = Math.floor(days / 30)
   const years = Math.floor(days / 365)
-  
+
   const isPast = diffInSeconds < 0
   const prefix = isPast ? "" : "in "
   const suffix = isPast ? " ago" : ""
-  
+
   if (years > 0) {
     return `${prefix}${years} year${years > 1 ? "s" : ""}${suffix}`
   } else if (months > 0) {
@@ -218,7 +218,7 @@ function getRelativeTime(dateString: string): string {
 }
 
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
+function DragHandle({ id }: { id: string | number }) {
   const { attributes, listeners } = useSortable({
     id,
   })
@@ -241,7 +241,7 @@ function DragHandle({ id }: { id: number }) {
 function SortableHeader({ column, children }: { column: any; children: React.ReactNode }) {
   const canSort = column.getCanSort()
   const sortDirection = column.getIsSorted()
-  
+
   if (!canSort) {
     return <>{children}</>
   }
@@ -362,14 +362,14 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     },
     cell: ({ row }) => {
       const assignedUsers = row.original.assignedTo || []
-      
+
       if (assignedUsers.length === 0) {
         return <span className="text-muted-foreground text-sm">Unassigned</span>
       }
-      
+
       const firstUser = assignedUsers[0]
       const remainingCount = assignedUsers.length - 1
-      
+
       return (
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
@@ -380,11 +380,11 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
               <AvatarFallback className="text-xs">
                 {firstUser.name
                   ? firstUser.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)
                   : "?"}
               </AvatarFallback>
             </Avatar>
@@ -417,7 +417,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         "High": { label: "High", color: "text-red-500" },
       }
       const priority = priorityMap[row.original.priority] || priorityMap["Low"]
-      
+
       return (
         <Badge variant="outline" className="text-muted-foreground px-1.5">
           <IconFlagFilled className={`h-3.5 w-3.5 ${priority.color}`} />
@@ -445,9 +445,9 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       }
       const status = statusMap[row.original.status] || "offline"
       const updateStatus = (table.options.meta as any)?.updateStatus
-      
+
       const availableStatuses = ["Not Started", "In Progress", "Done"]
-      
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -491,10 +491,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       const userPrefs = (table.options.meta as any)?.userPrefs
       const dateFormat = userPrefs?.dateFormat || "DMY"
       const timeFormat = userPrefs?.timeFormat || "H24"
-      
+
       const relativeTime = getRelativeTime(row.original.dueDate)
       const fullDate = formatDate(row.original.dueDate, dateFormat, timeFormat)
-      
+
       return (
         <TooltipProvider>
           <Tooltip>
@@ -535,10 +535,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ 
-  row, 
-  onRowClick 
-}: { 
+function DraggableRow({
+  row,
+  onRowClick
+}: {
   row: Row<z.infer<typeof schema>>
   onRowClick?: (row: z.infer<typeof schema>) => void
 }) {
@@ -595,14 +595,14 @@ export function DataTable({
   onRowClick?: (row: z.infer<typeof schema>) => void
 }) {
   const [data, setData] = React.useState(() => initialData)
-  
+
   // Update data when initialData prop changes
   React.useEffect(() => {
     setData(initialData)
     // Clear selection when data changes (e.g., filter changes)
     setRowSelection({})
   }, [initialData])
-  
+
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -618,7 +618,7 @@ export function DataTable({
     dateFormat: "DMY" | "MDY" | "YMD"
     timeFormat: "H24" | "H12"
   } | null>(null)
-  
+
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -651,7 +651,7 @@ export function DataTable({
     [data]
   )
 
-  const updateStatus = React.useCallback((taskId: number, newStatus: string) => {
+  const updateStatus = React.useCallback((taskId: string | number, newStatus: string) => {
     setData((prevData) =>
       prevData.map((item) =>
         item.id === taskId ? { ...item, status: newStatus } : item
@@ -751,76 +751,76 @@ export function DataTable({
 
   return (
     <div className="w-full py-6 flex flex-col min-h-0 flex-1">
-        <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
+      <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
+        <DndContext
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis]}
+          onDragEnd={handleDragEnd}
+          sensors={sensors}
+          id={sortableId}
+        >
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody className="**:data-[slot=table-cell]:first:w-8">
+              {rows?.length ? (
+                <SortableContext
+                  items={dataIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {rows.map((row) => (
+                    <DraggableRow key={row.id} row={row} onRowClick={onRowClick} />
+                  ))}
+                  {isLoading && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columns.length}
+                        className="h-12 text-center"
+                      >
+                        <IconLoader className="h-4 w-4 animate-spin inline-block mr-2" />
+                        Loading more...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </SortableContext>
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
                   >
-                    {rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} onRowClick={onRowClick} />
-                    ))}
-                    {isLoading && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          className="h-12 text-center"
-                        >
-                          <IconLoader className="h-4 w-4 animate-spin inline-block mr-2" />
-                          Loading more...
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
-        </div>
-        <DataTableActionBar table={table}>
-          <DataTableActionBarSelection table={table} />
-          <DataTableActionBarAction tooltip="Delete selected">
-            <IconDotsVertical className="h-3.5 w-3.5" />
-            Delete
-          </DataTableActionBarAction>
-        </DataTableActionBar>
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
+      <DataTableActionBar table={table}>
+        <DataTableActionBarSelection table={table} />
+        <DataTableActionBarAction tooltip="Delete selected">
+          <IconDotsVertical className="h-3.5 w-3.5" />
+          Delete
+        </DataTableActionBarAction>
+      </DataTableActionBar>
+    </div>
   )
 }
 

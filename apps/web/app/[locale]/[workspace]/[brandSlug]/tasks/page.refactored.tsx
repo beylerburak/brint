@@ -205,7 +205,7 @@ export default function BrandTasksPage() {
   useEffect(() => {
     async function init() {
       try {
-        const brand = await apiClient.getBrandBySlug({
+        const { brand } = await apiClient.getBrandBySlug({
           workspaceId: currentWorkspace!.id,
           slug: brandSlug,
         })
@@ -281,9 +281,8 @@ export default function BrandTasksPage() {
 
       {/* Data View */}
       <div
-        className={`w-full px-6 flex-1 min-h-0 flex flex-col ${
-          viewMode === "table" ? "-mt-4" : ""
-        }`}
+        className={`w-full px-6 flex-1 min-h-0 flex flex-col ${viewMode === "table" ? "-mt-4" : ""
+          }`}
       >
         {viewMode === "table" ? (
           <DataViewTable

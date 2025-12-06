@@ -62,11 +62,9 @@ export default function BrandTasksPage() {
   const [searchValue, setSearchValue] = useState("")
   // Track locally updated tasks to ignore WebSocket events for them
   const locallyUpdatedTasksRef = useRef<Set<string>>(new Set())
-  // Cache for task details
-  const taskDetailsCacheRef = useRef<Map<string, { task: any; timestamp: number }>>(new Map())
-  const taskDetailsLoadingRef = useRef<Set<string>>(new Set())
   const [tasks, setTasks] = useState<Array<{
     id: string;
+    taskNumber: number;
     title: string;
     description: string | null;
     status: {
@@ -90,6 +88,13 @@ export default function BrandTasksPage() {
     total: 0,
     totalPages: 0,
   })
+
+  // Refs for preventing duplicate API calls
+  const initFetchingRef = useRef(false)
+  const initFetchedForRef = useRef<string | null>(null)
+
+  // Create mode state
+  const [isCreateMode, setIsCreateMode] = useState(false)
 
   // Infinite scroll state for table
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -116,9 +121,9 @@ export default function BrandTasksPage() {
   // Filter tasks by search value
   const filteredTasks = useMemo(() => {
     if (!searchValue.trim()) return tasks
-    
+
     const searchLower = searchValue.toLowerCase().trim()
-    return tasks.filter((task) => 
+    return tasks.filter((task) =>
       task.title.toLowerCase().includes(searchLower) ||
       task.description?.toLowerCase().includes(searchLower)
     )
@@ -151,7 +156,7 @@ export default function BrandTasksPage() {
         status: statusMap[task.status.group] || task.status.label,
         dueDate: task.dueDate || new Date().toISOString(),
         assignedTo: (task as any).assignedTo || [], // Use assignedTo from API or empty array
-        commentCount: 0, // Can be fetched separately if needed
+        commentCount: (task as any)._count?.comments || 0,
       } as TableTask
     })
   }, [filteredTasks])
@@ -192,8 +197,9 @@ export default function BrandTasksPage() {
         priority,
         priorityColor,
         status: task.status.label,
-        dueDate: dueDate ? `in ${Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days` : "No due date",
-        commentCount: 0,
+        dueDate: task.dueDate || '', // Keep raw ISO date for modal
+        dueDateDisplay: dueDate ? `in ${Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days` : "No due date",
+        commentCount: (task as any)._count?.comments || 0,
         assignedTo: (task as any).assignedTo || [], // Use assignedTo from API or empty array
         user: task.assigneeUserId || "Unassigned",
         userSeed: task.assigneeUserId || "unassigned",
@@ -313,6 +319,21 @@ export default function BrandTasksPage() {
     async function init() {
       if (!currentWorkspace) return
 
+      // Create a unique key for this fetch operation
+      const fetchKey = `${currentWorkspace.id}:${brandSlug}`
+
+      // Skip if already fetching or already fetched for this key
+      if (initFetchingRef.current) {
+        console.log('[Init] Skipping - already fetching')
+        return
+      }
+      if (initFetchedForRef.current === fetchKey) {
+        console.log('[Init] Skipping - already fetched for this key')
+        return
+      }
+
+      initFetchingRef.current = true
+
       try {
         // Get brand ID
         const brandsResponse = await apiClient.listBrands(currentWorkspace.id)
@@ -339,11 +360,15 @@ export default function BrandTasksPage() {
         })
         setTasks(tasksResponse.tasks)
         setPagination(tasksResponse.pagination)
+
+        // Mark as fetched for this key
+        initFetchedForRef.current = fetchKey
       } catch (error: any) {
         console.error("Failed to initialize:", error)
         toast.error("Failed to load page data")
       } finally {
         setIsLoadingTasks(false)
+        initFetchingRef.current = false
       }
     }
 
@@ -376,13 +401,13 @@ export default function BrandTasksPage() {
 
         case "task.updated":
           console.log('[WebSocket] task.updated event:', event.data)
-          
+
           // Ignore WebSocket events for tasks that were just updated locally
           if (locallyUpdatedTasksRef.current.has(String(event.data.id))) {
             console.log('[WebSocket] Ignoring WebSocket event for locally updated task:', event.data.id)
             break
           }
-          
+
           // Update existing task - merge only changed fields to avoid overriding local updates
           setTasks((prev) => {
             const taskIndex = prev.findIndex((t) => String(t.id) === String(event.data.id))
@@ -390,24 +415,24 @@ export default function BrandTasksPage() {
               console.warn('[WebSocket] Task not found in state:', event.data.id)
               return prev
             }
-            
+
             const updatedTasks = [...prev]
             const currentTask = updatedTasks[taskIndex]
-            
+
             // Check if this is a checklist-only update (only checklistItems changed)
             // If checklistItems is present and other fields are not explicitly changed, preserve priority and attachments
             const hasChecklistUpdate = event.data.checklistItems !== undefined
-            const hasOtherUpdates = 
+            const hasOtherUpdates =
               event.data.title !== undefined ||
               event.data.description !== undefined ||
               event.data.status !== undefined ||
               event.data.dueDate !== undefined ||
               event.data.assignedTo !== undefined
-            
+
             // If this is a checklist-only update (checklistItems changed but no other fields), 
             // don't update priority even if it's present in the event data
             const isChecklistOnlyUpdate = hasChecklistUpdate && !hasOtherUpdates
-            
+
             // Merge only the fields that are present in the event data
             // For checklist-only updates, preserve priority and attachments
             updatedTasks[taskIndex] = {
@@ -429,44 +454,39 @@ export default function BrandTasksPage() {
               ...(event.data.assignedTo !== undefined && { assignedTo: event.data.assignedTo || [] }),
               ...(event.data.checklistItems !== undefined && { checklistItems: event.data.checklistItems || [] }),
             }
-            
+
             console.log('[WebSocket] Task updated from WebSocket:', {
               taskId: event.data.id,
               oldTitle: currentTask.title,
               newTitle: updatedTasks[taskIndex].title,
             })
-            
+
             return updatedTasks
           })
-          
+
           // Update selected task if it's the one being updated
           if (selectedTask && String(selectedTask.id) === String(event.data.id)) {
             console.log('[WebSocket] Updating selected task from WebSocket')
-            
+
             // Check if this is a checklist-only update
             const hasChecklistUpdate = event.data.checklistItems !== undefined
-            const hasOtherUpdates = 
+            const hasOtherUpdates =
               event.data.title !== undefined ||
               event.data.description !== undefined ||
               event.data.status !== undefined ||
               event.data.dueDate !== undefined ||
               event.data.assignedTo !== undefined
-            
+
             // If this is a checklist-only update (checklistItems changed but no other fields), 
             // don't update priority even if it's present in the event data
             const isChecklistOnlyUpdate = hasChecklistUpdate && !hasOtherUpdates
-            
+
             setSelectedTask((prev) => ({
               ...prev!,
               ...(event.data.title !== undefined && { title: event.data.title }),
               ...(event.data.description !== undefined && { description: event.data.description }),
               ...(event.data.status !== undefined && {
-                status: {
-                  id: event.data.status.id,
-                  label: event.data.status.label,
-                  color: event.data.status.color,
-                  group: event.data.status.group,
-                }
+                status: event.data.status.label
               }),
               // Don't update priority if this is a checklist-only update
               // Backend might send wrong priority value in checklist update events
@@ -539,7 +559,9 @@ export default function BrandTasksPage() {
         {/* Mobile Add Task Button */}
         <div className="sm:hidden ml-auto">
           <Button size="sm" onClick={() => {
-            // Handle new task
+            setSelectedTask(null)
+            setIsCreateMode(true)
+            setIsTaskModalOpen(true)
           }}>
             <IconPlus className="h-4 w-4" />
             {t("newTask")}
@@ -556,7 +578,9 @@ export default function BrandTasksPage() {
             onFilterChange={setFilterTab}
             onSearchChange={setSearchValue}
             onNewTask={() => {
-              // Handle new task
+              setSelectedTask(null)
+              setIsCreateMode(true)
+              setIsTaskModalOpen(true)
             }}
             searchPlaceholder={t("toolbar.searchPlaceholder")}
             newTaskLabel={t("newTask")}
@@ -626,46 +650,9 @@ export default function BrandTasksPage() {
             onLoadMore={loadMoreTableData}
             hasMore={pagination.page < pagination.totalPages}
             isLoading={isLoadingMore}
-            onTaskClick={async (task) => {
-              // Check cache first
-              const cached = taskDetailsCacheRef.current.get(task.id)
-              if (cached && Date.now() - cached.timestamp < 60000) { // Cache valid for 1 minute
-                setSelectedTask({
-                  ...task,
-                  checklistItems: cached.task.checklistItems,
-                } as BaseTask)
-                setIsTaskModalOpen(true)
-                return
-              }
-
-              // Prevent duplicate requests
-              if (taskDetailsLoadingRef.current.has(task.id)) {
-                return
-              }
-
-              // Fetch full task details including checklistItems
-              try {
-                taskDetailsLoadingRef.current.add(task.id)
-                const fullTask = await apiClient.getTask(currentWorkspace.id, String(task.id))
-                if (fullTask?.task) {
-                  // Cache the result
-                  taskDetailsCacheRef.current.set(task.id, {
-                    task: fullTask.task,
-                    timestamp: Date.now(),
-                  })
-                  setSelectedTask({
-                    ...task,
-                    checklistItems: fullTask.task.checklistItems,
-                  } as BaseTask)
-                } else {
-                  setSelectedTask(task)
-                }
-              } catch (error) {
-                console.error("Failed to fetch task details:", error)
-                setSelectedTask(task)
-              } finally {
-                taskDetailsLoadingRef.current.delete(task.id)
-              }
+            onTaskClick={(task) => {
+              // Just select the task and open modal - hook handles fetching
+              setSelectedTask(task)
               setIsTaskModalOpen(true)
             }}
           />
@@ -680,46 +667,9 @@ export default function BrandTasksPage() {
             onColumnCollapse={collapseColumn}
             draggingCardId={draggingCardId}
             setDraggingCardId={setDraggingCardId}
-            onTaskClick={async (task: KanbanTask) => {
-              // Check cache first
-              const cached = taskDetailsCacheRef.current.get(task.id)
-              if (cached && Date.now() - cached.timestamp < 60000) { // Cache valid for 1 minute
-                setSelectedTask({
-                  ...task,
-                  checklistItems: cached.task.checklistItems,
-                } as BaseTask)
-                setIsTaskModalOpen(true)
-                return
-              }
-
-              // Prevent duplicate requests
-              if (taskDetailsLoadingRef.current.has(task.id)) {
-                return
-              }
-
-              // Fetch full task details including checklistItems
-              try {
-                taskDetailsLoadingRef.current.add(task.id)
-                const fullTask = await apiClient.getTask(currentWorkspace.id, String(task.id))
-                if (fullTask?.task) {
-                  // Cache the result
-                  taskDetailsCacheRef.current.set(task.id, {
-                    task: fullTask.task,
-                    timestamp: Date.now(),
-                  })
-                  setSelectedTask({
-                    ...task,
-                    checklistItems: fullTask.task.checklistItems,
-                  } as BaseTask)
-                } else {
-                  setSelectedTask(task)
-                }
-              } catch (error) {
-                console.error("Failed to fetch task details:", error)
-                setSelectedTask(task)
-              } finally {
-                taskDetailsLoadingRef.current.delete(task.id)
-              }
+            onTaskClick={(task: KanbanTask) => {
+              // Just select the task and open modal - hook handles fetching
+              setSelectedTask(task)
               setIsTaskModalOpen(true)
             }}
           />
@@ -731,21 +681,55 @@ export default function BrandTasksPage() {
         <TaskDetailModal
           task={selectedTask}
           open={isTaskModalOpen}
-          onOpenChange={setIsTaskModalOpen}
+          onOpenChange={(open) => {
+            setIsTaskModalOpen(open)
+            if (!open) {
+              // Reset create mode when modal closes
+              setIsCreateMode(false)
+            }
+          }}
           workspaceId={currentWorkspace.id}
+          brandId={brandId || undefined}
           brandSlug={brandInfo?.slug}
           brandName={brandInfo?.name}
           brandLogoUrl={brandInfo?.logoUrl}
+          isCreateMode={isCreateMode}
+          onTaskCreate={(newTask) => {
+            // Add new task to list (prevent duplicates)
+            setTasks((prev) => {
+              // Check if task already exists
+              const exists = prev.some(t => String(t.id) === String(newTask.id))
+              if (exists) return prev
+
+              return [{
+                id: String(newTask.id),
+                taskNumber: newTask.taskNumber || 0,
+                title: newTask.title || '',
+                description: newTask.description || null,
+                priority: newTask.priority === 'High' ? 'HIGH' : newTask.priority === 'Low' ? 'LOW' : 'MEDIUM',
+                status: { id: '', label: newTask.status, color: null, group: 'TODO' as const },
+                dueDate: newTask.dueDate || null,
+                assigneeUserId: null,
+                assignedTo: [],
+                checklistItems: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }, ...prev]
+            })
+            // Update selected task with created task info
+            setSelectedTask(newTask as any)
+            setIsCreateMode(false)
+          }}
           onTaskUpdate={(taskId, updates) => {
             console.log('[TaskUpdate] Callback called:', { taskId, updates, currentTasksCount: tasks.length })
-            
+
             // Mark this task as locally updated to ignore WebSocket events for it
             locallyUpdatedTasksRef.current.add(String(taskId))
             // Clear the flag after a short delay to allow WebSocket events from other users
             setTimeout(() => {
               locallyUpdatedTasksRef.current.delete(String(taskId))
             }, 1000)
-            
+
             // Update local task state immediately
             setTasks((prevTasks) => {
               const taskIndex = prevTasks.findIndex((t) => String(t.id) === String(taskId))
@@ -753,23 +737,23 @@ export default function BrandTasksPage() {
                 console.warn('[TaskUpdate] Task not found in state:', taskId)
                 return prevTasks
               }
-              
+
               const updatedTasks = [...prevTasks]
               updatedTasks[taskIndex] = {
                 ...updatedTasks[taskIndex],
                 ...(updates.title && { title: updates.title }),
                 ...(updates.description !== undefined && { description: updates.description }),
               }
-              
+
               console.log('[TaskUpdate] Task updated:', {
                 taskId,
                 oldTitle: prevTasks[taskIndex].title,
                 newTitle: updatedTasks[taskIndex].title,
               })
-              
+
               return updatedTasks
             })
-            
+
             // Update selected task if it's the one being edited
             if (selectedTask && String(selectedTask.id) === String(taskId)) {
               console.log('[TaskUpdate] Updating selected task')

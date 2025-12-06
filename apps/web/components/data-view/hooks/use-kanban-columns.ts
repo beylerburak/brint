@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, createRef } from "react"
 import { KanbanTask } from "../types"
 
 export interface UseKanbanColumnsOptions {
@@ -20,12 +20,12 @@ export function useKanbanColumns({
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null)
 
   const columnRefs = useMemo(() => {
-    return {} as Record<string, React.RefObject<HTMLDivElement>>
+    return {} as Record<string, React.RefObject<HTMLDivElement | null>>
   }, [])
 
   const getColumnRef = (columnId: string) => {
     if (!columnRefs[columnId]) {
-      columnRefs[columnId] = { current: null }
+      columnRefs[columnId] = createRef<HTMLDivElement>()
     }
     return columnRefs[columnId]
   }

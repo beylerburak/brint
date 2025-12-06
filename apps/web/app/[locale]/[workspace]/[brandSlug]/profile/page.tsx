@@ -7,14 +7,14 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useTranslations } from "next-intl"
 import { motion, PanInfo } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { 
-  Tabs, 
-  TabsList, 
+import {
+  Tabs,
+  TabsList,
   TabsHighlight,
   TabsHighlightItem,
-  TabsTrigger, 
+  TabsTrigger,
   TabsContents,
-  TabsContent 
+  TabsContent
 } from "@/components/animate-ui/primitives/animate/tabs"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -52,12 +52,12 @@ import {
 import Cropper, { Area } from "react-easy-crop"
 import { toast } from "sonner"
 import { apiClient } from "@/lib/api-client"
-import type { 
-  BrandDetailDto, 
-  BrandProfileData, 
+import type {
+  BrandDetailDto,
+  BrandProfileData,
   BrandContactChannelDto,
   BrandContactType,
-  CreateBrandContactChannelInput 
+  CreateBrandContactChannelInput
 } from "@/lib/brand-types"
 import { formatDateShort, formatTimeShort, DateFormat, TimeFormat } from "@/lib/datetime"
 import {
@@ -69,6 +69,7 @@ import {
   ColorPickerHueSlider,
   ColorPickerInput,
 } from "@/components/ui/color-picker"
+import { MAX_AVATAR_SIZE_MB, MAX_AVATAR_SIZE_BYTES } from "@brint/shared-config/upload"
 
 // Country codes for phone input
 const countryCodes = [
@@ -266,7 +267,7 @@ const citiesByCountry: Record<string, string[]> = {
 const formatPhoneNumber = (value: string, countryCode: string): string => {
   // Remove all non-digits
   const digits = value.replace(/\D/g, '')
-  
+
   // Turkey format: 5XX XXX XX XX
   if (countryCode === '+90') {
     if (digits.length <= 3) return digits
@@ -274,14 +275,14 @@ const formatPhoneNumber = (value: string, countryCode: string): string => {
     if (digits.length <= 8) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
     return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`
   }
-  
+
   // US format: (XXX) XXX-XXXX
   if (countryCode === '+1') {
     if (digits.length <= 3) return digits
     if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
   }
-  
+
   // Generic format: XXX XXX XXXX
   if (digits.length <= 3) return digits
   if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`
@@ -327,7 +328,7 @@ export default function BrandProfilePage() {
   const isMobile = useIsMobile()
   const [brand, setBrand] = useState<BrandDetailDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
+
   // Contact channels state
   const [contactChannels, setContactChannels] = useState<BrandContactChannelDto[]>([])
   const [showAddContactDialog, setShowAddContactDialog] = useState(false)
@@ -342,14 +343,14 @@ export default function BrandProfilePage() {
   })
   const [isContactSaving, setIsContactSaving] = useState(false)
   const [contactEmailError, setContactEmailError] = useState<string | null>(null)
-  
+
   // Profile edit state
   const [isProfileSaving, setIsProfileSaving] = useState(false)
-  
+
   // Edit dialog states
   const [showIdentityDialog, setShowIdentityDialog] = useState(false)
   const [identityForm, setIdentityForm] = useState({ tagline: '', mission: '', vision: '' })
-  
+
   const [showQuickFactsDialog, setShowQuickFactsDialog] = useState(false)
   const [showQuickFactsInfo, setShowQuickFactsInfo] = useState(false)
   const [showIdentityInfo, setShowIdentityInfo] = useState(false)
@@ -371,14 +372,14 @@ export default function BrandProfilePage() {
       sunday: { isOpen: false, startTime: '', endTime: '' },
     },
   })
-  
+
   const [showBusinessOverviewDialog, setShowBusinessOverviewDialog] = useState(false)
   const [businessOverviewForm, setBusinessOverviewForm] = useState({
     businessType: '' as 'Service' | 'Product' | 'Both' | '',
     marketType: '' as 'B2B' | 'B2C' | 'B2B2C' | '',
     deliveryModel: '',
   })
-  
+
   const [showCoreOfferingsDialog, setShowCoreOfferingsDialog] = useState(false)
   const [coreOfferingsForm, setCoreOfferingsForm] = useState({
     coreServices: [] as string[],
@@ -386,7 +387,7 @@ export default function BrandProfilePage() {
     newService: '',
     newProduct: '',
   })
-  
+
   const [showSalesChannelsDialog, setShowSalesChannelsDialog] = useState(false)
   const [salesChannelsForm, setSalesChannelsForm] = useState({
     salesChannels: [] as string[],
@@ -394,7 +395,7 @@ export default function BrandProfilePage() {
     newChannel: '',
     newType: '',
   })
-  
+
   const [showServiceRegionsDialog, setShowServiceRegionsDialog] = useState(false)
   const [serviceRegionsForm, setServiceRegionsForm] = useState({
     structureType: '' as 'Single-location' | 'Multi-branch' | 'Franchise' | 'Online-only' | '',
@@ -408,13 +409,13 @@ export default function BrandProfilePage() {
   const [countryOpen, setCountryOpen] = useState(false)
   const [cityOpen, setCityOpen] = useState(false)
   const [isLoadingCities, setIsLoadingCities] = useState(false)
-  
+
   // Business dialog info states
   const [showBusinessOverviewInfo, setShowBusinessOverviewInfo] = useState(false)
   const [showCoreOfferingsInfo, setShowCoreOfferingsInfo] = useState(false)
   const [showSalesChannelsInfo, setShowSalesChannelsInfo] = useState(false)
   const [showServiceRegionsInfo, setShowServiceRegionsInfo] = useState(false)
-  
+
   // Audience edit states
   const [showPersonaDialog, setShowPersonaDialog] = useState(false)
   const [showPersonaInfo, setShowPersonaInfo] = useState(false)
@@ -427,7 +428,7 @@ export default function BrandProfilePage() {
     painPoints: [] as string[],
     newPainPoint: '',
   })
-  
+
   const [showPositioningDialog, setShowPositioningDialog] = useState(false)
   const [showPositioningInfo, setShowPositioningInfo] = useState(false)
   const [positioningForm, setPositioningForm] = useState({
@@ -435,7 +436,7 @@ export default function BrandProfilePage() {
     usps: [] as string[],
     newUsp: '',
   })
-  
+
   const [showCompetitorDialog, setShowCompetitorDialog] = useState(false)
   const [showCompetitorInfo, setShowCompetitorInfo] = useState(false)
   const [editingCompetitor, setEditingCompetitor] = useState<string | null>(null)
@@ -443,7 +444,7 @@ export default function BrandProfilePage() {
     name: '',
     note: '',
   })
-  
+
   // Voice edit states
   const [showToneDialog, setShowToneDialog] = useState(false)
   const [showToneInfo, setShowToneInfo] = useState(false)
@@ -453,21 +454,21 @@ export default function BrandProfilePage() {
     simpleComplex: 0.5,
     warmNeutral: 0.5,
   })
-  
+
   const [showDoSayDialog, setShowDoSayDialog] = useState(false)
   const [showDoSayInfo, setShowDoSayInfo] = useState(false)
   const [doSayForm, setDoSayForm] = useState({
     doSay: [] as string[],
     newPhrase: '',
   })
-  
+
   const [showDontSayDialog, setShowDontSayDialog] = useState(false)
   const [showDontSayInfo, setShowDontSayInfo] = useState(false)
   const [dontSayForm, setDontSayForm] = useState({
     dontSay: [] as string[],
     newPhrase: '',
   })
-  
+
   // Rules edit states
   const [showAllowedTopicsDialog, setShowAllowedTopicsDialog] = useState(false)
   const [showAllowedTopicsInfo, setShowAllowedTopicsInfo] = useState(false)
@@ -475,7 +476,7 @@ export default function BrandProfilePage() {
     topics: [] as string[],
     newTopic: '',
   })
-  
+
   const [showForbiddenTopicsDialog, setShowForbiddenTopicsDialog] = useState(false)
   const [showForbiddenTopicsInfo, setShowForbiddenTopicsInfo] = useState(false)
   const [forbiddenTopicsForm, setForbiddenTopicsForm] = useState({
@@ -484,7 +485,7 @@ export default function BrandProfilePage() {
     crisisGuidelines: [] as string[],
     newGuideline: '',
   })
-  
+
   const [showLegalConstraintDialog, setShowLegalConstraintDialog] = useState(false)
   const [showLegalConstraintInfo, setShowLegalConstraintInfo] = useState(false)
   const [editingLegalConstraint, setEditingLegalConstraint] = useState<string | null>(null)
@@ -492,7 +493,7 @@ export default function BrandProfilePage() {
     title: '',
     description: '',
   })
-  
+
   // Assets edit states
   const [showBrandColorsDialog, setShowBrandColorsDialog] = useState(false)
   const [showBrandColorsInfo, setShowBrandColorsInfo] = useState(false)
@@ -502,14 +503,14 @@ export default function BrandProfilePage() {
     newPrimary: '#3b82f6',
     newAccent: '#10b981',
   })
-  
+
   const [showVisualGuidelinesDialog, setShowVisualGuidelinesDialog] = useState(false)
   const [showVisualGuidelinesInfo, setShowVisualGuidelinesInfo] = useState(false)
   const [visualGuidelinesForm, setVisualGuidelinesForm] = useState({
     guidelines: [] as string[],
     newGuideline: '',
   })
-  
+
   const [showAiConfigDialog, setShowAiConfigDialog] = useState(false)
   const [showAiConfigInfo, setShowAiConfigInfo] = useState(false)
   const [aiConfigForm, setAiConfigForm] = useState({
@@ -521,7 +522,7 @@ export default function BrandProfilePage() {
     preferredPlatforms: [] as string[],
     newPlatform: '',
   })
-  
+
   // Avatar upload states
   const [showCropDialog, setShowCropDialog] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -538,7 +539,7 @@ export default function BrandProfilePage() {
 
   // Tab order for swipe navigation
   const tabOrder = ["overview", "business", "audience", "voice", "rules", "assets"]
-  
+
   const handleSwipe = (direction: 'left' | 'right') => {
     const currentIndex = tabOrder.indexOf(activeTab)
     if (direction === 'left' && currentIndex < tabOrder.length - 1) {
@@ -552,7 +553,7 @@ export default function BrandProfilePage() {
   const profile = brand?.profile?.data ?? {} as BrandProfileData
   const optimizationScore = brand?.profile?.optimizationScore ?? null
   const optimizationScoreUpdatedAt = brand?.profile?.optimizationScoreUpdatedAt
-  
+
   // Profile sections
   const identity = profile.identity ?? {}
   const quickFacts = profile.quickFacts ?? {}
@@ -573,7 +574,7 @@ export default function BrandProfilePage() {
         // First get brand list to find brand ID by slug
         const listResponse = await apiClient.listBrands(currentWorkspace.id)
         const foundBrandBasic = listResponse.brands.find((b) => b.slug === brandSlug)
-        
+
         if (!foundBrandBasic) {
           console.error('Brand not found')
           setIsLoading(false)
@@ -608,14 +609,14 @@ export default function BrandProfilePage() {
   // Refresh optimization score handler
   const handleRefreshOptimizationScore = async () => {
     if (!currentWorkspace?.id || !brand?.id) return
-    
+
     setIsRefreshingScore(true)
     try {
       const response = await apiClient.refreshBrandOptimizationScore(
         currentWorkspace.id,
         brand.id
       )
-      
+
       // Update local state with new score
       setBrand(prev => prev ? {
         ...prev,
@@ -625,7 +626,7 @@ export default function BrandProfilePage() {
           optimizationScoreUpdatedAt: new Date().toISOString(),
         } : null
       } : null)
-      
+
       toast.success(`Optimization score updated: ${response.optimizationScore.score}%`)
     } catch (error) {
       console.error('Failed to refresh optimization score:', error)
@@ -652,11 +653,11 @@ export default function BrandProfilePage() {
 
   const handleEditContact = (contact: BrandContactChannelDto) => {
     setEditingContact(contact)
-    
+
     // Parse phone number if type is PHONE or WHATSAPP
     let countryCode = '+90'
     let phoneNumber = contact.value
-    
+
     if (contact.type === 'PHONE' || contact.type === 'WHATSAPP') {
       // Try to extract country code
       const foundCode = countryCodes.find(c => contact.value.startsWith(c.code))
@@ -665,13 +666,13 @@ export default function BrandProfilePage() {
         phoneNumber = contact.value.slice(foundCode.code.length).trim()
       }
     }
-    
+
     // For website, remove https://
     let value = contact.value
     if (contact.type === 'WEBSITE') {
       value = formatWebsiteUrl(contact.value)
     }
-    
+
     setContactForm({
       type: contact.type,
       label: contact.label ?? '',
@@ -685,8 +686,8 @@ export default function BrandProfilePage() {
   }
 
   const handleContactTypeChange = (type: BrandContactType) => {
-    setContactForm(prev => ({ 
-      ...prev, 
+    setContactForm(prev => ({
+      ...prev,
       type,
       value: '',
       phoneNumber: '',
@@ -743,7 +744,7 @@ export default function BrandProfilePage() {
   const handleSaveContact = async () => {
     if (!currentWorkspace?.id || !brand?.id) return
     if (!isContactFormValid()) return
-    
+
     setIsContactSaving(true)
     try {
       const submitData: CreateBrandContactChannelInput = {
@@ -752,7 +753,7 @@ export default function BrandProfilePage() {
         value: getContactSubmitValue(),
         isPrimary: contactForm.isPrimary,
       }
-      
+
       if (editingContact) {
         // Update existing
         const response = await apiClient.updateBrandContactChannel(
@@ -761,7 +762,7 @@ export default function BrandProfilePage() {
           editingContact.id,
           submitData
         )
-        setContactChannels(prev => 
+        setContactChannels(prev =>
           prev.map(ch => ch.id === editingContact.id ? response.contactChannel : ch)
         )
         toast.success('Contact channel updated')
@@ -786,7 +787,7 @@ export default function BrandProfilePage() {
 
   const handleDeleteContact = async (channelId: string) => {
     if (!currentWorkspace?.id || !brand?.id) return
-    
+
     try {
       await apiClient.deleteBrandContactChannel(currentWorkspace.id, brand.id, channelId)
       setContactChannels(prev => prev.filter(ch => ch.id !== channelId))
@@ -800,7 +801,7 @@ export default function BrandProfilePage() {
   // Profile save handler
   const handleSaveProfile = async (updatedProfile: BrandProfileData) => {
     if (!currentWorkspace?.id || !brand?.id) return
-    
+
     setIsProfileSaving(true)
     try {
       const response = await apiClient.updateBrandProfile(
@@ -811,13 +812,13 @@ export default function BrandProfilePage() {
           optimizationScore: brand.profile?.optimizationScore,
         }
       )
-      
+
       // Update local state
       setBrand(prev => prev ? {
         ...prev,
         profile: response.profile
       } : null)
-      
+
       toast.success('Brand profile updated successfully')
       return true
     } catch (error) {
@@ -867,11 +868,11 @@ export default function BrandProfilePage() {
   }): string => {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    
+
     // Group consecutive days with same hours
     const groups: { days: string[]; hours: string }[] = []
     let currentGroup: { days: string[]; hours: string } | null = null
-    
+
     days.forEach((day, idx) => {
       const dayData = detail[day]
       if (dayData?.isOpen && dayData.startTime && dayData.endTime) {
@@ -886,10 +887,10 @@ export default function BrandProfilePage() {
         currentGroup = null
       }
     })
-    
+
     // Format groups
     return groups.map(group => {
-      const daysStr = group.days.length > 1 
+      const daysStr = group.days.length > 1
         ? `${group.days[0]}-${group.days[group.days.length - 1]}`
         : group.days[0]
       return `${daysStr} ${group.hours}`
@@ -907,7 +908,7 @@ export default function BrandProfilePage() {
       saturday: { isOpen: false, startTime: '', endTime: '' },
       sunday: { isOpen: false, startTime: '', endTime: '' },
     }
-    
+
     setQuickFactsForm({
       primaryLocale: brand?.primaryLocale || '',
       timezone: brand?.timezone || '',
@@ -930,23 +931,23 @@ export default function BrandProfilePage() {
 
   const handleSaveQuickFacts = async () => {
     if (!currentWorkspace?.id || !brand?.id) return
-    
+
     setIsProfileSaving(true)
     try {
       // Update brand basic info (timezone, locale, industry)
-      if (quickFactsForm.primaryLocale !== brand.primaryLocale || 
-          quickFactsForm.timezone !== brand.timezone ||
-          quickFactsForm.industry !== brand.industry) {
+      if (quickFactsForm.primaryLocale !== brand.primaryLocale ||
+        quickFactsForm.timezone !== brand.timezone ||
+        quickFactsForm.industry !== brand.industry) {
         await apiClient.updateBrand(currentWorkspace.id, brand.id, {
           primaryLocale: quickFactsForm.primaryLocale || null,
           timezone: quickFactsForm.timezone || null,
           industry: quickFactsForm.industry || null,
         })
       }
-      
+
       // Generate summary
       const summary = generateWorkingHoursSummary(quickFactsForm.workingHoursDetail)
-      
+
       // Update profile
       const updatedProfile: BrandProfileData = {
         ...profile,
@@ -956,7 +957,7 @@ export default function BrandProfilePage() {
           workingHoursDetail: quickFactsForm.workingHoursDetail,
         },
       }
-      
+
       const response = await apiClient.updateBrandProfile(
         currentWorkspace.id,
         brand.id,
@@ -965,7 +966,7 @@ export default function BrandProfilePage() {
           optimizationScore: brand.profile?.optimizationScore,
         }
       )
-      
+
       // Update local state
       setBrand(prev => prev ? {
         ...prev,
@@ -974,7 +975,7 @@ export default function BrandProfilePage() {
         industry: quickFactsForm.industry || null,
         profile: response.profile,
       } : null)
-      
+
       toast.success('Quick Facts updated successfully')
       setShowQuickFactsDialog(false)
     } catch (error) {
@@ -1137,7 +1138,7 @@ export default function BrandProfilePage() {
     const hqParts = (businessProfile.hqLocation || '').split(', ')
     const hqCity = hqParts[0] || ''
     const hqCountry = hqParts[1] || ''
-    
+
     setServiceRegionsForm({
       structureType: businessProfile.structureType || '',
       hqCountry,
@@ -1145,22 +1146,22 @@ export default function BrandProfilePage() {
       serviceRegions: [...(businessProfile.serviceRegions || [])],
       newRegion: '',
     })
-    
+
     // Load cities if country is selected
     if (hqCountry) {
       setCities(citiesByCountry[hqCountry] || [])
     } else {
       setCities([])
     }
-    
+
     setCountryOpen(false)
     setCityOpen(false)
     setShowServiceRegionsDialog(true)
   }
 
   const handleCountryChange = (countryCode: string) => {
-    setServiceRegionsForm(prev => ({ 
-      ...prev, 
+    setServiceRegionsForm(prev => ({
+      ...prev,
       hqCountry: countryCode,
       hqCity: '', // Reset city when country changes
     }))
@@ -1190,7 +1191,7 @@ export default function BrandProfilePage() {
     const hqLocation = serviceRegionsForm.hqCity && serviceRegionsForm.hqCountry
       ? `${serviceRegionsForm.hqCity}, ${serviceRegionsForm.hqCountry}`
       : null
-    
+
     const updatedProfile: BrandProfileData = {
       ...profile,
       business: {
@@ -1213,7 +1214,7 @@ export default function BrandProfilePage() {
       const ageParts = (persona.ageRange || '').split('-')
       const ageStart = ageParts[0]?.trim() || ''
       const ageEnd = ageParts[1]?.trim() || ''
-      
+
       setEditingPersona(persona.id)
       setPersonaForm({
         name: persona.name || '',
@@ -1259,14 +1260,14 @@ export default function BrandProfilePage() {
       toast.error('Persona name is required')
       return
     }
-    
+
     // Build age range string: "28-45" or just "28" if only start is set
     const ageRange = personaForm.ageStart && personaForm.ageEnd
       ? `${personaForm.ageStart}-${personaForm.ageEnd}`
       : personaForm.ageStart || personaForm.ageEnd || undefined
-    
+
     const personas = [...(audience.personas || [])]
-    
+
     if (editingPersona) {
       // Update existing
       const idx = personas.findIndex(p => p.id === editingPersona)
@@ -1289,7 +1290,7 @@ export default function BrandProfilePage() {
         painPoints: personaForm.painPoints,
       })
     }
-    
+
     const updatedProfile: BrandProfileData = {
       ...profile,
       audience: {
@@ -1297,7 +1298,7 @@ export default function BrandProfilePage() {
         personas,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowPersonaDialog(false)
@@ -1355,7 +1356,7 @@ export default function BrandProfilePage() {
         },
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowPositioningDialog(false)
@@ -1385,9 +1386,9 @@ export default function BrandProfilePage() {
       toast.error('Competitor name is required')
       return
     }
-    
+
     const competitors = [...(audience.positioning?.competitors || [])]
-    
+
     if (editingCompetitor) {
       // Update existing
       const idx = competitors.findIndex(c => c.id === editingCompetitor)
@@ -1406,7 +1407,7 @@ export default function BrandProfilePage() {
         note: competitorForm.note || undefined,
       })
     }
-    
+
     const updatedProfile: BrandProfileData = {
       ...profile,
       audience: {
@@ -1417,7 +1418,7 @@ export default function BrandProfilePage() {
         },
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowCompetitorDialog(false)
@@ -1463,7 +1464,7 @@ export default function BrandProfilePage() {
         },
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowToneDialog(false)
@@ -1504,7 +1505,7 @@ export default function BrandProfilePage() {
         doSay: doSayForm.doSay,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowDoSayDialog(false)
@@ -1545,7 +1546,7 @@ export default function BrandProfilePage() {
         dontSay: dontSayForm.dontSay,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowDontSayDialog(false)
@@ -1586,7 +1587,7 @@ export default function BrandProfilePage() {
         allowedTopics: allowedTopicsForm.topics,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowAllowedTopicsDialog(false)
@@ -1647,7 +1648,7 @@ export default function BrandProfilePage() {
         crisisGuidelines: forbiddenTopicsForm.crisisGuidelines,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowForbiddenTopicsDialog(false)
@@ -1677,9 +1678,9 @@ export default function BrandProfilePage() {
       toast.error('Title is required')
       return
     }
-    
+
     const legalConstraints = [...(rules.legalConstraints || [])]
-    
+
     if (editingLegalConstraint) {
       // Update existing
       const idx = legalConstraints.findIndex(c => c.id === editingLegalConstraint)
@@ -1698,7 +1699,7 @@ export default function BrandProfilePage() {
         description: legalConstraintForm.description,
       })
     }
-    
+
     const updatedProfile: BrandProfileData = {
       ...profile,
       rules: {
@@ -1706,7 +1707,7 @@ export default function BrandProfilePage() {
         legalConstraints,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowLegalConstraintDialog(false)
@@ -1779,7 +1780,7 @@ export default function BrandProfilePage() {
         },
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowBrandColorsDialog(false)
@@ -1820,7 +1821,7 @@ export default function BrandProfilePage() {
         visualGuidelines: visualGuidelinesForm.guidelines,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowVisualGuidelinesDialog(false)
@@ -1872,7 +1873,7 @@ export default function BrandProfilePage() {
         preferredPlatforms: aiConfigForm.preferredPlatforms,
       },
     }
-    
+
     const success = await handleSaveProfile(updatedProfile)
     if (success) {
       setShowAiConfigDialog(false)
@@ -1886,8 +1887,8 @@ export default function BrandProfilePage() {
         toast.error('Please select an image file')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image size should be less than 5MB')
+      if (file.size > MAX_AVATAR_SIZE_BYTES) {
+        toast.error(`Image size should be less than ${MAX_AVATAR_SIZE_MB}MB`)
         return
       }
       const reader = new FileReader()
@@ -1973,12 +1974,12 @@ export default function BrandProfilePage() {
       // Immediately show blob preview
       const blobUrl = URL.createObjectURL(croppedBlob)
       setPreviewLogoUrl(blobUrl)
-      
+
       // Notify brand-switcher and header to update logo preview
       window.dispatchEvent(new CustomEvent('brand-logo-preview', {
         detail: { brandId: brand.id, previewUrl: blobUrl }
       }))
-      
+
       // Close dialog and reset states
       setShowCropDialog(false)
       setSelectedImage(null)
@@ -2025,11 +2026,11 @@ export default function BrandProfilePage() {
 
       const uploadData = await uploadResponse.json()
       console.log('Upload response:', uploadData)
-      
+
       if (!uploadData.success || !uploadData.media?.id) {
         throw new Error('Invalid upload response')
       }
-      
+
       const mediaId = uploadData.media.id
 
       // Update brand with new logo
@@ -2071,7 +2072,7 @@ export default function BrandProfilePage() {
       }
 
       toast.success('Brand logo updated successfully')
-      
+
       // Note: Blob preview will stay until page refresh
       // This gives instant feedback. Real S3 URL will load on next page visit.
     } catch (error) {
@@ -2112,8 +2113,8 @@ export default function BrandProfilePage() {
           {/* Avatar with edit button */}
           <div className="relative">
             <Avatar className="h-20 w-20 rounded-full">
-              <AvatarImage 
-                src={previewLogoUrl || brand.logoUrl || undefined} 
+              <AvatarImage
+                src={previewLogoUrl || brand.logoUrl || undefined}
                 alt={brand.name}
                 key={previewLogoUrl || brand.logoUrl || 'fallback'}
               />
@@ -2128,9 +2129,9 @@ export default function BrandProfilePage() {
               className="hidden"
               onChange={handleFileSelect}
             />
-            <Button 
-              variant="secondary" 
-              size="icon" 
+            <Button
+              variant="secondary"
+              size="icon"
               className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full shadow-sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
@@ -2162,54 +2163,54 @@ export default function BrandProfilePage() {
         <div className="flex items-start justify-between gap-2 md:gap-4">
           <div className="flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1 min-w-max">
-            <TabsHighlight className="bg-background shadow-sm rounded-md">
-              <TabsHighlightItem value="overview">
-                <TabsTrigger value="overview" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconLayoutDashboard className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "overview") && <span>{t('brandProfile.tabs.overview')}</span>}
-                </TabsTrigger>
-              </TabsHighlightItem>
-              
-              <TabsHighlightItem value="business">
-                <TabsTrigger value="business" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconBriefcase className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "business") && <span>{t('brandProfile.tabs.business')}</span>}
-                </TabsTrigger>
-              </TabsHighlightItem>
-              
-              <TabsHighlightItem value="audience">
-                <TabsTrigger value="audience" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconUsers className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "audience") && <span>{t('brandProfile.tabs.audience')}</span>}
-                </TabsTrigger>
-              </TabsHighlightItem>
-              
-              <TabsHighlightItem value="voice">
-                <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconMessageCircle className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "voice") && <span>{t('brandProfile.tabs.voice')}</span>}
-            </TabsTrigger>
-              </TabsHighlightItem>
-              
-              <TabsHighlightItem value="rules">
-                <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconShieldCheck className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "rules") && <span>{t('brandProfile.tabs.rules')}</span>}
-            </TabsTrigger>
-              </TabsHighlightItem>
-              
-              <TabsHighlightItem value="assets">
-                <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
-                  <IconPalette className="h-4 w-4 shrink-0" />
-                  {(!isMobile || activeTab === "assets") && <span>{t('brandProfile.tabs.assets')}</span>}
-            </TabsTrigger>
-              </TabsHighlightItem>
-            </TabsHighlight>
-          </TabsList>
+              <TabsHighlight className="bg-background shadow-sm rounded-md">
+                <TabsHighlightItem value="overview">
+                  <TabsTrigger value="overview" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconLayoutDashboard className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "overview") && <span>{t('brandProfile.tabs.overview')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+
+                <TabsHighlightItem value="business">
+                  <TabsTrigger value="business" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconBriefcase className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "business") && <span>{t('brandProfile.tabs.business')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+
+                <TabsHighlightItem value="audience">
+                  <TabsTrigger value="audience" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconUsers className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "audience") && <span>{t('brandProfile.tabs.audience')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+
+                <TabsHighlightItem value="voice">
+                  <TabsTrigger value="voice" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconMessageCircle className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "voice") && <span>{t('brandProfile.tabs.voice')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+
+                <TabsHighlightItem value="rules">
+                  <TabsTrigger value="rules" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconShieldCheck className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "rules") && <span>{t('brandProfile.tabs.rules')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+
+                <TabsHighlightItem value="assets">
+                  <TabsTrigger value="assets" className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground md:gap-2 md:px-3">
+                    <IconPalette className="h-4 w-4 shrink-0" />
+                    {(!isMobile || activeTab === "assets") && <span>{t('brandProfile.tabs.assets')}</span>}
+                  </TabsTrigger>
+                </TabsHighlightItem>
+              </TabsHighlight>
+            </TabsList>
           </div>
         </div>
 
-        <motion.div 
+        <motion.div
           className="mt-4"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -2223,973 +2224,973 @@ export default function BrandProfilePage() {
             }
           }}
         >
-        <TabsContents>
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
-            {/* Optimization Score - Outer Container */}
-            <div className="relative rounded-3xl bg-gradient-to-br from-white/80 via-purple-50/30 to-white/80 dark:from-background dark:via-purple-950/10 dark:to-background p-2 pb-4 shadow-sm">
-              {/* Purple glow effect at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-purple-500/10 to-transparent rounded-b-2xl pointer-events-none" />
-              
-              {/* Inner Card */}
-              <Card className="relative bg-background/60 backdrop-blur-sm border-0 shadow-md">
-                <CardContent className="px-6 py-4">
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold">{t('brandProfile.overview.optimizationScore')}</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={handleRefreshOptimizationScore}
-                          disabled={isRefreshingScore}
-                        >
-                          <IconSparkles className={`h-4 w-4 ${isRefreshingScore ? 'animate-spin' : ''}`} />
-                        </Button>
-                      </div>
-                      <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-                        {optimizationScore !== null ? (
-                          <>
-                            <CountingNumber 
-                              number={optimizationScore} 
-                              delay={0.3}
-                              transition={{ stiffness: 100, damping: 30 }}
-                            />
-                            %
-                          </>
-                        ) : (
-                            <span className="text-muted-foreground text-lg">{t('brandProfile.overview.notCalculated')}</span>
-                        )}
-                      </div>
-                    </div>
+          <TabsContents>
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="space-y-4">
+              {/* Optimization Score - Outer Container */}
+              <div className="relative rounded-3xl bg-gradient-to-br from-white/80 via-purple-50/30 to-white/80 dark:from-background dark:via-purple-950/10 dark:to-background p-2 pb-4 shadow-sm">
+                {/* Purple glow effect at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-purple-500/10 to-transparent rounded-b-2xl pointer-events-none" />
 
-                    {/* Progress Bar */}
+                {/* Inner Card */}
+                <Card className="relative bg-background/60 backdrop-blur-sm border-0 shadow-md">
+                  <CardContent className="px-6 py-4">
                     <div className="space-y-2">
-                      <div className="relative h-3 w-full">
-                        {/* Progress bar container with overflow hidden */}
-                        <div className="absolute inset-0 rounded-full overflow-hidden">
-                          {/* Animated gradient bar */}
-                          <div 
-                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 transition-all duration-1000 ease-out"
-                            style={{ width: `${progressValue}%` }}
-                          />
-                          
-                          {/* Dotted remaining portion - responsive */}
-                          <div 
-                            className="absolute inset-y-0 left-0 right-0 rounded-full flex items-center justify-start gap-1 px-2 overflow-hidden transition-all duration-1000"
-                            style={{ paddingLeft: `calc(${progressValue}% + 8px)` }}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold">{t('brandProfile.overview.optimizationScore')}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={handleRefreshOptimizationScore}
+                            disabled={isRefreshingScore}
                           >
-                            {Array.from({ length: 100 }).map((_, i) => (
-                              <div key={i} className="w-0.5 h-2 bg-muted-foreground/20 rounded-full flex-shrink-0" />
-                            ))}
-                          </div>
+                            <IconSparkles className={`h-4 w-4 ${isRefreshingScore ? 'animate-spin' : ''}`} />
+                          </Button>
                         </div>
-                        
-                        {/* Circular indicator at the end - outside overflow container */}
-                        <div 
-                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white shadow-lg flex items-center justify-center z-10 transition-all duration-1000 ease-out border border-muted-foreground/10"
-                          style={{ 
-                            left: `${progressValue}%`,
-                            opacity: progressValue > 0 ? 1 : 0,
-                            scale: progressValue > 0 ? 1 : 0.5
-                          }}
-                        >
-                          <div className="w-3 h-3 rounded-full bg-red-500" />
+                        <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                          {optimizationScore !== null ? (
+                            <>
+                              <CountingNumber
+                                number={optimizationScore}
+                                delay={0.3}
+                                transition={{ stiffness: 100, damping: 30 }}
+                              />
+                              %
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground text-lg">{t('brandProfile.overview.notCalculated')}</span>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              {/* Footer - Outside the inner card */}
-              <div className="relative flex items-center justify-between text-sm mt-4 px-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span>{t('brandProfile.overview.lastUpdate')}</span>
-                  {optimizationScoreUpdatedAt ? (
-                    <>
-                      <span className="text-orange-500 font-medium">
-                        {formatDateShort(optimizationScoreUpdatedAt, user?.locale || 'en-US')}
-                      </span>
-                      <span className="text-purple-500">
-                        {t('brandProfile.overview.at')} {formatTimeShort(optimizationScoreUpdatedAt, user?.timeFormat === 'H12' ? TimeFormat.H12 : TimeFormat.H24)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>
-                  )}
-                </div>
-                {optimizationScore !== null && (
-                  <Badge 
-                    variant="secondary" 
-                    className={
-                      optimizationScore >= 80 
-                        ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900"
-                        : optimizationScore >= 50 
-                          ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"
-                          : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900"
-                    }
-                  >
-                    {optimizationScore >= 80 ? t('brandProfile.overview.healthy') : optimizationScore >= 50 ? t('brandProfile.overview.needsWork') : t('brandProfile.overview.atRisk')}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Brand Identity Section */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.overview.brandIdentity')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenIdentityDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.tagline')}</p>
-                    <p className="text-sm">
-                      {identity.tagline || brand.description || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.mission')}</p>
-                    <p className="text-sm">
-                      {identity.mission || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.vision')}</p>
-                    <p className="text-sm">
-                      {identity.vision || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Contact & Quick Facts Row */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.overview.contactChannels')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleAddContact}>
-                    <IconPlus className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {contactChannels.length === 0 ? (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-muted-foreground mb-3">{t('brandProfile.overview.noContactsYet')}</p>
-                      <Button variant="outline" size="sm" onClick={handleAddContact}>
-                        <IconPlus className="h-4 w-4" />
-                        {t('brandProfile.overview.addContact')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {contactChannels.map((channel) => {
-                        const IconComponent = contactTypeIcons[channel.type]
-                        return (
-                          <div 
-                            key={channel.id} 
-                            className="flex items-center justify-between text-sm group hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                                <IconComponent className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              {channel.type === 'WEBSITE' ? (
-                                <a 
-                                  href={channel.value.startsWith('http') ? channel.value : `https://${channel.value}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline"
-                                >
-                                  {channel.value}
-                                </a>
-                              ) : (
-                                <span>{channel.value}</span>
-                              )}
-                              {channel.isPrimary && (
-                                <Badge variant="outline" className="text-xs">{t('brandProfile.overview.primary')}</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {channel.label && (
-                                <Badge variant="secondary" className="text-xs">{channel.label}</Badge>
-                              )}
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6"
-                                  onClick={() => handleEditContact(channel)}
-                                >
-                                  <IconPencil className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6 text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteContact(channel.id)}
-                                >
-                                  <IconTrash className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.overview.quickFacts')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenQuickFactsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.overview.primaryLanguage')}</span>
-                      <span className="font-medium">{brand.primaryLocale || t('brandProfile.overview.notSet')}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.overview.timezone')}</span>
-                      <span className="font-medium">{brand.timezone || t('brandProfile.overview.notSet')}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.overview.industry')}</span>
-                      <span className="font-medium capitalize">{brand.industry || t('brandProfile.overview.notSet')}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.overview.location')}</span>
-                      <span className="font-medium">
-                        {brand.city && brand.country 
-                          ? `${brand.city}, ${brand.country}` 
-                          : t('brandProfile.overview.notSet')}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.overview.workingHours')}</span>
-                      <span className="font-medium">{quickFacts.workingHours || t('brandProfile.overview.notSet')}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Business & Offering Tab */}
-          <TabsContent value="business" className="space-y-4">
-            {/* Business Overview */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.business.businessOverview')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBusinessOverviewDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3 text-sm">
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">{t('brandProfile.business.businessType')}</div>
-                    <div className="font-medium">{businessProfile.businessType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">{t('brandProfile.business.marketType')}</div>
-                    <div className="font-medium">{businessProfile.marketType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">{t('brandProfile.business.deliveryModel')}</div>
-                    <div className="font-medium">{businessProfile.deliveryModel || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Core Offerings */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.business.coreOfferings')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenCoreOfferingsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2 text-sm">
-                  <div>
-                    <div className="mb-3 text-xs font-medium text-muted-foreground">
-                      {t('brandProfile.business.coreServices')}
-                    </div>
-                    {(businessProfile.coreServices ?? []).length > 0 ? (
-                      <ul className="space-y-2">
-                        {(businessProfile.coreServices ?? []).map((item, idx) => (
-                          <li key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
-                            <div className="flex items-center gap-2">
-                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                              <span>{item}</span>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <IconX className="h-3 w-3" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        {t('brandProfile.business.noServicesYet')}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <div className="mb-3 text-xs font-medium text-muted-foreground">
-                      {t('brandProfile.business.coreProducts')}
-                    </div>
-                    {(businessProfile.coreProducts ?? []).length > 0 ? (
-                      <ul className="space-y-2">
-                        {(businessProfile.coreProducts ?? []).map((item, idx) => (
-                          <li key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
-                            <div className="flex items-center gap-2">
-                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                              <span>{item}</span>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <IconX className="h-3 w-3" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        {t('brandProfile.business.noProductsYet')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Sales & Service Channels */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.business.salesAndService')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenSalesChannelsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2 text-sm">
-                  <div>
-                    <div className="mb-3 text-xs font-medium text-muted-foreground">
-                      {t('brandProfile.business.salesChannels')}
-                    </div>
-                    {(businessProfile.salesChannels ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(businessProfile.salesChannels ?? []).map((item, idx) => (
-                          <Badge key={idx} variant="secondary" className="gap-1 pr-1">
-                            {item}
-                            <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
-                              <IconX className="h-2.5 w-2.5" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        {t('brandProfile.business.noSalesChannels')}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <div className="mb-3 text-xs font-medium text-muted-foreground">
-                      {t('brandProfile.business.transactionTypes')}
-                    </div>
-                    {(businessProfile.transactionTypes ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(businessProfile.transactionTypes ?? []).map((item, idx) => (
-                          <Badge key={idx} variant="secondary" className="gap-1 pr-1">
-                            {item}
-                            <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
-                              <IconX className="h-2.5 w-2.5" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        {t('brandProfile.business.noTransactionTypes')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Service Regions & Structure */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.business.serviceRegions')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenServiceRegionsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2 text-sm">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{t('brandProfile.business.structureType')}</span>
-                      <span className="font-medium">{businessProfile.structureType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{t('brandProfile.business.hqLocation')}</span>
-                      <span className="font-medium">{businessProfile.hqLocation || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="mb-3 text-xs font-medium text-muted-foreground">
-                      {t('brandProfile.business.regions')}
-                    </div>
-                    {(businessProfile.serviceRegions ?? []).length > 0 ? (
+                      {/* Progress Bar */}
                       <div className="space-y-2">
-                        {(businessProfile.serviceRegions ?? []).map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                            <span>{item}</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <IconX className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        {t('brandProfile.business.noRegions')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                        <div className="relative h-3 w-full">
+                          {/* Progress bar container with overflow hidden */}
+                          <div className="absolute inset-0 rounded-full overflow-hidden">
+                            {/* Animated gradient bar */}
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 transition-all duration-1000 ease-out"
+                              style={{ width: `${progressValue}%` }}
+                            />
 
-          {/* Audience & Positioning Tab */}
-          <TabsContent value="audience" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.audience.primaryPersonas')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenPersonaDialog()}>
-                  <IconPlus className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {(audience.personas ?? []).length > 0 ? (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {(audience.personas ?? []).map((persona) => (
-                      <div key={persona.id} className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-medium text-sm">{persona.name}</h4>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenPersonaDialog(persona)}>
-                              <IconPencil className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePersona(persona.id)}>
-                              <IconTrash className="h-3 w-3" />
-                            </Button>
-                    </div>
-                  </div>
-                        <p className="text-xs text-muted-foreground">
-                          {persona.ageRange && `Age ${persona.ageRange} • `}{persona.description || 'No description'}
-                        </p>
-                        {(persona.painPoints ?? []).length > 0 && (
-                    <div className="space-y-1">
-                            <p className="text-xs font-medium">Pain Points</p>
-                            <div className="flex flex-wrap gap-1">
-                              {(persona.painPoints ?? []).map((point, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs">{point}</Badge>
+                            {/* Dotted remaining portion - responsive */}
+                            <div
+                              className="absolute inset-y-0 left-0 right-0 rounded-full flex items-center justify-start gap-1 px-2 overflow-hidden transition-all duration-1000"
+                              style={{ paddingLeft: `calc(${progressValue}% + 8px)` }}
+                            >
+                              {Array.from({ length: 100 }).map((_, i) => (
+                                <div key={i} className="w-0.5 h-2 bg-muted-foreground/20 rounded-full flex-shrink-0" />
                               ))}
+                            </div>
+                          </div>
+
+                          {/* Circular indicator at the end - outside overflow container */}
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white shadow-lg flex items-center justify-center z-10 transition-all duration-1000 ease-out border border-muted-foreground/10"
+                            style={{
+                              left: `${progressValue}%`,
+                              opacity: progressValue > 0 ? 1 : 0,
+                              scale: progressValue > 0 ? 1 : 0.5
+                            }}
+                          >
+                            <div className="w-3 h-3 rounded-full bg-red-500" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                        )}
-                </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground mb-3">No personas defined yet</p>
-                    <Button variant="outline" size="sm" onClick={() => handleOpenPersonaDialog()}>
-                      <IconPlus className="h-4 w-4"/>
-                      {t('brandProfile.audience.addPersona')}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.audience.positioning')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenPositioningDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">{t('brandProfile.audience.category')}</span>
-                    {audience.positioning?.category ? (
-                      <Badge variant="secondary">{audience.positioning.category}</Badge>
-                    ) : (
-                      <span className="text-sm text-muted-foreground italic">Not set</span>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium">{t('brandProfile.audience.usps')}</p>
-                    {(audience.positioning?.usps ?? []).length > 0 ? (
-                      <ul className="text-sm space-y-1.5">
-                        {(audience.positioning?.usps ?? []).map((usp, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                        <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                            <span>{usp}</span>
-                      </li>
-                        ))}
-                    </ul>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.audience.noUspsYet')}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.audience.competitors')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenCompetitorDialog()}>
-                    <IconPlus className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {(audience.positioning?.competitors ?? []).length > 0 ? (
-                  <div className="space-y-2">
-                      {(audience.positioning?.competitors ?? []).map((competitor) => (
-                        <div key={competitor.id} className="flex items-start justify-between p-2 rounded-lg bg-muted/30">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{competitor.name}</p>
-                            {competitor.note && (
-                              <p className="text-xs text-muted-foreground">{competitor.note}</p>
-                            )}
-                    </div>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenCompetitorDialog(competitor)}>
-                              <IconPencil className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteCompetitor(competitor.id)}>
-                              <IconTrash className="h-3 w-3" />
-                            </Button>
-                    </div>
-                    </div>
-                      ))}
-                  </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-xs text-muted-foreground">{t('brandProfile.audience.noCompetitorsYet')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Voice & Tone Tab */}
-          <TabsContent value="voice" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.voice.toneCharacteristics.title')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenToneDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                {/* Formal - Informal */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.formal')}</span>
-                      <span className="font-medium">{Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.informal')}</span>
-                  </div>
-                    <Slider value={[Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)]} max={100} step={1} disabled />
-                </div>
-
-                {/* Serious - Playful */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.serious')}</span>
-                      <span className="font-medium">{Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.playful')}</span>
-                  </div>
-                    <Slider value={[Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)]} max={100} step={1} disabled />
-                </div>
-
-                {/* Simple - Complex */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.simple')}</span>
-                      <span className="font-medium">{Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.complex')}</span>
-                  </div>
-                    <Slider value={[Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)]} max={100} step={1} disabled />
-                </div>
-
-                {/* Warm - Neutral */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.warm')}</span>
-                      <span className="font-medium">{Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)}%</span>
-                    <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.neutral')}</span>
-                  </div>
-                    <Slider value={[Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)]} max={100} step={1} disabled />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <IconCheck className="h-4 w-4 text-green-600" />
-                    {t('brandProfile.voice.doSay.title')}
-                  </CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDoSayDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {(voice.doSay ?? []).length > 0 ? (
-                  <ul className="space-y-2">
-                      {(voice.doSay ?? []).map((phrase, i) => (
-                        <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20 text-sm group hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors">
-                          <span>&quot;{phrase}&quot;</span>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <IconX className="h-3 w-3" />
-                          </Button>
-                    </li>
-                      ))}
-                  </ul>
-                  ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.doSay.emptyState')}</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <IconX className="h-4 w-4 text-red-600" />
-                    {t('brandProfile.voice.dontSay.title')}
-                  </CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDontSayDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {(voice.dontSay ?? []).length > 0 ? (
-                  <ul className="space-y-2">
-                      {(voice.dontSay ?? []).map((phrase, i) => (
-                        <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
-                          <span>&quot;{phrase}&quot;</span>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <IconX className="h-3 w-3" />
-                          </Button>
-                    </li>
-                      ))}
-                  </ul>
-                  ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.dontSay.emptyState')}</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Content Rules Tab */}
-          <TabsContent value="rules" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.rules.allowedTopics.title')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAllowedTopicsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {(rules.allowedTopics ?? []).length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                    {(rules.allowedTopics ?? []).map((topic, i) => (
-                      <Badge key={i} variant="secondary" className="gap-1 pr-1">
-                        {topic}
-                        <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
-                          <IconX className="h-2.5 w-2.5" />
-                        </button>
-                      </Badge>
-                    ))}
-                </div>
-                ) : (
-                  <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.allowedTopics.emptyState')}</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.rules.forbiddenTopics.title')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenForbiddenTopicsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.topicsToAvoid')}</p>
-                  {(rules.forbiddenTopics ?? []).length > 0 ? (
-                    (rules.forbiddenTopics ?? []).map((topic, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
-                        <span className="flex items-center gap-2">
-                          <IconX className="h-3.5 w-3.5 text-red-600 shrink-0" />
-                          {topic}
+                {/* Footer - Outside the inner card */}
+                <div className="relative flex items-center justify-between text-sm mt-4 px-2">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span>{t('brandProfile.overview.lastUpdate')}</span>
+                    {optimizationScoreUpdatedAt ? (
+                      <>
+                        <span className="text-orange-500 font-medium">
+                          {formatDateShort(optimizationScoreUpdatedAt, user?.locale || 'en-US')}
                         </span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <IconX className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.emptyState')}</p>
-                  )}
-                  </div>
-                  <div className="pt-2 border-t">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">{t('brandProfile.rules.forbiddenTopics.crisisGuidelines')}</p>
-                  {(rules.crisisGuidelines ?? []).length > 0 ? (
-                    <ul className="text-xs text-muted-foreground space-y-1.5">
-                      {(rules.crisisGuidelines ?? []).map((guideline, i) => (
-                        <li key={i}>• {guideline}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.crisisEmptyState')}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  ⚖️ {t('brandProfile.rules.legalConstraints.title')}
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenLegalConstraintDialog()}>
-                  <IconPlus className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {(rules.legalConstraints ?? []).length > 0 ? (
-                  <div className="space-y-2">
-                    {(rules.legalConstraints ?? []).map((item) => (
-                      <div key={item.id} className="flex items-start justify-between p-3 rounded-lg bg-background border border-amber-200 dark:border-amber-900/50 group hover:shadow-sm transition-shadow">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium mb-0.5">{item.title}</p>
-                          <p className="text-xs text-muted-foreground">{item.description}</p>
-                  </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-100" onClick={() => handleOpenLegalConstraintDialog(item)}>
-                            <IconPencil className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive opacity-100" onClick={() => handleDeleteLegalConstraint(item.id)}>
-                            <IconTrash className="h-3 w-3" />
-                          </Button>
-                  </div>
-                  </div>
-                    ))}
-                </div>
-                ) : (
-                  <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.legalConstraints.emptyState')}</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Assets & AI Config Tab */}
-          <TabsContent value="assets" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold">{t('brandProfile.assets.brandColors.title')}</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBrandColorsDialog}>
-                  <IconPencil className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.primaryColors')}</p>
-                    {(assets.brandColors?.primary ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(assets.brandColors?.primary ?? []).map((color, i) => (
-                          <ColorPicker 
-                            key={i}
-                            value={color} 
-                            onValueChange={async (newColor) => {
-                              const updatedProfile: BrandProfileData = {
-                                ...profile,
-                                assets: {
-                                  ...assets,
-                                  brandColors: {
-                                    ...assets.brandColors,
-                                    primary: (assets.brandColors?.primary || []).map((c, idx) => idx === i ? newColor : c),
-                                  },
-                                },
-                              }
-                              await handleSaveProfile(updatedProfile)
-                            }}
-                          >
-                            <ColorPickerTrigger asChild>
-                              <button className="group relative block">
-                                <div 
-                                  className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20 cursor-pointer"
-                                  style={{ backgroundColor: color }}
-                                />
-                                <span className="block text-xs text-muted-foreground mt-1 font-mono">{color}</span>
-                              </button>
-                            </ColorPickerTrigger>
-                            <ColorPickerContent>
-                              <ColorPickerArea />
-                              <ColorPickerHueSlider />
-                              <ColorPickerInput />
-                            </ColorPickerContent>
-                          </ColorPicker>
-                        ))}
-                      </div>
+                        <span className="text-purple-500">
+                          {t('brandProfile.overview.at')} {formatTimeShort(optimizationScoreUpdatedAt, user?.timeFormat === 'H12' ? TimeFormat.H12 : TimeFormat.H24)}
+                        </span>
+                      </>
                     ) : (
-                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.primaryEmptyState')}</p>
-                    )}
-                      </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.accentColors')}</p>
-                    {(assets.brandColors?.accent ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(assets.brandColors?.accent ?? []).map((color, i) => (
-                          <ColorPicker 
-                            key={i}
-                            value={color} 
-                            onValueChange={async (newColor) => {
-                              const updatedProfile: BrandProfileData = {
-                                ...profile,
-                                assets: {
-                                  ...assets,
-                                  brandColors: {
-                                    ...assets.brandColors,
-                                    accent: (assets.brandColors?.accent || []).map((c, idx) => idx === i ? newColor : c),
-                                  },
-                                },
-                              }
-                              await handleSaveProfile(updatedProfile)
-                            }}
-                          >
-                            <ColorPickerTrigger asChild>
-                              <button className="group relative block">
-                                <div 
-                                  className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20 cursor-pointer"
-                                  style={{ backgroundColor: color }}
-                                />
-                                <span className="block text-xs text-muted-foreground mt-1 font-mono">{color}</span>
-                              </button>
-                            </ColorPickerTrigger>
-                            <ColorPickerContent>
-                              <ColorPickerArea />
-                              <ColorPickerHueSlider />
-                              <ColorPickerInput />
-                            </ColorPickerContent>
-                          </ColorPicker>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.accentEmptyState')}</p>
+                      <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>
                     )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.assets.visualGuidelines.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenVisualGuidelinesDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
-              </CardHeader>
-              <CardContent>
-                  {(assets.visualGuidelines ?? []).length > 0 ? (
-                <ul className="text-sm space-y-2">
-                      {(assets.visualGuidelines ?? []).map((rule, i) => (
-                        <li key={i} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                          <IconCheck className="h-4 w-4 text-green-600 shrink-0" />
-                          <span>{rule}</span>
-                  </li>
-                      ))}
-                </ul>
-                  ) : (
-                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.assets.visualGuidelines.emptyState')}</p>
+                  {optimizationScore !== null && (
+                    <Badge
+                      variant="secondary"
+                      className={
+                        optimizationScore >= 80
+                          ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900"
+                          : optimizationScore >= 50
+                            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"
+                            : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900"
+                      }
+                    >
+                      {optimizationScore >= 80 ? t('brandProfile.overview.healthy') : optimizationScore >= 50 ? t('brandProfile.overview.needsWork') : t('brandProfile.overview.atRisk')}
+                    </Badge>
                   )}
-              </CardContent>
-            </Card>
+                </div>
+              </div>
 
-            <Card>
+              {/* Brand Identity Section */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-base font-semibold">{t('brandProfile.assets.aiConfiguration.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAiConfigDialog}>
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.overview.brandIdentity')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenIdentityDialog}>
                     <IconPencil className="h-3.5 w-3.5" />
                   </Button>
-              </CardHeader>
-              <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.defaultLanguage')}</span>
-                      <span className="font-medium">{aiConfig.defaultLanguage || brand.primaryLocale || t('brandProfile.overview.notSet')}</span>
-                  </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.contentLength')}</span>
-                      <span className="font-medium">
-                        {aiConfig.contentLength 
-                          ? `${aiConfig.contentLength.min ?? '?'}-${aiConfig.contentLength.max ?? '?'} ${aiConfig.contentLength.unit ?? 'chars'}`
-                          : t('brandProfile.overview.notSet')}
-                      </span>
-                  </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.ctaStyle')}</span>
-                      <span className="font-medium">{aiConfig.ctaStyle || t('brandProfile.overview.notSet')}</span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.tagline')}</p>
+                      <p className="text-sm">
+                        {identity.tagline || brand.description || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
+                      </p>
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">{t('brandProfile.assets.aiConfiguration.preferredPlatforms')}</p>
-                      {(aiConfig.preferredPlatforms ?? []).length > 0 ? (
-                    <div className="flex gap-1 flex-wrap">
-                          {(aiConfig.preferredPlatforms ?? []).map((platform, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">{platform}</Badge>
-                          ))}
+                      <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.mission')}</p>
+                      <p className="text-sm">
+                        {identity.mission || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
+                      </p>
                     </div>
-                      ) : (
-                        <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.aiConfiguration.platformsEmptyState')}</p>
-                      )}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.overview.vision')}</p>
+                      <p className="text-sm">
+                        {identity.vision || <span className="text-muted-foreground italic">{t('brandProfile.overview.notSet')}</span>}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-            </div>
-          </TabsContent>
-        </TabsContents>
+                </CardContent>
+              </Card>
+
+              {/* Contact & Quick Facts Row */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.overview.contactChannels')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleAddContact}>
+                      <IconPlus className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {contactChannels.length === 0 ? (
+                      <div className="text-center py-6">
+                        <p className="text-sm text-muted-foreground mb-3">{t('brandProfile.overview.noContactsYet')}</p>
+                        <Button variant="outline" size="sm" onClick={handleAddContact}>
+                          <IconPlus className="h-4 w-4" />
+                          {t('brandProfile.overview.addContact')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {contactChannels.map((channel) => {
+                          const IconComponent = contactTypeIcons[channel.type]
+                          return (
+                            <div
+                              key={channel.id}
+                              className="flex items-center justify-between text-sm group hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                  <IconComponent className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                {channel.type === 'WEBSITE' ? (
+                                  <a
+                                    href={channel.value.startsWith('http') ? channel.value : `https://${channel.value}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline"
+                                  >
+                                    {channel.value}
+                                  </a>
+                                ) : (
+                                  <span>{channel.value}</span>
+                                )}
+                                {channel.isPrimary && (
+                                  <Badge variant="outline" className="text-xs">{t('brandProfile.overview.primary')}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {channel.label && (
+                                  <Badge variant="secondary" className="text-xs">{channel.label}</Badge>
+                                )}
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleEditContact(channel)}
+                                  >
+                                    <IconPencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteContact(channel.id)}
+                                  >
+                                    <IconTrash className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.overview.quickFacts')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenQuickFactsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.overview.primaryLanguage')}</span>
+                        <span className="font-medium">{brand.primaryLocale || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.overview.timezone')}</span>
+                        <span className="font-medium">{brand.timezone || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.overview.industry')}</span>
+                        <span className="font-medium capitalize">{brand.industry || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.overview.location')}</span>
+                        <span className="font-medium">
+                          {brand.city && brand.country
+                            ? `${brand.city}, ${brand.country}`
+                            : t('brandProfile.overview.notSet')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.overview.workingHours')}</span>
+                        <span className="font-medium">{quickFacts.workingHours || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Business & Offering Tab */}
+            <TabsContent value="business" className="space-y-4">
+              {/* Business Overview */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.business.businessOverview')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBusinessOverviewDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-3 text-sm">
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">{t('brandProfile.business.businessType')}</div>
+                      <div className="font-medium">{businessProfile.businessType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">{t('brandProfile.business.marketType')}</div>
+                      <div className="font-medium">{businessProfile.marketType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">{t('brandProfile.business.deliveryModel')}</div>
+                      <div className="font-medium">{businessProfile.deliveryModel || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Core Offerings */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.business.coreOfferings')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenCoreOfferingsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 text-sm">
+                    <div>
+                      <div className="mb-3 text-xs font-medium text-muted-foreground">
+                        {t('brandProfile.business.coreServices')}
+                      </div>
+                      {(businessProfile.coreServices ?? []).length > 0 ? (
+                        <ul className="space-y-2">
+                          {(businessProfile.coreServices ?? []).map((item, idx) => (
+                            <li key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                              <div className="flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                <span>{item}</span>
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <IconX className="h-3 w-3" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          {t('brandProfile.business.noServicesYet')}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <div className="mb-3 text-xs font-medium text-muted-foreground">
+                        {t('brandProfile.business.coreProducts')}
+                      </div>
+                      {(businessProfile.coreProducts ?? []).length > 0 ? (
+                        <ul className="space-y-2">
+                          {(businessProfile.coreProducts ?? []).map((item, idx) => (
+                            <li key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                              <div className="flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                <span>{item}</span>
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <IconX className="h-3 w-3" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          {t('brandProfile.business.noProductsYet')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sales & Service Channels */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.business.salesAndService')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenSalesChannelsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 text-sm">
+                    <div>
+                      <div className="mb-3 text-xs font-medium text-muted-foreground">
+                        {t('brandProfile.business.salesChannels')}
+                      </div>
+                      {(businessProfile.salesChannels ?? []).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {(businessProfile.salesChannels ?? []).map((item, idx) => (
+                            <Badge key={idx} variant="secondary" className="gap-1 pr-1">
+                              {item}
+                              <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                                <IconX className="h-2.5 w-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          {t('brandProfile.business.noSalesChannels')}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <div className="mb-3 text-xs font-medium text-muted-foreground">
+                        {t('brandProfile.business.transactionTypes')}
+                      </div>
+                      {(businessProfile.transactionTypes ?? []).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {(businessProfile.transactionTypes ?? []).map((item, idx) => (
+                            <Badge key={idx} variant="secondary" className="gap-1 pr-1">
+                              {item}
+                              <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                                <IconX className="h-2.5 w-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          {t('brandProfile.business.noTransactionTypes')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Service Regions & Structure */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.business.serviceRegions')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenServiceRegionsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 text-sm">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{t('brandProfile.business.structureType')}</span>
+                        <span className="font-medium">{businessProfile.structureType || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{t('brandProfile.business.hqLocation')}</span>
+                        <span className="font-medium">{businessProfile.hqLocation || <span className="text-muted-foreground italic">{t('brandProfile.business.notSet')}</span>}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-3 text-xs font-medium text-muted-foreground">
+                        {t('brandProfile.business.regions')}
+                      </div>
+                      {(businessProfile.serviceRegions ?? []).length > 0 ? (
+                        <div className="space-y-2">
+                          {(businessProfile.serviceRegions ?? []).map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                              <span>{item}</span>
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                <IconX className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          {t('brandProfile.business.noRegions')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Audience & Positioning Tab */}
+            <TabsContent value="audience" className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.audience.primaryPersonas')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenPersonaDialog()}>
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {(audience.personas ?? []).length > 0 ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {(audience.personas ?? []).map((persona) => (
+                        <div key={persona.id} className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
+                          <div className="flex items-start justify-between">
+                            <h4 className="font-medium text-sm">{persona.name}</h4>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenPersonaDialog(persona)}>
+                                <IconPencil className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePersona(persona.id)}>
+                                <IconTrash className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {persona.ageRange && `Age ${persona.ageRange} • `}{persona.description || 'No description'}
+                          </p>
+                          {(persona.painPoints ?? []).length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium">Pain Points</p>
+                              <div className="flex flex-wrap gap-1">
+                                {(persona.painPoints ?? []).map((point, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">{point}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-muted-foreground mb-3">No personas defined yet</p>
+                      <Button variant="outline" size="sm" onClick={() => handleOpenPersonaDialog()}>
+                        <IconPlus className="h-4 w-4" />
+                        {t('brandProfile.audience.addPersona')}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.audience.positioning')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenPositioningDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">{t('brandProfile.audience.category')}</span>
+                      {audience.positioning?.category ? (
+                        <Badge variant="secondary">{audience.positioning.category}</Badge>
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">Not set</span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium">{t('brandProfile.audience.usps')}</p>
+                      {(audience.positioning?.usps ?? []).length > 0 ? (
+                        <ul className="text-sm space-y-1.5">
+                          {(audience.positioning?.usps ?? []).map((usp, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <IconCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                              <span>{usp}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">{t('brandProfile.audience.noUspsYet')}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.audience.competitors')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenCompetitorDialog()}>
+                      <IconPlus className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {(audience.positioning?.competitors ?? []).length > 0 ? (
+                      <div className="space-y-2">
+                        {(audience.positioning?.competitors ?? []).map((competitor) => (
+                          <div key={competitor.id} className="flex items-start justify-between p-2 rounded-lg bg-muted/30">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{competitor.name}</p>
+                              {competitor.note && (
+                                <p className="text-xs text-muted-foreground">{competitor.note}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenCompetitorDialog(competitor)}>
+                                <IconPencil className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteCompetitor(competitor.id)}>
+                                <IconTrash className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground">{t('brandProfile.audience.noCompetitorsYet')}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Voice & Tone Tab */}
+            <TabsContent value="voice" className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.voice.toneCharacteristics.title')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenToneDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* Formal - Informal */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.formal')}</span>
+                        <span className="font-medium">{Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)}%</span>
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.informal')}</span>
+                      </div>
+                      <Slider value={[Math.round((voice.toneScales?.formalInformal ?? 0.5) * 100)]} max={100} step={1} disabled />
+                    </div>
+
+                    {/* Serious - Playful */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.serious')}</span>
+                        <span className="font-medium">{Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)}%</span>
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.playful')}</span>
+                      </div>
+                      <Slider value={[Math.round((voice.toneScales?.seriousPlayful ?? 0.5) * 100)]} max={100} step={1} disabled />
+                    </div>
+
+                    {/* Simple - Complex */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.simple')}</span>
+                        <span className="font-medium">{Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)}%</span>
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.complex')}</span>
+                      </div>
+                      <Slider value={[Math.round((voice.toneScales?.simpleComplex ?? 0.5) * 100)]} max={100} step={1} disabled />
+                    </div>
+
+                    {/* Warm - Neutral */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.warm')}</span>
+                        <span className="font-medium">{Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)}%</span>
+                        <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.neutral')}</span>
+                      </div>
+                      <Slider value={[Math.round((voice.toneScales?.warmNeutral ?? 0.5) * 100)]} max={100} step={1} disabled />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <IconCheck className="h-4 w-4 text-green-600" />
+                      {t('brandProfile.voice.doSay.title')}
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDoSayDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {(voice.doSay ?? []).length > 0 ? (
+                      <ul className="space-y-2">
+                        {(voice.doSay ?? []).map((phrase, i) => (
+                          <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20 text-sm group hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors">
+                            <span>&quot;{phrase}&quot;</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <IconX className="h-3 w-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.doSay.emptyState')}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <IconX className="h-4 w-4 text-red-600" />
+                      {t('brandProfile.voice.dontSay.title')}
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDontSayDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {(voice.dontSay ?? []).length > 0 ? (
+                      <ul className="space-y-2">
+                        {(voice.dontSay ?? []).map((phrase, i) => (
+                          <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
+                            <span>&quot;{phrase}&quot;</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <IconX className="h-3 w-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.voice.dontSay.emptyState')}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Content Rules Tab */}
+            <TabsContent value="rules" className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.rules.allowedTopics.title')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAllowedTopicsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {(rules.allowedTopics ?? []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(rules.allowedTopics ?? []).map((topic, i) => (
+                        <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                          {topic}
+                          <button className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5">
+                            <IconX className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.allowedTopics.emptyState')}</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.rules.forbiddenTopics.title')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenForbiddenTopicsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.topicsToAvoid')}</p>
+                    {(rules.forbiddenTopics ?? []).length > 0 ? (
+                      (rules.forbiddenTopics ?? []).map((topic, i) => (
+                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
+                          <span className="flex items-center gap-2">
+                            <IconX className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                            {topic}
+                          </span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <IconX className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.emptyState')}</p>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">{t('brandProfile.rules.forbiddenTopics.crisisGuidelines')}</p>
+                    {(rules.crisisGuidelines ?? []).length > 0 ? (
+                      <ul className="text-xs text-muted-foreground space-y-1.5">
+                        {(rules.crisisGuidelines ?? []).map((guideline, i) => (
+                          <li key={i}>• {guideline}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">{t('brandProfile.rules.forbiddenTopics.crisisEmptyState')}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    ⚖️ {t('brandProfile.rules.legalConstraints.title')}
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenLegalConstraintDialog()}>
+                    <IconPlus className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {(rules.legalConstraints ?? []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(rules.legalConstraints ?? []).map((item) => (
+                        <div key={item.id} className="flex items-start justify-between p-3 rounded-lg bg-background border border-amber-200 dark:border-amber-900/50 group hover:shadow-sm transition-shadow">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium mb-0.5">{item.title}</p>
+                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-100" onClick={() => handleOpenLegalConstraintDialog(item)}>
+                              <IconPencil className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive opacity-100" onClick={() => handleDeleteLegalConstraint(item.id)}>
+                              <IconTrash className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.rules.legalConstraints.emptyState')}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Assets & AI Config Tab */}
+            <TabsContent value="assets" className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base font-semibold">{t('brandProfile.assets.brandColors.title')}</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBrandColorsDialog}>
+                    <IconPencil className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.primaryColors')}</p>
+                      {(assets.brandColors?.primary ?? []).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {(assets.brandColors?.primary ?? []).map((color, i) => (
+                            <ColorPicker
+                              key={i}
+                              value={color}
+                              onValueChange={async (newColor) => {
+                                const updatedProfile: BrandProfileData = {
+                                  ...profile,
+                                  assets: {
+                                    ...assets,
+                                    brandColors: {
+                                      ...assets.brandColors,
+                                      primary: (assets.brandColors?.primary || []).map((c, idx) => idx === i ? newColor : c),
+                                    },
+                                  },
+                                }
+                                await handleSaveProfile(updatedProfile)
+                              }}
+                            >
+                              <ColorPickerTrigger asChild>
+                                <button className="group relative block">
+                                  <div
+                                    className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20 cursor-pointer"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                  <span className="block text-xs text-muted-foreground mt-1 font-mono">{color}</span>
+                                </button>
+                              </ColorPickerTrigger>
+                              <ColorPickerContent>
+                                <ColorPickerArea />
+                                <ColorPickerHueSlider />
+                                <ColorPickerInput />
+                              </ColorPickerContent>
+                            </ColorPicker>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.primaryEmptyState')}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">{t('brandProfile.assets.brandColors.accentColors')}</p>
+                      {(assets.brandColors?.accent ?? []).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {(assets.brandColors?.accent ?? []).map((color, i) => (
+                            <ColorPicker
+                              key={i}
+                              value={color}
+                              onValueChange={async (newColor) => {
+                                const updatedProfile: BrandProfileData = {
+                                  ...profile,
+                                  assets: {
+                                    ...assets,
+                                    brandColors: {
+                                      ...assets.brandColors,
+                                      accent: (assets.brandColors?.accent || []).map((c, idx) => idx === i ? newColor : c),
+                                    },
+                                  },
+                                }
+                                await handleSaveProfile(updatedProfile)
+                              }}
+                            >
+                              <ColorPickerTrigger asChild>
+                                <button className="group relative block">
+                                  <div
+                                    className="h-12 w-12 rounded-lg border-2 border-muted transition-all group-hover:scale-110 group-hover:border-foreground/20 cursor-pointer"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                  <span className="block text-xs text-muted-foreground mt-1 font-mono">{color}</span>
+                                </button>
+                              </ColorPickerTrigger>
+                              <ColorPickerContent>
+                                <ColorPickerArea />
+                                <ColorPickerHueSlider />
+                                <ColorPickerInput />
+                              </ColorPickerContent>
+                            </ColorPicker>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.brandColors.accentEmptyState')}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.assets.visualGuidelines.title')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenVisualGuidelinesDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {(assets.visualGuidelines ?? []).length > 0 ? (
+                      <ul className="text-sm space-y-2">
+                        {(assets.visualGuidelines ?? []).map((rule, i) => (
+                          <li key={i} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                            <IconCheck className="h-4 w-4 text-green-600 shrink-0" />
+                            <span>{rule}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground text-center py-4">{t('brandProfile.assets.visualGuidelines.emptyState')}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base font-semibold">{t('brandProfile.assets.aiConfiguration.title')}</CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAiConfigDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.defaultLanguage')}</span>
+                        <span className="font-medium">{aiConfig.defaultLanguage || brand.primaryLocale || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.contentLength')}</span>
+                        <span className="font-medium">
+                          {aiConfig.contentLength
+                            ? `${aiConfig.contentLength.min ?? '?'}-${aiConfig.contentLength.max ?? '?'} ${aiConfig.contentLength.unit ?? 'chars'}`
+                            : t('brandProfile.overview.notSet')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('brandProfile.assets.aiConfiguration.ctaStyle')}</span>
+                        <span className="font-medium">{aiConfig.ctaStyle || t('brandProfile.overview.notSet')}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">{t('brandProfile.assets.aiConfiguration.preferredPlatforms')}</p>
+                        {(aiConfig.preferredPlatforms ?? []).length > 0 ? (
+                          <div className="flex gap-1 flex-wrap">
+                            {(aiConfig.preferredPlatforms ?? []).map((platform, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{platform}</Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs italic text-muted-foreground">{t('brandProfile.assets.aiConfiguration.platformsEmptyState')}</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </TabsContents>
         </motion.div>
       </Tabs>
 
@@ -3207,12 +3208,12 @@ export default function BrandProfilePage() {
               {editingContact ? t('brandProfile.dialogs.contactChannel.descriptionEdit') : t('brandProfile.dialogs.contactChannel.descriptionAdd')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="contact-type">{t('brandProfile.dialogs.contactChannel.typeLabel')}</Label>
-              <Select 
-                value={contactForm.type} 
+              <Select
+                value={contactForm.type}
                 onValueChange={handleContactTypeChange}
               >
                 <SelectTrigger>
@@ -3225,14 +3226,14 @@ export default function BrandProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Phone / WhatsApp Input with Country Code */}
             {(contactForm.type === 'PHONE' || contactForm.type === 'WHATSAPP') && (
               <div className="space-y-2">
                 <Label>{contactForm.type === 'PHONE' ? t('brandProfile.dialogs.contactChannel.phoneLabel') : t('brandProfile.dialogs.contactChannel.whatsappLabel')}</Label>
                 <div className="flex gap-2">
-                  <Select 
-                    value={contactForm.countryCode} 
+                  <Select
+                    value={contactForm.countryCode}
                     onValueChange={(value) => setContactForm(prev => ({ ...prev, countryCode: value }))}
                   >
                     <SelectTrigger className="w-[120px]">
@@ -3255,7 +3256,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
             )}
-            
+
             {/* Email Input with Validation */}
             {contactForm.type === 'EMAIL' && (
               <div className="space-y-2">
@@ -3273,7 +3274,7 @@ export default function BrandProfilePage() {
                 )}
               </div>
             )}
-            
+
             {/* Website Input with https:// prefix */}
             {contactForm.type === 'WEBSITE' && (
               <div className="space-y-2">
@@ -3292,7 +3293,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
             )}
-            
+
             {/* Address Input */}
             {contactForm.type === 'ADDRESS' && (
               <div className="space-y-2">
@@ -3306,7 +3307,7 @@ export default function BrandProfilePage() {
                 />
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="contact-label">{t('brandProfile.dialogs.contactChannel.labelLabel')}</Label>
               <Input
@@ -3316,7 +3317,7 @@ export default function BrandProfilePage() {
                 onChange={(e) => setContactForm(prev => ({ ...prev, label: e.target.value || null }))}
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Checkbox
                 id="contact-primary"
@@ -3326,7 +3327,7 @@ export default function BrandProfilePage() {
               <Label htmlFor="contact-primary" className="text-sm font-normal cursor-pointer">{t('brandProfile.dialogs.contactChannel.markAsPrimary')}</Label>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -3335,8 +3336,8 @@ export default function BrandProfilePage() {
             >
               {t('brandProfile.dialogs.contactChannel.cancel')}
             </Button>
-            <Button 
-              onClick={handleSaveContact} 
+            <Button
+              onClick={handleSaveContact}
               disabled={isContactSaving || !isContactFormValid()}
             >
               {isContactSaving ? t('brandProfile.dialogs.contactChannel.saving') : editingContact ? t('brandProfile.dialogs.contactChannel.update') : t('brandProfile.dialogs.contactChannel.add')}
@@ -3359,7 +3360,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.brandIdentity.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="identity-tagline">{t('brandProfile.dialogs.brandIdentity.taglineLabel')}</Label>
@@ -3372,7 +3373,7 @@ export default function BrandProfilePage() {
               />
               <p className="text-xs text-muted-foreground">{identityForm.tagline.length}/300</p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="identity-mission">{t('brandProfile.dialogs.brandIdentity.missionLabel')}</Label>
               <Textarea
@@ -3385,7 +3386,7 @@ export default function BrandProfilePage() {
               />
               <p className="text-xs text-muted-foreground">{identityForm.mission.length}/1000</p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="identity-vision">{t('brandProfile.dialogs.brandIdentity.visionLabel')}</Label>
               <Textarea
@@ -3399,7 +3400,7 @@ export default function BrandProfilePage() {
               <p className="text-xs text-muted-foreground">{identityForm.vision.length}/1000</p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowIdentityDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.brandIdentity.cancel')}
@@ -3425,7 +3426,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.quickFacts.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4 px-4 max-h-[70vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             {/* Basic Info */}
             <div className="grid gap-4 md:grid-cols-2">
@@ -3440,11 +3441,11 @@ export default function BrandProfilePage() {
                       aria-expanded={languageOpen}
                       className="w-full justify-between"
                     >
-                      {quickFactsForm.primaryLocale 
+                      {quickFactsForm.primaryLocale
                         ? (() => {
-                            const selected = languages.find(l => l.code === quickFactsForm.primaryLocale)
-                            return selected ? `${selected.flag} ${selected.name}` : quickFactsForm.primaryLocale
-                          })()
+                          const selected = languages.find(l => l.code === quickFactsForm.primaryLocale)
+                          return selected ? `${selected.flag} ${selected.name}` : quickFactsForm.primaryLocale
+                        })()
                         : t('brandProfile.dialogs.quickFacts.selectLanguage')}
                       <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -3476,7 +3477,7 @@ export default function BrandProfilePage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              
+
               {/* Timezone Combobox */}
               <div className="space-y-2">
                 <Label>{t('brandProfile.dialogs.quickFacts.timezoneLabel')}</Label>
@@ -3488,11 +3489,11 @@ export default function BrandProfilePage() {
                       aria-expanded={timezoneOpen}
                       className="w-full justify-between"
                     >
-                      {quickFactsForm.timezone 
+                      {quickFactsForm.timezone
                         ? (() => {
-                            const selected = timezones.find(t => t.value === quickFactsForm.timezone)
-                            return selected ? selected.label : quickFactsForm.timezone
-                          })()
+                          const selected = timezones.find(t => t.value === quickFactsForm.timezone)
+                          return selected ? selected.label : quickFactsForm.timezone
+                        })()
                         : t('brandProfile.dialogs.quickFacts.selectTimezone')}
                       <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -3525,7 +3526,7 @@ export default function BrandProfilePage() {
                 </Popover>
               </div>
             </div>
-            
+
             {/* Industry Combobox */}
             <div className="space-y-2">
               <Label>{t('brandProfile.dialogs.quickFacts.industryLabel')}</Label>
@@ -3568,7 +3569,7 @@ export default function BrandProfilePage() {
                 </PopoverContent>
               </Popover>
             </div>
-            
+
             {/* Working Hours by Day */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -3646,7 +3647,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowQuickFactsDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.quickFacts.cancel')}
@@ -3664,7 +3665,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.voice.toneCharacteristics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.toneCharacteristics.infoDialog.whatAre')}</h4>
@@ -3672,46 +3673,46 @@ export default function BrandProfilePage() {
                 {t('brandProfile.voice.toneCharacteristics.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-3">
               <div>
                 <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.left')}</strong><br/>
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.left')}</strong><br />
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.right')}</strong><br />
                   <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.formalInformal.middle')}</strong>
                 </p>
               </div>
-              
+
               <div>
                 <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.left')}</strong><br/>
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.left')}</strong><br />
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.right')}</strong><br />
                   <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.seriousPlayful.middle')}</strong>
                 </p>
               </div>
-              
+
               <div>
                 <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.left')}</strong><br/>
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.left')}</strong><br />
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.right')}</strong><br />
                   <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.simpleComplex.middle')}</strong>
                 </p>
               </div>
-              
+
               <div>
                 <h4 className="font-medium text-xs mb-1">{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.title')}</h4>
                 <p className="text-xs text-muted-foreground">
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.left')}</strong><br/>
-                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.right')}</strong><br/>
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.left')}</strong><br />
+                  <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.right')}</strong><br />
                   <strong>{t('brandProfile.voice.toneCharacteristics.infoDialog.warmNeutral.middle')}</strong>
                 </p>
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowToneInfo(false)}>
               {t('common.gotIt')}
@@ -3726,7 +3727,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.voice.doSay.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.whatAre')}</h4>
@@ -3734,7 +3735,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.voice.doSay.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.howToWrite.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -3744,7 +3745,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.voice.doSay.infoDialog.howToWrite.point4')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.doSay.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
@@ -3756,7 +3757,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowDoSayInfo(false)}>
               {t('common.gotIt')}
@@ -3771,7 +3772,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.voice.dontSay.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whatAre')}</h4>
@@ -3779,7 +3780,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.voice.dontSay.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -3789,7 +3790,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.voice.dontSay.infoDialog.whatToAvoid.point4')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
@@ -3800,7 +3801,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.voice.dontSay.infoDialog.examples.example5')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.voice.dontSay.infoDialog.whyMatters.title')}</h4>
               <p className="text-xs text-muted-foreground">
@@ -3808,7 +3809,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowDontSayInfo(false)}>
               {t('common.gotIt')}
@@ -3823,7 +3824,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.assets.brandColors.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.primaryColorsTitle')}</h4>
@@ -3837,7 +3838,7 @@ export default function BrandProfilePage() {
                 <strong>{t('brandProfile.assets.brandColors.infoDialog.primaryColorsTipLabel')}</strong> {t('brandProfile.assets.brandColors.infoDialog.primaryColorsTipValue')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.accentColorsTitle')}</h4>
               <p className="text-muted-foreground">
@@ -3850,7 +3851,7 @@ export default function BrandProfilePage() {
                 <strong>{t('brandProfile.assets.brandColors.infoDialog.accentColorsTipLabel')}</strong> {t('brandProfile.assets.brandColors.infoDialog.accentColorsTipValue')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.brandColors.infoDialog.howToUseTitle')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -3861,7 +3862,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowBrandColorsInfo(false)}>
               {t('common.gotIt')}
@@ -3876,7 +3877,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.assets.visualGuidelines.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.whatAre')}</h4>
@@ -3884,7 +3885,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.assets.visualGuidelines.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -3895,7 +3896,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.whatToInclude.point5')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
@@ -3907,7 +3908,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.assets.visualGuidelines.infoDialog.examples.example6')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.visualGuidelines.infoDialog.tipsTitle')}</h4>
               <p className="text-xs text-muted-foreground">
@@ -3915,7 +3916,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowVisualGuidelinesInfo(false)}>
               {t('common.gotIt')}
@@ -3930,7 +3931,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.assets.aiConfiguration.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.defaultLanguageTitle')}</h4>
@@ -3941,21 +3942,21 @@ export default function BrandProfilePage() {
                 {t('brandProfile.assets.aiConfiguration.infoDialog.defaultLanguageExample')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthTitle')}</h4>
               <p className="text-muted-foreground">
                 {t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthDescription')}
               </p>
               <p className="text-xs text-muted-foreground">
-                <strong>{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthCharsExample')}</strong><br/>
+                <strong>{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthCharsExample')}</strong><br />
                 <strong>{t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthWordsExample')}</strong>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {t('brandProfile.assets.aiConfiguration.infoDialog.contentLengthTip')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.ctaStyleTitle')}</h4>
               <p className="text-muted-foreground">
@@ -3965,7 +3966,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.assets.aiConfiguration.infoDialog.ctaStyleExamples')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.assets.aiConfiguration.infoDialog.preferredPlatformsTitle')}</h4>
               <p className="text-muted-foreground">
@@ -3979,7 +3980,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowAiConfigInfo(false)}>
               {t('common.gotIt')}
@@ -3994,7 +3995,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.rules.allowedTopics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.whatAre')}</h4>
@@ -4002,7 +4003,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.rules.allowedTopics.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -4012,7 +4013,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.rules.allowedTopics.infoDialog.howToDefine.point4')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.allowedTopics.infoDialog.examples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
@@ -4027,7 +4028,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowAllowedTopicsInfo(false)}>
               {t('common.gotIt')}
@@ -4042,7 +4043,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.rules.forbiddenTopics.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsTitle')}</h4>
@@ -4060,7 +4061,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.forbiddenTopicsExample5')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4076,7 +4077,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.rules.forbiddenTopics.infoDialog.crisisGuidelinesExample4')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.forbiddenTopics.infoDialog.whyMattersTitle')}</h4>
               <p className="text-xs text-muted-foreground">
@@ -4084,7 +4085,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowForbiddenTopicsInfo(false)}>
               {t('common.gotIt')}
@@ -4099,7 +4100,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.rules.legalConstraints.infoDialog.title')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.whatAre')}</h4>
@@ -4107,7 +4108,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.rules.legalConstraints.infoDialog.description')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -4118,7 +4119,7 @@ export default function BrandProfilePage() {
                 <li>• {t('brandProfile.rules.legalConstraints.infoDialog.whatToInclude.point5')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.exampleTitle')}</h4>
               <p className="text-xs text-muted-foreground">
@@ -4128,7 +4129,7 @@ export default function BrandProfilePage() {
                 <strong>{t('brandProfile.rules.legalConstraints.infoDialog.exampleDescLabel')}</strong> <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.rules.legalConstraints.infoDialog.exampleDescValue')}</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.rules.legalConstraints.infoDialog.moreExamples.title')}</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -4138,7 +4139,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowLegalConstraintInfo(false)}>
               {t('common.gotIt')}
@@ -4153,7 +4154,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.dialogs.quickFacts.infoTitle')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.quickFacts.infoPrimaryLanguageTitle')}</h4>
@@ -4164,7 +4165,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.dialogs.quickFacts.infoPrimaryLanguageExample')} <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.dialogs.quickFacts.infoPrimaryLanguageExamples')}</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.quickFacts.infoTimezoneTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4174,14 +4175,14 @@ export default function BrandProfilePage() {
                 {t('brandProfile.dialogs.quickFacts.infoTimezoneExample')} <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.dialogs.quickFacts.infoTimezoneExamples')}</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.quickFacts.infoIndustryTitle')}</h4>
               <p className="text-muted-foreground">
                 {t('brandProfile.dialogs.quickFacts.infoIndustryDesc')}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.quickFacts.infoWorkingHoursTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4192,7 +4193,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowQuickFactsInfo(false)}>
               {t('brandProfile.dialogs.quickFacts.gotIt')}
@@ -4207,7 +4208,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.dialogs.brandIdentity.infoTitle')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.brandIdentity.infoTaglineTitle')}</h4>
@@ -4219,7 +4220,7 @@ export default function BrandProfilePage() {
               </p>
               <p className="text-xs text-muted-foreground">{t('brandProfile.dialogs.brandIdentity.infoTaglineMax')}</p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.brandIdentity.infoMissionTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4230,7 +4231,7 @@ export default function BrandProfilePage() {
               </p>
               <p className="text-xs text-muted-foreground">{t('brandProfile.dialogs.brandIdentity.infoMissionMax')}</p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.brandIdentity.infoVisionTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4242,7 +4243,7 @@ export default function BrandProfilePage() {
               <p className="text-xs text-muted-foreground">{t('brandProfile.dialogs.brandIdentity.infoVisionMax')}</p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowIdentityInfo(false)}>
               {t('brandProfile.dialogs.brandIdentity.gotIt')}
@@ -4257,7 +4258,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>{t('brandProfile.dialogs.contactChannel.infoTitle')}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.contactChannel.infoTypesTitle')}</h4>
@@ -4269,7 +4270,7 @@ export default function BrandProfilePage() {
                 <li>{t('brandProfile.dialogs.contactChannel.infoTypeAddress')}</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.contactChannel.infoLabelTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4279,7 +4280,7 @@ export default function BrandProfilePage() {
                 {t('brandProfile.dialogs.contactChannel.infoLabelExample')} <code className="px-1 py-0.5 bg-muted rounded">{t('brandProfile.dialogs.contactChannel.infoLabelExamples')}</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">{t('brandProfile.dialogs.contactChannel.infoPrimaryTitle')}</h4>
               <p className="text-muted-foreground">
@@ -4287,7 +4288,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowContactInfo(false)}>
               {t('brandProfile.dialogs.contactChannel.gotIt')}
@@ -4302,7 +4303,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Business Overview Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Business Type</h4>
@@ -4315,7 +4316,7 @@ export default function BrandProfilePage() {
                 <li><strong>Both:</strong> You offer both services and products</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Market Type</h4>
               <p className="text-muted-foreground">
@@ -4327,7 +4328,7 @@ export default function BrandProfilePage() {
                 <li><strong>B2B2C:</strong> Both business and consumer markets</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Delivery Model</h4>
               <p className="text-muted-foreground">
@@ -4338,7 +4339,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowBusinessOverviewInfo(false)}>
               Got it
@@ -4353,7 +4354,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Core Offerings Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Core Services</h4>
@@ -4370,7 +4371,7 @@ export default function BrandProfilePage() {
                 <li>• Content strategy</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Core Products</h4>
               <p className="text-muted-foreground">
@@ -4385,7 +4386,7 @@ export default function BrandProfilePage() {
                 <li>• Brand guideline kits</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Tips</h4>
               <ul className="text-xs text-muted-foreground space-y-0.5">
@@ -4395,7 +4396,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowCoreOfferingsInfo(false)}>
               Got it
@@ -4410,7 +4411,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Sales & Service Channels Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Sales Channels</h4>
@@ -4428,7 +4429,7 @@ export default function BrandProfilePage() {
                 <li>• Social media</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Transaction Types</h4>
               <p className="text-muted-foreground">
@@ -4446,7 +4447,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowSalesChannelsInfo(false)}>
               Got it
@@ -4461,7 +4462,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Audience Persona Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Persona Name</h4>
@@ -4472,7 +4473,7 @@ export default function BrandProfilePage() {
                 Examples: <code className="px-1 py-0.5 bg-muted rounded">Tech-Savvy Professional</code>, <code className="px-1 py-0.5 bg-muted rounded">Creative Entrepreneur</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Age Range</h4>
               <p className="text-muted-foreground">
@@ -4482,7 +4483,7 @@ export default function BrandProfilePage() {
                 Example: From <strong>28</strong> To <strong>45</strong> → Saved as "28-45"
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Description</h4>
               <p className="text-muted-foreground">
@@ -4492,7 +4493,7 @@ export default function BrandProfilePage() {
                 Example: <code className="px-1 py-0.5 bg-muted rounded">Urban professional seeking efficiency and reliability</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Pain Points</h4>
               <p className="text-muted-foreground">
@@ -4503,7 +4504,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowPersonaInfo(false)}>
               Got it
@@ -4518,7 +4519,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Positioning Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Category</h4>
@@ -4529,7 +4530,7 @@ export default function BrandProfilePage() {
                 Examples: <code className="px-1 py-0.5 bg-muted rounded">Digital Experience Studio</code>, <code className="px-1 py-0.5 bg-muted rounded">Premium Lifestyle Brand</code>, <code className="px-1 py-0.5 bg-muted rounded">Enterprise SaaS Platform</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Unique Selling Points (USPs)</h4>
               <p className="text-muted-foreground">
@@ -4549,7 +4550,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowPositioningInfo(false)}>
               Got it
@@ -4564,7 +4565,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Competitor Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Competitor Name</h4>
@@ -4575,7 +4576,7 @@ export default function BrandProfilePage() {
                 Examples: <code className="px-1 py-0.5 bg-muted rounded">Acme Digital</code>, <code className="px-1 py-0.5 bg-muted rounded">Creative Studio X</code>
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Note</h4>
               <p className="text-muted-foreground">
@@ -4595,7 +4596,7 @@ export default function BrandProfilePage() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowCompetitorInfo(false)}>
               Got it
@@ -4610,7 +4611,7 @@ export default function BrandProfilePage() {
           <DialogHeader>
             <DialogTitle>Service Regions & Structure Guide</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium">Structure Type</h4>
@@ -4624,7 +4625,7 @@ export default function BrandProfilePage() {
                 <li><strong>Online-only:</strong> No physical presence</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">HQ Location</h4>
               <p className="text-muted-foreground">
@@ -4634,7 +4635,7 @@ export default function BrandProfilePage() {
                 First select country, then city from the dropdown.
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium">Service Regions</h4>
               <p className="text-muted-foreground">
@@ -4651,7 +4652,7 @@ export default function BrandProfilePage() {
               </ul>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button onClick={() => setShowServiceRegionsInfo(false)}>
               Got it
@@ -4674,12 +4675,12 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.businessOverview.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label>{t('brandProfile.dialogs.businessOverview.businessTypeLabel')}</Label>
-              <Select 
-                value={businessOverviewForm.businessType} 
+              <Select
+                value={businessOverviewForm.businessType}
                 onValueChange={(value: 'Service' | 'Product' | 'Both') => setBusinessOverviewForm(prev => ({ ...prev, businessType: value }))}
               >
                 <SelectTrigger>
@@ -4692,11 +4693,11 @@ export default function BrandProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label>{t('brandProfile.dialogs.businessOverview.marketTypeLabel')}</Label>
-              <Select 
-                value={businessOverviewForm.marketType} 
+              <Select
+                value={businessOverviewForm.marketType}
                 onValueChange={(value: 'B2B' | 'B2C' | 'B2B2C') => setBusinessOverviewForm(prev => ({ ...prev, marketType: value }))}
               >
                 <SelectTrigger>
@@ -4709,7 +4710,7 @@ export default function BrandProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="business-delivery">{t('brandProfile.dialogs.businessOverview.deliveryModelLabel')}</Label>
               <Input
@@ -4720,7 +4721,7 @@ export default function BrandProfilePage() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBusinessOverviewDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.businessOverview.cancel')}
@@ -4746,7 +4747,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.coreOfferings.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             {/* Core Services */}
             <div className="space-y-3">
@@ -4773,7 +4774,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Core Products */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.dialogs.coreOfferings.coreProductsLabel')}</Label>
@@ -4800,7 +4801,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCoreOfferingsDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.coreOfferings.cancel')}
@@ -4826,7 +4827,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.salesChannels.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             {/* Sales Channels */}
             <div className="space-y-3">
@@ -4835,7 +4836,7 @@ export default function BrandProfilePage() {
                 {salesChannelsForm.salesChannels.map((channel, idx) => (
                   <Badge key={idx} variant="secondary" className="gap-1 pr-1">
                     {channel}
-                    <button 
+                    <button
                       className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
                       onClick={() => handleRemoveSalesChannel(idx)}
                     >
@@ -4856,7 +4857,7 @@ export default function BrandProfilePage() {
                 </Button>
               </div>
             </div>
-            
+
             {/* Transaction Types */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.dialogs.salesChannels.transactionTypesLabel')}</Label>
@@ -4864,7 +4865,7 @@ export default function BrandProfilePage() {
                 {salesChannelsForm.transactionTypes.map((type, idx) => (
                   <Badge key={idx} variant="secondary" className="gap-1 pr-1">
                     {type}
-                    <button 
+                    <button
                       className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
                       onClick={() => handleRemoveTransactionType(idx)}
                     >
@@ -4886,7 +4887,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSalesChannelsDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.salesChannels.cancel')}
@@ -4912,12 +4913,12 @@ export default function BrandProfilePage() {
               {t('brandProfile.dialogs.serviceRegions.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label>{t('brandProfile.dialogs.serviceRegions.structureTypeLabel')}</Label>
-              <Select 
-                value={serviceRegionsForm.structureType} 
+              <Select
+                value={serviceRegionsForm.structureType}
                 onValueChange={(value: 'Single-location' | 'Multi-branch' | 'Franchise' | 'Online-only') => setServiceRegionsForm(prev => ({ ...prev, structureType: value }))}
               >
                 <SelectTrigger>
@@ -4931,7 +4932,7 @@ export default function BrandProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* HQ Location: Country + City */}
             <div className="space-y-3">
               <Label>{t('brandProfile.dialogs.serviceRegions.hqLocationLabel')}</Label>
@@ -4947,11 +4948,11 @@ export default function BrandProfilePage() {
                         aria-expanded={countryOpen}
                         className="w-full justify-between"
                       >
-                        {serviceRegionsForm.hqCountry 
+                        {serviceRegionsForm.hqCountry
                           ? (() => {
-                              const selected = countriesData.find(c => c.code === serviceRegionsForm.hqCountry)
-                              return selected ? `${selected.flag} ${selected.name}` : serviceRegionsForm.hqCountry
-                            })()
+                            const selected = countriesData.find(c => c.code === serviceRegionsForm.hqCountry)
+                            return selected ? `${selected.flag} ${selected.name}` : serviceRegionsForm.hqCountry
+                          })()
                           : t('brandProfile.dialogs.serviceRegions.selectCountry')}
                         <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -4980,7 +4981,7 @@ export default function BrandProfilePage() {
                     </PopoverContent>
                   </Popover>
                 </div>
-                
+
                 {/* City */}
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">{t('brandProfile.dialogs.serviceRegions.cityLabel')}</Label>
@@ -5026,7 +5027,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.dialogs.serviceRegions.serviceRegionsLabel')}</Label>
               <div className="space-y-2">
@@ -5052,7 +5053,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowServiceRegionsDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.dialogs.serviceRegions.cancel')}
@@ -5078,7 +5079,7 @@ export default function BrandProfilePage() {
               {editingPersona ? t('brandProfile.persona.descriptionEdit') : t('brandProfile.persona.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="persona-name">{t('brandProfile.persona.nameLabel')} *</Label>
@@ -5090,14 +5091,14 @@ export default function BrandProfilePage() {
                 maxLength={200}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>{t('brandProfile.persona.ageRangeLabel')}</Label>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{t('brandProfile.persona.ageFrom')}</Label>
-                  <Select 
-                    value={personaForm.ageStart} 
+                  <Select
+                    value={personaForm.ageStart}
                     onValueChange={(value) => setPersonaForm(prev => ({ ...prev, ageStart: value }))}
                   >
                     <SelectTrigger>
@@ -5114,8 +5115,8 @@ export default function BrandProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{t('brandProfile.persona.ageTo')}</Label>
-                  <Select 
-                    value={personaForm.ageEnd} 
+                  <Select
+                    value={personaForm.ageEnd}
                     onValueChange={(value) => setPersonaForm(prev => ({ ...prev, ageEnd: value }))}
                   >
                     <SelectTrigger>
@@ -5132,7 +5133,7 @@ export default function BrandProfilePage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="persona-description">{t('brandProfile.persona.descriptionLabel')}</Label>
               <Textarea
@@ -5144,14 +5145,14 @@ export default function BrandProfilePage() {
                 maxLength={500}
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.persona.painPointsLabel')}</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {personaForm.painPoints.map((point, idx) => (
                   <Badge key={idx} variant="outline" className="gap-1 pr-1">
                     {point}
-                    <button 
+                    <button
                       className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
                       onClick={() => handleRemovePainPoint(idx)}
                     >
@@ -5173,7 +5174,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPersonaDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.persona.cancel')}
@@ -5199,7 +5200,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.positioning.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="positioning-category">{t('brandProfile.positioning.categoryLabel')}</Label>
@@ -5210,7 +5211,7 @@ export default function BrandProfilePage() {
                 onChange={(e) => setPositioningForm(prev => ({ ...prev, category: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.positioning.uspsLabel')}</Label>
               <div className="space-y-2 mb-2">
@@ -5237,7 +5238,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPositioningDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.positioning.cancel')}
@@ -5263,7 +5264,7 @@ export default function BrandProfilePage() {
               {editingCompetitor ? t('brandProfile.competitor.descriptionEdit') : t('brandProfile.competitor.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="competitor-name">{t('brandProfile.competitor.nameLabel')} *</Label>
@@ -5275,7 +5276,7 @@ export default function BrandProfilePage() {
                 maxLength={200}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="competitor-note">{t('brandProfile.competitor.noteLabel')}</Label>
               <Textarea
@@ -5288,7 +5289,7 @@ export default function BrandProfilePage() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCompetitorDialog(false)} disabled={isProfileSaving}>
               {t('brandProfile.competitor.cancel')}
@@ -5314,7 +5315,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.voice.toneCharacteristics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4 px-4">{/* px-4 for proper focus ring space */}
             {/* Formal - Informal */}
             <div className="space-y-3">
@@ -5323,11 +5324,11 @@ export default function BrandProfilePage() {
                 <span className="font-medium">{Math.round(toneForm.formalInformal * 100)}%</span>
                 <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.informal')}</span>
               </div>
-              <Slider 
-                value={[toneForm.formalInformal * 100]} 
+              <Slider
+                value={[toneForm.formalInformal * 100]}
                 onValueChange={([value]) => setToneForm(prev => ({ ...prev, formalInformal: value / 100 }))}
-                max={100} 
-                step={1} 
+                max={100}
+                step={1}
               />
             </div>
 
@@ -5338,11 +5339,11 @@ export default function BrandProfilePage() {
                 <span className="font-medium">{Math.round(toneForm.seriousPlayful * 100)}%</span>
                 <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.playful')}</span>
               </div>
-              <Slider 
-                value={[toneForm.seriousPlayful * 100]} 
+              <Slider
+                value={[toneForm.seriousPlayful * 100]}
                 onValueChange={([value]) => setToneForm(prev => ({ ...prev, seriousPlayful: value / 100 }))}
-                max={100} 
-                step={1} 
+                max={100}
+                step={1}
               />
             </div>
 
@@ -5353,11 +5354,11 @@ export default function BrandProfilePage() {
                 <span className="font-medium">{Math.round(toneForm.simpleComplex * 100)}%</span>
                 <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.complex')}</span>
               </div>
-              <Slider 
-                value={[toneForm.simpleComplex * 100]} 
+              <Slider
+                value={[toneForm.simpleComplex * 100]}
                 onValueChange={([value]) => setToneForm(prev => ({ ...prev, simpleComplex: value / 100 }))}
-                max={100} 
-                step={1} 
+                max={100}
+                step={1}
               />
             </div>
 
@@ -5368,15 +5369,15 @@ export default function BrandProfilePage() {
                 <span className="font-medium">{Math.round(toneForm.warmNeutral * 100)}%</span>
                 <span className="text-muted-foreground">{t('brandProfile.voice.toneCharacteristics.neutral')}</span>
               </div>
-              <Slider 
-                value={[toneForm.warmNeutral * 100]} 
+              <Slider
+                value={[toneForm.warmNeutral * 100]}
                 onValueChange={([value]) => setToneForm(prev => ({ ...prev, warmNeutral: value / 100 }))}
-                max={100} 
-                step={1} 
+                max={100}
+                step={1}
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowToneDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5402,16 +5403,16 @@ export default function BrandProfilePage() {
               {t('brandProfile.voice.doSay.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               {doSayForm.doSay.map((phrase, idx) => (
                 <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20 text-sm group hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors">
                   <span>&quot;{phrase}&quot;</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 opacity-100" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-100"
                     onClick={() => handleRemoveDoSay(idx)}
                   >
                     <IconX className="h-3 w-3" />
@@ -5422,7 +5423,7 @@ export default function BrandProfilePage() {
                 <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.voice.doSay.editDialog.emptyState')}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="dosay-phrase">{t('brandProfile.voice.doSay.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
@@ -5440,7 +5441,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDoSayDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5466,16 +5467,16 @@ export default function BrandProfilePage() {
               {t('brandProfile.voice.dontSay.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               {dontSayForm.dontSay.map((phrase, idx) => (
                 <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
                   <span>&quot;{phrase}&quot;</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 opacity-100" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-100"
                     onClick={() => handleRemoveDontSay(idx)}
                   >
                     <IconX className="h-3 w-3" />
@@ -5486,7 +5487,7 @@ export default function BrandProfilePage() {
                 <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.voice.dontSay.editDialog.emptyState')}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="dontsay-phrase">{t('brandProfile.voice.dontSay.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
@@ -5504,7 +5505,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDontSayDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5530,14 +5531,14 @@ export default function BrandProfilePage() {
               {t('brandProfile.rules.allowedTopics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2 mb-2">
                 {allowedTopicsForm.topics.map((topic, idx) => (
                   <Badge key={idx} variant="secondary" className="gap-1 pr-1">
                     {topic}
-                    <button 
+                    <button
                       className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
                       onClick={() => handleRemoveAllowedTopic(idx)}
                     >
@@ -5550,7 +5551,7 @@ export default function BrandProfilePage() {
                 <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.rules.allowedTopics.editDialog.emptyState')}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="allowed-topic">{t('brandProfile.rules.allowedTopics.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
@@ -5568,7 +5569,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAllowedTopicsDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5594,7 +5595,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.rules.forbiddenTopics.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             {/* Forbidden Topics */}
             <div className="space-y-3">
@@ -5606,10 +5607,10 @@ export default function BrandProfilePage() {
                       <IconX className="h-3.5 w-3.5 text-red-600 shrink-0" />
                       {topic}
                     </span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 opacity-100" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-100"
                       onClick={() => handleRemoveForbiddenTopic(idx)}
                     >
                       <IconX className="h-3 w-3" />
@@ -5633,7 +5634,7 @@ export default function BrandProfilePage() {
                 </Button>
               </div>
             </div>
-            
+
             {/* Crisis Guidelines */}
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-medium">{t('brandProfile.rules.forbiddenTopics.editDialog.crisisGuidelinesLabel')}</Label>
@@ -5641,10 +5642,10 @@ export default function BrandProfilePage() {
                 {forbiddenTopicsForm.crisisGuidelines.map((guideline, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm group hover:bg-muted transition-colors">
                     <span className="text-xs">• {guideline}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 opacity-100" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-100"
                       onClick={() => handleRemoveCrisisGuideline(idx)}
                     >
                       <IconX className="h-3 w-3" />
@@ -5669,7 +5670,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowForbiddenTopicsDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5695,7 +5696,7 @@ export default function BrandProfilePage() {
               {editingLegalConstraint ? t('brandProfile.rules.legalConstraints.editDialog.descriptionEdit') : t('brandProfile.rules.legalConstraints.editDialog.descriptionAdd')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="legal-title">{t('brandProfile.rules.legalConstraints.editDialog.titleLabel')}</Label>
@@ -5707,7 +5708,7 @@ export default function BrandProfilePage() {
                 maxLength={200}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="legal-description">{t('brandProfile.rules.legalConstraints.editDialog.descriptionLabel')}</Label>
               <Textarea
@@ -5721,7 +5722,7 @@ export default function BrandProfilePage() {
               <p className="text-xs text-muted-foreground">{legalConstraintForm.description.length}/1000</p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowLegalConstraintDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5747,7 +5748,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.assets.brandColors.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Primary Colors Column */}
@@ -5756,8 +5757,8 @@ export default function BrandProfilePage() {
                 <div className="flex flex-wrap gap-3 mb-3 min-h-[100px]">
                   {brandColorsForm.primary.map((color, idx) => (
                     <div key={idx} className="relative group">
-                      <ColorPicker 
-                        value={color} 
+                      <ColorPicker
+                        value={color}
                         onValueChange={(newColor) => {
                           setBrandColorsForm(prev => ({
                             ...prev,
@@ -5767,7 +5768,7 @@ export default function BrandProfilePage() {
                       >
                         <ColorPickerTrigger asChild>
                           <button className="block">
-                            <div 
+                            <div
                               className="h-16 w-16 rounded-lg border-2 border-muted transition-all hover:scale-105 hover:border-foreground/20 cursor-pointer"
                               style={{ backgroundColor: color }}
                             />
@@ -5794,14 +5795,14 @@ export default function BrandProfilePage() {
                     </div>
                   ))}
                 </div>
-                
+
                 <div>
                   <Label className="text-xs mb-2 block">{t('brandProfile.assets.brandColors.editDialog.addPrimaryColor')}</Label>
                   <div className="flex items-center gap-2">
                     <ColorPicker value={brandColorsForm.newPrimary} onValueChange={(color) => setBrandColorsForm(prev => ({ ...prev, newPrimary: color }))}>
                       <ColorPickerTrigger asChild>
                         <Button variant="outline" className="h-10 px-3 flex items-center gap-2 flex-1">
-                          <div 
+                          <div
                             className="h-6 w-6 rounded border shrink-0"
                             style={{ backgroundColor: brandColorsForm.newPrimary }}
                           />
@@ -5820,15 +5821,15 @@ export default function BrandProfilePage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Accent Colors Column */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">{t('brandProfile.assets.brandColors.editDialog.accentColorsLabel')}</Label>
                 <div className="flex flex-wrap gap-3 mb-3 min-h-[100px]">
                   {brandColorsForm.accent.map((color, idx) => (
                     <div key={idx} className="relative group">
-                      <ColorPicker 
-                        value={color} 
+                      <ColorPicker
+                        value={color}
                         onValueChange={(newColor) => {
                           setBrandColorsForm(prev => ({
                             ...prev,
@@ -5838,7 +5839,7 @@ export default function BrandProfilePage() {
                       >
                         <ColorPickerTrigger asChild>
                           <button className="block">
-                            <div 
+                            <div
                               className="h-16 w-16 rounded-lg border-2 border-muted transition-all hover:scale-105 hover:border-foreground/20 cursor-pointer"
                               style={{ backgroundColor: color }}
                             />
@@ -5865,14 +5866,14 @@ export default function BrandProfilePage() {
                     </div>
                   ))}
                 </div>
-                
+
                 <div>
                   <Label className="text-xs mb-2 block">{t('brandProfile.assets.brandColors.editDialog.addAccentColor')}</Label>
                   <div className="flex items-center gap-2">
                     <ColorPicker value={brandColorsForm.newAccent} onValueChange={(color) => setBrandColorsForm(prev => ({ ...prev, newAccent: color }))}>
                       <ColorPickerTrigger asChild>
                         <Button variant="outline" className="h-10 px-3 flex items-center gap-2 flex-1">
-                          <div 
+                          <div
                             className="h-6 w-6 rounded border shrink-0"
                             style={{ backgroundColor: brandColorsForm.newAccent }}
                           />
@@ -5893,7 +5894,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBrandColorsDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5919,17 +5920,17 @@ export default function BrandProfilePage() {
               {t('brandProfile.assets.visualGuidelines.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               {visualGuidelinesForm.guidelines.map((guideline, idx) => (
                 <div key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
                   <IconCheck className="h-4 w-4 text-green-600 shrink-0" />
                   <span className="flex-1 text-sm">{guideline}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 opacity-100" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-100"
                     onClick={() => handleRemoveVisualGuideline(idx)}
                   >
                     <IconX className="h-3 w-3" />
@@ -5940,7 +5941,7 @@ export default function BrandProfilePage() {
                 <p className="text-xs text-muted-foreground text-center py-4">{t('brandProfile.assets.visualGuidelines.editDialog.emptyState')}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="visual-guideline">{t('brandProfile.assets.visualGuidelines.editDialog.addNewLabel')}</Label>
               <div className="flex gap-2">
@@ -5958,7 +5959,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowVisualGuidelinesDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -5984,7 +5985,7 @@ export default function BrandProfilePage() {
               {t('brandProfile.assets.aiConfiguration.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4 px-4 max-h-[60vh] overflow-y-auto">{/* px-4 for proper focus ring space */}
             <div className="space-y-2">
               <Label htmlFor="ai-language">{t('brandProfile.assets.aiConfiguration.editDialog.defaultLanguageLabel')}</Label>
@@ -5995,7 +5996,7 @@ export default function BrandProfilePage() {
                 onChange={(e) => setAiConfigForm(prev => ({ ...prev, defaultLanguage: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.assets.aiConfiguration.editDialog.contentLengthLabel')}</Label>
               <div className="grid gap-2 grid-cols-2">
@@ -6022,8 +6023,8 @@ export default function BrandProfilePage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">{t('brandProfile.assets.aiConfiguration.editDialog.unitLabel')}</Label>
-                <Select 
-                  value={aiConfigForm.contentLengthUnit} 
+                <Select
+                  value={aiConfigForm.contentLengthUnit}
                   onValueChange={(value: 'chars' | 'words') => setAiConfigForm(prev => ({ ...prev, contentLengthUnit: value }))}
                 >
                   <SelectTrigger>
@@ -6036,7 +6037,7 @@ export default function BrandProfilePage() {
                 </Select>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="ai-cta">{t('brandProfile.assets.aiConfiguration.editDialog.ctaStyleLabel')}</Label>
               <Input
@@ -6046,14 +6047,14 @@ export default function BrandProfilePage() {
                 onChange={(e) => setAiConfigForm(prev => ({ ...prev, ctaStyle: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-sm font-medium">{t('brandProfile.assets.aiConfiguration.editDialog.preferredPlatformsLabel')}</Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {aiConfigForm.preferredPlatforms.map((platform, idx) => (
                   <Badge key={idx} variant="outline" className="gap-1 pr-1">
                     {platform}
-                    <button 
+                    <button
                       className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
                       onClick={() => handleRemovePlatform(idx)}
                     >
@@ -6075,7 +6076,7 @@ export default function BrandProfilePage() {
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAiConfigDialog(false)} disabled={isProfileSaving}>
               {t('common.cancel')}
@@ -6096,7 +6097,7 @@ export default function BrandProfilePage() {
               Adjust the image to fit perfectly as your brand logo
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Cropper */}
             <div className="relative h-96 w-full bg-muted rounded-lg overflow-hidden">

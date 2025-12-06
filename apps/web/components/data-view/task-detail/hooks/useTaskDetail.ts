@@ -1,0 +1,548 @@
+"use client"
+
+import { useState, useEffect, useRef, useCallback } from "react"
+import { apiClient } from "@/lib/api-client"
+import { toast } from "sonner"
+import { BaseTask } from "../../types"
+import {
+    ChecklistItem,
+    AttachmentItem,
+    AttachmentDetails,
+    WorkspaceMember,
+    API_PRIORITY_MAP
+} from "../types"
+
+interface UseTaskDetailProps {
+    task: BaseTask | null
+    workspaceId: string
+    brandId?: string
+    open: boolean
+    isCreateMode?: boolean
+    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskCreate?: (task: BaseTask) => void
+}
+
+interface UseTaskDetailReturn {
+    // State
+    editedTitle: string
+    setEditedTitle: (title: string) => void
+    editedDescription: string
+    setEditedDescription: (desc: string) => void
+    currentStatus: string
+    currentPriority: "High" | "Medium" | "Low"
+    currentDueDate: string | null
+    currentAssigneeId: string | null
+    currentAssigneeName: string | null
+    checklistItems: ChecklistItem[]
+    setChecklistItems: (items: ChecklistItem[]) => void
+    attachments: AttachmentItem[]
+    setAttachments: (attachments: AttachmentItem[]) => void
+    attachmentDetails: Map<string, AttachmentDetails>
+    setAttachmentDetails: React.Dispatch<React.SetStateAction<Map<string, AttachmentDetails>>>
+    workspaceMembers: WorkspaceMember[]
+
+    // Editing state
+    isEditingTitle: boolean
+    setIsEditingTitle: (editing: boolean) => void
+    isEditingDescription: boolean
+    setIsEditingDescription: (editing: boolean) => void
+    isDescriptionExpanded: boolean
+    setIsDescriptionExpanded: (expanded: boolean) => void
+
+    // Handlers
+    handleSaveTitle: () => Promise<void>
+    handleSaveDescription: () => Promise<void>
+    handleStatusChange: (newStatus: string) => Promise<void>
+    handlePriorityChange: (newPriority: string) => Promise<void>
+    handleDateChange: (newDate: string | null) => Promise<void>
+    handleAssigneeChange: (newAssigneeId: string | null) => Promise<void>
+
+    // Create mode
+    isCreateMode: boolean
+    createdTaskId: string | null
+}
+
+export function useTaskDetail({
+    task,
+    workspaceId,
+    brandId,
+    open,
+    isCreateMode = false,
+    onTaskUpdate,
+    onTaskCreate,
+}: UseTaskDetailProps): UseTaskDetailReturn {
+    // Editing states
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+    const [editedTitle, setEditedTitle] = useState(task?.title || "")
+    const [editedDescription, setEditedDescription] = useState(task?.description || "")
+
+    // Task property states
+    const [currentStatus, setCurrentStatus] = useState(() => {
+        const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
+            ? (task.status as any).label
+            : (task?.status || "Not Started")
+        return statusValue
+    })
+    const [currentPriority, setCurrentPriority] = useState<"High" | "Medium" | "Low">(
+        (task?.priority as "High" | "Medium" | "Low") || "Medium"
+    )
+    const [currentDueDate, setCurrentDueDate] = useState(task?.dueDate || null)
+    const [currentAssigneeId, setCurrentAssigneeId] = useState<string | null>(null)
+    const [currentAssigneeName, setCurrentAssigneeName] = useState<string | null>(null)
+
+    // Changing flags
+    const [isStatusChanging, setIsStatusChanging] = useState(false)
+    const [isPriorityChanging, setIsPriorityChanging] = useState(false)
+    const [isAssigneeChanging, setIsAssigneeChanging] = useState(false)
+
+    // Create mode state - tracks the ID of a newly created task
+    const [createdTaskId, setCreatedTaskId] = useState<string | null>(null)
+
+    // Data states
+    const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([])
+    const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
+    const [attachments, setAttachments] = useState<AttachmentItem[]>([])
+    const [attachmentDetails, setAttachmentDetails] = useState<Map<string, AttachmentDetails>>(new Map())
+
+    // Cache refs
+    const membersCacheRef = useRef<Map<string, WorkspaceMember[]>>(new Map())
+    const membersLoadingRef = useRef<Set<string>>(new Set())
+
+    // Task fetching deduplication refs
+    const taskFetchingRef = useRef(false)
+    const taskFetchedForRef = useRef<string | null>(null)
+
+    // Fetch workspace members with cache
+    useEffect(() => {
+        async function fetchMembers() {
+            if (!workspaceId) return
+
+            if (membersCacheRef.current.has(workspaceId)) {
+                setWorkspaceMembers(membersCacheRef.current.get(workspaceId)!)
+                return
+            }
+
+            if (membersLoadingRef.current.has(workspaceId)) {
+                return
+            }
+
+            membersLoadingRef.current.add(workspaceId)
+
+            try {
+                const response = await apiClient.listWorkspaceMembers(workspaceId)
+                membersCacheRef.current.set(workspaceId, response.members)
+                setWorkspaceMembers(response.members)
+            } catch (error) {
+                console.error("Failed to fetch workspace members:", error)
+            } finally {
+                membersLoadingRef.current.delete(workspaceId)
+            }
+        }
+
+        fetchMembers()
+    }, [workspaceId])
+
+    // Fetch full task details when modal opens
+    useEffect(() => {
+        async function fetchTaskDetails() {
+            if (!open || !task?.id || !workspaceId) return
+
+            // Create unique key for this fetch
+            const fetchKey = `${workspaceId}:${task.id}`
+
+            // Skip if already fetching or already fetched for this task
+            if (taskFetchingRef.current) {
+                console.log('[useTaskDetail] Skipping - already fetching')
+                return
+            }
+            if (taskFetchedForRef.current === fetchKey) {
+                console.log('[useTaskDetail] Skipping - already fetched for this key')
+                return
+            }
+
+            taskFetchingRef.current = true
+
+            try {
+                const fullTask = await apiClient.getTask(workspaceId, String(task.id))
+                if (fullTask?.task?.checklistItems) {
+                    setChecklistItems(fullTask.task.checklistItems)
+                } else {
+                    setChecklistItems(task?.checklistItems || [])
+                }
+                if (fullTask?.task?.attachments) {
+                    const detailsMap = new Map<string, AttachmentDetails>()
+                    const mediaPromises = fullTask.task.attachments.map(async (attachment: any) => {
+                        if (!attachment.mediaId || attachment.mediaId.startsWith('temp-')) return
+
+                        try {
+                            const mediaResponse = await apiClient.getMedia(workspaceId, attachment.mediaId)
+                            if (mediaResponse?.media) {
+                                detailsMap.set(attachment.mediaId, {
+                                    sizeBytes: mediaResponse.media.sizeBytes,
+                                    originalFilename: mediaResponse.media.originalFilename,
+                                })
+                            }
+                        } catch (error) {
+                            console.error(`Failed to fetch media details for ${attachment.mediaId}:`, error)
+                        }
+                    })
+
+                    await Promise.all(mediaPromises)
+                    setAttachmentDetails(detailsMap)
+
+                    const attachmentsWithDetails = fullTask.task.attachments.map((attachment: any) => {
+                        const details = detailsMap.get(attachment.mediaId)
+                        return {
+                            ...attachment,
+                            title: details?.originalFilename || attachment.title,
+                            sizeBytes: details?.sizeBytes,
+                        }
+                    })
+                    setAttachments(attachmentsWithDetails)
+                } else {
+                    setAttachments(task?.attachments || [])
+                }
+
+                // Mark as fetched for this key
+                taskFetchedForRef.current = fetchKey
+            } catch (error) {
+                console.error("Failed to fetch task details:", error)
+                setChecklistItems(task?.checklistItems || [])
+                setAttachments(task?.attachments || [])
+            } finally {
+                taskFetchingRef.current = false
+            }
+        }
+
+        fetchTaskDetails()
+
+        // Reset fetched key when modal closes so we refetch next time
+        return () => {
+            if (!open) {
+                taskFetchedForRef.current = null
+            }
+        }
+    }, [open, task?.id, workspaceId])
+
+    // Update states when task changes
+    useEffect(() => {
+        setEditedTitle(task?.title || "")
+        setEditedDescription(task?.description || "")
+
+        if (!isStatusChanging) {
+            const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
+                ? (task.status as any).label
+                : (task?.status || "Not Started")
+            setCurrentStatus(statusValue)
+        }
+
+        if (!isPriorityChanging) {
+            setCurrentPriority((task?.priority as "High" | "Medium" | "Low") || "Medium")
+        }
+
+        setCurrentDueDate(task?.dueDate || null)
+
+        if (!isAssigneeChanging) {
+            if (task?.assignedTo && task.assignedTo.length > 0) {
+                const assigneeId = task.assignedTo[0].id
+                setCurrentAssigneeId(assigneeId)
+                const assignee = workspaceMembers.find(m => m.id === assigneeId)
+                setCurrentAssigneeName(assignee?.name || assignee?.email || task.assignedTo[0].name || null)
+            } else {
+                setCurrentAssigneeId(null)
+                setCurrentAssigneeName(null)
+            }
+        }
+        // NOTE: Attachments are intentionally NOT reset here
+        // They are managed by the modal's fetchTaskDetails and attachment update handlers
+        // Resetting them on task prop change would cause data loss after any update
+    }, [task, isStatusChanging, isPriorityChanging, isAssigneeChanging, workspaceMembers])
+
+    // Handlers
+    const handleSaveTitle = useCallback(async () => {
+        // Create mode: create new task when title is saved
+        if (isCreateMode && !task && !createdTaskId) {
+            if (!editedTitle.trim()) {
+                setIsEditingTitle(false)
+                return
+            }
+
+            if (!brandId) {
+                toast.error("Brand ID is required to create a task")
+                setIsEditingTitle(false)
+                return
+            }
+
+            try {
+                const response = await apiClient.createTask(workspaceId, {
+                    brandId,
+                    title: editedTitle.trim(),
+                    priority: API_PRIORITY_MAP[currentPriority] || 'MEDIUM',
+                })
+                if (response?.task) {
+                    setCreatedTaskId(String(response.task.id))
+                    // Notify parent about new task
+                    onTaskCreate?.({
+                        id: response.task.id,
+                        taskNumber: response.task.taskNumber,
+                        title: response.task.title,
+                        description: response.task.description,
+                        priority: currentPriority,
+                        status: response.task.status?.label || 'Not Started',
+                        dueDate: response.task.dueDate || '',
+                        assignedTo: [],
+                        commentCount: 0,
+                    })
+                    toast.success("Task created")
+                }
+            } catch (error: any) {
+                console.error("Failed to create task:", error)
+                toast.error(error?.message || "Failed to create task")
+            } finally {
+                setIsEditingTitle(false)
+            }
+            return
+        }
+
+        // Get task ID (from prop or newly created)
+        const taskId = task?.id || createdTaskId
+        if (!taskId || editedTitle === (task?.title || '')) {
+            setIsEditingTitle(false)
+            return
+        }
+
+        try {
+            const response = await apiClient.updateTask(workspaceId, String(taskId), {
+                title: editedTitle,
+            })
+            if (response?.task) {
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+            } else {
+                onTaskUpdate?.(String(taskId), { title: editedTitle })
+            }
+            setEditedTitle(response?.task?.title || editedTitle)
+        } catch (error: any) {
+            console.error("Failed to save title:", error)
+            setEditedTitle(task?.title || "")
+            toast.error(error?.message || "Failed to save title")
+        } finally {
+            setIsEditingTitle(false)
+        }
+    }, [task, editedTitle, workspaceId, brandId, isCreateMode, createdTaskId, currentPriority, onTaskUpdate, onTaskCreate])
+
+    const handleSaveDescription = useCallback(async () => {
+        if (!task || editedDescription === (task.description || "")) {
+            setIsEditingDescription(false)
+            return
+        }
+
+        try {
+            const response = await apiClient.updateTask(workspaceId, String(task.id), {
+                description: editedDescription || undefined,
+            })
+            if (response?.task) {
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+            } else {
+                onTaskUpdate?.(String(task.id), { description: editedDescription })
+            }
+            setEditedDescription(response?.task?.description || editedDescription)
+        } catch (error: any) {
+            console.error("Failed to save description:", error)
+            setEditedDescription(task.description || "")
+            toast.error(error?.message || "Failed to save description")
+        } finally {
+            setIsEditingDescription(false)
+        }
+    }, [task, editedDescription, workspaceId, onTaskUpdate])
+
+    const handleStatusChange = useCallback(async (newStatus: string) => {
+        if (!task) return
+
+        setIsStatusChanging(true)
+
+        try {
+            setCurrentStatus(newStatus)
+
+            const statusesResponse = await apiClient.listTaskStatuses(workspaceId)
+            const allStatuses = Object.values(statusesResponse.statuses).flat()
+            const statusObj = allStatuses.find((s: any) => s.label === newStatus)
+
+            if (!statusObj) {
+                const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
+                    ? (task.status as any).label
+                    : (task?.status || "Not Started")
+                setCurrentStatus(statusValue)
+                setIsStatusChanging(false)
+                throw new Error(`Status "${newStatus}" not found`)
+            }
+
+            const response = await apiClient.updateTask(workspaceId, String(task.id), {
+                statusId: statusObj.id,
+            })
+
+            if (response?.task) {
+                setCurrentStatus(newStatus)
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+                setTimeout(() => {
+                    setIsStatusChanging(false)
+                }, 2000)
+            } else {
+                setIsStatusChanging(false)
+            }
+        } catch (error: any) {
+            console.error("Failed to change status:", error)
+            const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
+                ? (task.status as any).label
+                : (task?.status || "Not Started")
+            setCurrentStatus(statusValue)
+            setIsStatusChanging(false)
+            toast.error(error?.message || "Failed to change status")
+        }
+    }, [task, workspaceId, onTaskUpdate])
+
+    const handlePriorityChange = useCallback(async (newPriority: string) => {
+        if (!task) return
+
+        setIsPriorityChanging(true)
+
+        try {
+            const apiPriority = API_PRIORITY_MAP[newPriority] || "MEDIUM"
+            setCurrentPriority(newPriority as "High" | "Medium" | "Low")
+
+            const response = await apiClient.updateTask(workspaceId, String(task.id), {
+                priority: apiPriority,
+            })
+
+            if (response?.task) {
+                setCurrentPriority(newPriority as "High" | "Medium" | "Low")
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+                setTimeout(() => {
+                    setIsPriorityChanging(false)
+                }, 2000)
+            } else {
+                setIsPriorityChanging(false)
+            }
+        } catch (error: any) {
+            console.error("Failed to change priority:", error)
+            setCurrentPriority((task?.priority as "High" | "Medium" | "Low") || "Medium")
+            setIsPriorityChanging(false)
+            toast.error(error?.message || "Failed to change priority")
+        }
+    }, [task, workspaceId, onTaskUpdate])
+
+    const handleDateChange = useCallback(async (newDate: string | null) => {
+        if (!task) return
+
+        try {
+            setCurrentDueDate(newDate)
+
+            const response = await apiClient.updateTask(workspaceId, String(task.id), {
+                dueDate: newDate || undefined,
+            })
+
+            if (response?.task) {
+                setCurrentDueDate(newDate)
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+            }
+        } catch (error: any) {
+            console.error("Failed to change due date:", error)
+            setCurrentDueDate(task?.dueDate || null)
+            toast.error(error?.message || "Failed to change due date")
+        }
+    }, [task, workspaceId, onTaskUpdate])
+
+    const handleAssigneeChange = useCallback(async (newAssigneeId: string | null) => {
+        if (!task) return
+
+        setIsAssigneeChanging(true)
+        try {
+            const assignee = newAssigneeId ? workspaceMembers.find(m => m.id === newAssigneeId) : null
+            setCurrentAssigneeId(newAssigneeId)
+            setCurrentAssigneeName(assignee?.name || assignee?.email || null)
+
+            const response = await apiClient.updateTask(workspaceId, String(task.id), {
+                assigneeUserId: newAssigneeId || undefined,
+            })
+
+            if (response?.task) {
+                const updatedAssigneeId = response.task.assigneeUserId || null
+                const updatedAssignee = updatedAssigneeId ? workspaceMembers.find(m => m.id === updatedAssigneeId) : null
+                setCurrentAssigneeId(updatedAssigneeId)
+                setCurrentAssigneeName(updatedAssignee?.name || updatedAssignee?.email || null)
+                onTaskUpdate?.(String(response.task.id), {
+                    title: response.task.title,
+                    description: response.task.description
+                })
+                setTimeout(() => {
+                    setIsAssigneeChanging(false)
+                }, 2000)
+            } else {
+                setIsAssigneeChanging(false)
+            }
+        } catch (error: any) {
+            console.error("Failed to change assignee:", error)
+            const originalAssignee = task?.assignedTo && task.assignedTo.length > 0 ? task.assignedTo[0] : null
+            setCurrentAssigneeId(originalAssignee?.id || null)
+            setCurrentAssigneeName(originalAssignee?.name || null)
+            setIsAssigneeChanging(false)
+            toast.error(error?.message || "Failed to change assignee")
+        }
+    }, [task, workspaceId, workspaceMembers, onTaskUpdate])
+
+    return {
+        // State
+        editedTitle,
+        setEditedTitle,
+        editedDescription,
+        setEditedDescription,
+        currentStatus,
+        currentPriority,
+        currentDueDate,
+        currentAssigneeId,
+        currentAssigneeName,
+        checklistItems,
+        setChecklistItems,
+        attachments,
+        setAttachments,
+        attachmentDetails,
+        setAttachmentDetails,
+        workspaceMembers,
+
+        // Editing state
+        isEditingTitle,
+        setIsEditingTitle,
+        isEditingDescription,
+        setIsEditingDescription,
+        isDescriptionExpanded,
+        setIsDescriptionExpanded,
+
+        // Handlers
+        handleSaveTitle,
+        handleSaveDescription,
+        handleStatusChange,
+        handlePriorityChange,
+        handleDateChange,
+        handleAssigneeChange,
+
+        // Create mode
+        isCreateMode,
+        createdTaskId,
+    }
+}

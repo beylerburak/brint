@@ -3,7 +3,22 @@
  * 
  * Centralized config for app-wide constants and defaults.
  * Avoids hard-coded values scattered across the codebase.
+ * 
+ * Common constants are imported from @brint/shared-config for consistency
+ * between frontend and backend.
  */
+
+import {
+  MAX_FILE_SIZE_MB as SHARED_MAX_FILE_SIZE_MB,
+  MAX_FILE_SIZE_BYTES as SHARED_MAX_FILE_SIZE_BYTES,
+  MAX_AVATAR_SIZE_MB as SHARED_MAX_AVATAR_SIZE_MB,
+  MAX_AVATAR_SIZE_BYTES as SHARED_MAX_AVATAR_SIZE_BYTES,
+  ALLOWED_IMAGE_TYPES as SHARED_ALLOWED_IMAGE_TYPES,
+  ALLOWED_VIDEO_TYPES as SHARED_ALLOWED_VIDEO_TYPES,
+  ALLOWED_DOCUMENT_TYPES as SHARED_ALLOWED_DOCUMENT_TYPES,
+} from '@brint/shared-config/upload';
+
+import { PLAN_LIMITS as SHARED_PLAN_LIMITS } from '@brint/shared-config/plans';
 
 export type AppConfig = {
   appName: string;
@@ -72,9 +87,6 @@ export type AppConfig = {
   };
 };
 
-const MAX_FILE_SIZE_MB = 200;
-const MAX_AVATAR_SIZE_MB = 3;
-
 export const APP_CONFIG: AppConfig = {
   appName: process.env.APP_NAME ?? "Brigmo",
   companyName: process.env.COMPANY_NAME ?? "Beyler Interactive",
@@ -91,56 +103,17 @@ export const APP_CONFIG: AppConfig = {
     supported: ["TRY", "USD", "EUR"],
   },
 
-  plans: {
-    FREE: {
-      maxBrands: 1,
-      maxStorageGB: 1,
-      maxTeamMembers: 2,
-    },
-    STARTER: {
-      maxBrands: 5,
-      maxStorageGB: 10,
-      maxTeamMembers: 5,
-    },
-    PRO: {
-      maxBrands: 20,
-      maxStorageGB: 100,
-      maxTeamMembers: 20,
-    },
-    AGENCY: {
-      maxBrands: -1, // unlimited
-      maxStorageGB: 500,
-      maxTeamMembers: 50,
-    },
-  },
+  plans: SHARED_PLAN_LIMITS,
 
   media: {
     upload: {
-      maxFileSizeMB: MAX_FILE_SIZE_MB,
-      maxFileSizeBytes: MAX_FILE_SIZE_MB * 1024 * 1024,
-      maxAvatarSizeMB: MAX_AVATAR_SIZE_MB,
-      maxAvatarSizeBytes: MAX_AVATAR_SIZE_MB * 1024 * 1024,
-      allowedImageTypes: [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/svg+xml',
-      ],
-      allowedVideoTypes: [
-        'video/mp4',
-        'video/webm',
-        'video/ogg',
-        'video/quicktime',
-      ],
-      allowedDocumentTypes: [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      ],
+      maxFileSizeMB: SHARED_MAX_FILE_SIZE_MB,
+      maxFileSizeBytes: SHARED_MAX_FILE_SIZE_BYTES,
+      maxAvatarSizeMB: SHARED_MAX_AVATAR_SIZE_MB,
+      maxAvatarSizeBytes: SHARED_MAX_AVATAR_SIZE_BYTES,
+      allowedImageTypes: [...SHARED_ALLOWED_IMAGE_TYPES],
+      allowedVideoTypes: [...SHARED_ALLOWED_VIDEO_TYPES],
+      allowedDocumentTypes: [...SHARED_ALLOWED_DOCUMENT_TYPES],
     },
     variants: {
       image: {

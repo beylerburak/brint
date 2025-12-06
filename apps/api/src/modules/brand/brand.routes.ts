@@ -192,6 +192,107 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // GET /workspaces/:workspaceId/brands/slug/:slug - Get brand by slug
+  app.get('/workspaces/:workspaceId/brands/slug/:slug', {
+    preHandler: requireWorkspaceRoleFor('brand:view'),
+    schema: {
+      tags: ['Brand'],
+      summary: 'Get brand by slug',
+      description: 'Get detailed information about a specific brand by its slug. Requires VIEWER role.',
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, slug } = request.params as { workspaceId: string; slug: string };
+
+    const brand = await getBrandBySlug(slug, workspaceId);
+
+    if (!brand) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'BRAND_NOT_FOUND',
+          message: 'Brand not found',
+        },
+      });
+    }
+
+    // Parse profile data safely
+    let profileData: BrandProfileData | null = null;
+    if (brand.profile?.data) {
+      try {
+        profileData = BrandProfileDataSchema.parse(brand.profile.data);
+      } catch (e) {
+        request.log.warn({ brandId: brand.id, error: e }, 'Failed to parse brand profile data');
+      }
+    }
+
+    // Generate logo URL if logo exists
+    let logoUrl: string | null = null;
+    if (brand.logoMedia) {
+      logoUrl = await getMediaVariantUrlAsync(
+        brand.logoMedia.bucket,
+        brand.logoMedia.variants,
+        'medium',
+        brand.logoMedia.isPublic
+      );
+    }
+
+    // Helper to safely convert to ISO string
+    const toISOString = (value: Date | string | null | undefined): string | null => {
+      if (!value) return null;
+      if (value instanceof Date) return value.toISOString();
+      if (typeof value === 'string') {
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date.toISOString();
+      }
+      return null;
+    };
+
+    return reply.status(200).send({
+      success: true,
+      brand: {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        description: brand.description,
+        industry: brand.industry,
+        country: brand.country,
+        city: brand.city,
+        primaryLocale: brand.primaryLocale,
+        timezone: brand.timezone,
+        status: brand.status,
+        logoMediaId: brand.logoMediaId,
+        logoUrl,
+        mediaCount: brand._count.media,
+        createdAt: toISOString(brand.createdAt) || new Date().toISOString(),
+        updatedAt: toISOString(brand.updatedAt) || new Date().toISOString(),
+        // Contact channels
+        contactChannels: brand.contactChannels.map((ch: any) => ({
+          id: ch.id,
+          type: ch.type,
+          label: ch.label,
+          value: ch.value,
+          isPrimary: ch.isPrimary,
+          order: ch.order,
+          metaJson: ch.metaJson,
+        })),
+        // Profile
+        profile: brand.profile
+          ? {
+            id: brand.profile.id,
+            version: brand.profile.version,
+            optimizationScore: brand.profile.optimizationScore,
+            optimizationScoreUpdatedAt: toISOString(brand.profile.optimizationScoreUpdatedAt),
+            aiSummaryShort: brand.profile.aiSummaryShort,
+            aiSummaryDetailed: brand.profile.aiSummaryDetailed,
+            data: profileData,
+            lastEditedAt: toISOString(brand.profile.lastEditedAt) || new Date().toISOString(),
+            lastAiRefreshAt: toISOString(brand.profile.lastAiRefreshAt),
+          }
+          : null,
+      },
+    });
+  });
+
   // GET /workspaces/:workspaceId/brands/:brandId - Get brand details
   app.get('/workspaces/:workspaceId/brands/:brandId', {
     preHandler: requireWorkspaceRoleFor('brand:view'),
@@ -267,7 +368,7 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
         createdAt: toISOString(brand.createdAt) || new Date().toISOString(),
         updatedAt: toISOString(brand.updatedAt) || new Date().toISOString(),
         // Contact channels
-        contactChannels: brand.contactChannels.map((ch) => ({
+        contactChannels: brand.contactChannels.map((ch: any) => ({
           id: ch.id,
           type: ch.type,
           label: ch.label,
@@ -279,16 +380,16 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
         // Profile
         profile: brand.profile
           ? {
-              id: brand.profile.id,
-              version: brand.profile.version,
-              optimizationScore: brand.profile.optimizationScore,
-              optimizationScoreUpdatedAt: toISOString(brand.profile.optimizationScoreUpdatedAt),
-              aiSummaryShort: brand.profile.aiSummaryShort,
-              aiSummaryDetailed: brand.profile.aiSummaryDetailed,
-              data: profileData,
-              lastEditedAt: toISOString(brand.profile.lastEditedAt) || new Date().toISOString(),
-              lastAiRefreshAt: toISOString(brand.profile.lastAiRefreshAt),
-            }
+            id: brand.profile.id,
+            version: brand.profile.version,
+            optimizationScore: brand.profile.optimizationScore,
+            optimizationScoreUpdatedAt: toISOString(brand.profile.optimizationScoreUpdatedAt),
+            aiSummaryShort: brand.profile.aiSummaryShort,
+            aiSummaryDetailed: brand.profile.aiSummaryDetailed,
+            data: profileData,
+            lastEditedAt: toISOString(brand.profile.lastEditedAt) || new Date().toISOString(),
+            lastAiRefreshAt: toISOString(brand.profile.lastAiRefreshAt),
+          }
           : null,
       },
     });

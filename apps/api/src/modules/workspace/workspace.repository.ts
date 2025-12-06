@@ -9,6 +9,7 @@ import { prisma } from '../../lib/prisma.js';
 import { WorkspaceEntity } from './workspace.entity.js';
 import { Prisma, WorkspacePlan } from '@prisma/client';
 import { APP_CONFIG } from '../../config/app-config.js';
+import { ensureDefaultStatusesForWorkspace } from '../task/task-status.service.js';
 
 export class WorkspaceRepository {
   /**
@@ -74,6 +75,9 @@ export class WorkspaceRepository {
           settings: data.settings ?? {},
         },
       });
+
+      // Create default task statuses for the new workspace
+      await ensureDefaultStatusesForWorkspace(workspace.id);
 
       return WorkspaceEntity.fromPrisma(workspace);
     } catch (error) {
@@ -148,6 +152,9 @@ export class WorkspaceRepository {
           role: 'OWNER',
         },
       });
+
+      // Create default task statuses (outside transaction)
+      await ensureDefaultStatusesForWorkspace(workspace.id);
 
       return {
         user: {

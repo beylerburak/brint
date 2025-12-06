@@ -176,19 +176,32 @@
     font-feature-settings: "liga" 1, "calt" 1;
     font-weight: 400;
   }
-  
+
   /* Better font rendering for headings */
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     letter-spacing: -0.02em;
   }
-  
+
   strong, b {
     font-weight: 600;
   }
-  
+
   /* Medium weight for buttons */
   button {
     font-weight: 500;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none !important;  /* IE and Edge */
+    scrollbar-width: none !important;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none !important;  /* Chrome, Safari and Opera */
+    width: 0 !important;
+    height: 0 !important;
   }
 }

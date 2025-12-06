@@ -149,10 +149,15 @@ async function fetchApi<T>(
   const hasJsonContent = contentType?.includes('application/json');
   
   let data: any;
-  if (hasJsonContent) {
-    const text = await response.text();
-    data = text ? JSON.parse(text) : {};
-  } else {
+  try {
+    const responseText = await response.text();
+    if (hasJsonContent && responseText) {
+      data = JSON.parse(responseText);
+    } else {
+      data = responseText ? { raw: responseText } : {};
+    }
+  } catch (parseError) {
+    console.error('[API] Failed to parse response:', parseError);
     data = {};
   }
 
@@ -493,6 +498,23 @@ export const apiClient = {
   },
 
   /**
+   * List workspace members
+   */
+  async listWorkspaceMembers(workspaceId: string): Promise<{
+    success: true;
+    members: Array<{
+      id: string;
+      name: string | null;
+      email: string;
+      avatarMediaId: string | null;
+      avatarUrl: string | null;
+      role: string;
+    }>;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/members`);
+  },
+
+  /**
    * Update brand basic info
    * Automatically updates cache
    */
@@ -720,6 +742,385 @@ export const apiClient = {
   }> {
     return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/optimization-score/refresh`, {
       method: 'POST',
+    });
+  },
+
+  // ============================================================================
+  // Task API Methods
+  // ============================================================================
+
+  /**
+   * List tasks
+   */
+  async listTasks(params: {
+    workspaceId: string;
+    brandId?: string;
+    projectId?: string;
+    statusIds?: string[];
+    assigneeUserId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    success: true;
+    tasks: Array<{
+      id: string;
+      taskNumber: number;
+      title: string;
+      description: string | null;
+      status: {
+        id: string;
+        label: string;
+        color: string | null;
+        group: 'TODO' | 'IN_PROGRESS' | 'DONE';
+      };
+      priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeUserId: string | null;
+      dueDate: string | null;
+      assignedTo?: Array<{ id: string; name: string | null; email: string; avatarUrl: string | null }>;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params.brandId) searchParams.append('brandId', params.brandId);
+    if (params.projectId) searchParams.append('projectId', params.projectId);
+    if (params.statusIds) params.statusIds.forEach(id => searchParams.append('statusIds[]', id));
+    if (params.assigneeUserId) searchParams.append('assigneeUserId', params.assigneeUserId);
+    if (params.page) searchParams.append('page', params.page.toString());
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    
+    return fetchApi(`/tasks${query}`, {
+      headers: {
+        'X-Workspace-Id': params.workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Get task details (includes checklist, attachments, comments)
+   */
+  async getTask(
+    workspaceId: string,
+    taskId: string
+  ): Promise<{
+    success: true;
+    task: {
+      id: string;
+      title: string;
+      description: string | null;
+      status: {
+        id: string;
+        label: string;
+        color: string | null;
+        group: 'TODO' | 'IN_PROGRESS' | 'DONE';
+      };
+      priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeUserId: string | null;
+      dueDate: string | null;
+      assignedTo?: Array<{ id: string; name: string | null; email: string; avatarUrl: string | null }>;
+      checklistItems?: Array<{
+        id: string;
+        title: string;
+        isCompleted: boolean;
+        sortOrder: number;
+      }>;
+      attachments?: Array<{
+        id: string;
+        mediaId: string;
+        title: string | null;
+      }>;
+      comments?: Array<{
+        id: string;
+        body: string;
+        authorUserId: string;
+        createdAt: string;
+        author: {
+          id: string;
+          name: string | null;
+          email: string;
+          avatarUrl: string | null;
+        };
+      }>;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }> {
+    return fetchApi(`/tasks/${taskId}`, {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Create a new task
+   */
+  async createTask(
+    workspaceId: string,
+    data: {
+      title: string;
+      description?: string;
+      brandId?: string;
+      projectId?: string;
+      statusId?: string;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeUserId?: string;
+      dueDate?: string;
+    }
+  ): Promise<{ success: true; task: any }> {
+    return fetchApi('/tasks', {
+      method: 'POST',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update a task
+   */
+  async updateTask(
+    workspaceId: string,
+    taskId: string,
+    data: {
+      title?: string;
+      description?: string;
+      statusId?: string;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeUserId?: string;
+      dueDate?: string;
+      checklistItems?: Array<{
+        id?: string;
+        title: string;
+        isCompleted?: boolean;
+        sortOrder?: number;
+      }>;
+      attachmentMediaIds?: string[];
+    }
+  ): Promise<{ success: true; task: any }> {
+    return fetchApi(`/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete a task
+   */
+  async deleteTask(
+    workspaceId: string,
+    taskId: string
+  ): Promise<{ success: true; message: string }> {
+    return fetchApi(`/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * List comments for a task
+   */
+  async listTaskComments(
+    workspaceId: string,
+    taskId: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<{
+    success: true;
+    comments: Array<{
+      id: string;
+      body: string;
+      authorUserId: string;
+      parentId: string | null;
+      isEdited: boolean;
+      createdAt: string;
+      author: {
+        id: string;
+        name: string | null;
+        email: string;
+        avatarUrl: string | null;
+      };
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    
+    return fetchApi(`/tasks/${taskId}/comments${query}`, {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Create a comment on a task
+   */
+  async createTaskComment(
+    workspaceId: string,
+    taskId: string,
+    data: {
+      body: string;
+      parentId?: string;
+    }
+  ): Promise<{
+    success: true;
+    comment: {
+      id: string;
+      body: string;
+      createdAt: string;
+      author: {
+        id: string;
+        name: string | null;
+        email: string;
+      };
+    };
+  }> {
+    return fetchApi(`/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * List task statuses (grouped)
+   */
+  async listTaskStatuses(
+    workspaceId: string,
+    brandId?: string
+  ): Promise<{
+    success: true;
+    statuses: {
+      TODO: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+      IN_PROGRESS: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+      DONE: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    };
+  }> {
+    const searchParams = new URLSearchParams();
+    if (brandId) searchParams.append('brandId', brandId);
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    
+    return fetchApi(`/task-statuses${query}`, {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Upload media file
+   */
+  async uploadMedia(
+    workspaceId: string,
+    file: File
+  ): Promise<{
+    success: true;
+    media: {
+      id: string;
+      originalFilename: string;
+      mimeType: string;
+      sizeBytes: number;
+      baseKey: string;
+      bucket: string;
+      variants?: Record<string, string>;
+      createdAt: string;
+    };
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/media`, {
+      method: 'POST',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new ApiError(
+        data.error?.message || 'Failed to upload media',
+        response.status,
+        data.error?.code
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get media URL (for downloading/viewing)
+   */
+  getMediaUrl(workspaceId: string, mediaId: string, variant?: string): string {
+    const variantParam = variant ? `?variant=${variant}` : '';
+    return `${API_BASE_URL}/workspaces/${workspaceId}/media/${mediaId}/download${variantParam}`;
+  },
+
+  /**
+   * Get media details by mediaId
+   */
+  async getMedia(
+    workspaceId: string,
+    mediaId: string
+  ): Promise<{
+    success: true;
+    media: {
+      id: string;
+      originalFilename: string;
+      extension: string;
+      sizeBytes: number;
+      mimeType: string;
+      [key: string]: any;
+    };
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/media/${mediaId}`, {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Delete media file (from S3 and database)
+   */
+  async deleteMedia(
+    workspaceId: string,
+    mediaId: string
+  ): Promise<{
+    success: true;
+    message: string;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/media/${mediaId}`, {
+      method: 'DELETE',
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
     });
   },
 };

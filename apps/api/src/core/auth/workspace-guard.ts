@@ -54,6 +54,12 @@ export const ENDPOINT_MIN_ROLE = {
   'task:create': 'EDITOR',
   'task:update': 'EDITOR',
   'task:delete': 'ADMIN',
+
+  // Comment management
+  'comment:list': 'VIEWER',
+  'comment:create': 'VIEWER', // Any workspace member can comment
+  'comment:update': 'VIEWER', // Owner check in service layer
+  'comment:delete': 'VIEWER', // Owner check in service layer
 } as const;
 
 export type EndpointAction = keyof typeof ENDPOINT_MIN_ROLE;

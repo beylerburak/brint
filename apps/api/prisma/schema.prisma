@@ -79,6 +79,9 @@ enum ActivityEntityType {
   MEDIA
   USER
   SETTINGS
+  PROJECT
+  TASK
+  COMMENT
   OTHER
 }
 
@@ -99,6 +102,26 @@ enum ActivitySeverity {
   INFO
   WARNING
   ERROR
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatusGroup {
+  TODO
+  IN_PROGRESS
+  DONE
 }
 
 model User {
@@ -136,6 +159,19 @@ model User {
   sessions         Session[]
   media            Media[]
   avatarMedia      Media?            @relation("UserAvatar", fields: [avatarMediaId], references: [id])
+  
+  // Project & Task relations
+  createdProjects       Project[]           @relation("ProjectCreatedBy")
+  updatedProjects       Project[]           @relation("ProjectUpdatedBy")
+  assignedTasks         Task[]              @relation("TaskAssignee")
+  createdTasks          Task[]              @relation("TaskCreatedBy")
+  updatedTasks          Task[]              @relation("TaskUpdatedBy")
+  createdChecklistItems TaskChecklistItem[] @relation("ChecklistItemCreatedBy")
+  completedChecklistItems TaskChecklistItem[] @relation("ChecklistItemCompletedBy")
+  createdTaskAttachments TaskAttachment[]   @relation("TaskAttachmentCreatedBy")
+  
+  // Comment relations
+  authoredComments Comment[] @relation("CommentAuthor")
 
   @@map("users")
 }
@@ -169,6 +205,12 @@ model Workspace {
   brands       Brand[]
   media        Media[]
   activityLogs ActivityLog[]
+  
+  // Project & Task relations
+  projects     Project[]
+  taskStatuses TaskStatus[]
+  tasks        Task[]
+  comments     Comment[]
 
   @@map("workspaces")
 }
@@ -227,6 +269,12 @@ model Brand {
   /// Yeni relations
   contactChannels BrandContactChannel[]
   profile         BrandProfile?
+  
+  // Project & Task relations
+  projects     Project[]
+  taskStatuses TaskStatus[]
+  tasks        Task[]
+  comments     Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -346,6 +394,9 @@ model Media {
   owner       User      @relation(fields: [ownerUserId], references: [id])
   userAvatars User[]    @relation("UserAvatar")
   brandLogos  Brand[]   @relation("BrandLogo")
+  
+  // Task relations
+  taskAttachments TaskAttachment[]
 
   @@index([workspaceId])
   @@index([brandId])
@@ -408,4 +459,194 @@ model ActivityLog {
   @@index([entityType, entityId, createdAt])
   @@index([eventKey, createdAt])
   @@map("activity_logs")
+}
+
+/// ============================================================================
+/// PROJECT & TASK MANAGEMENT MODELS
+/// ============================================================================
+
+model Project {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String?
+
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNED)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  createdByUserId String
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand           Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  createdByUser   User      @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser   User?     @relation("ProjectUpdatedBy", fields: [updatedByUserId], references: [id])
+  tasks           Task[]
+
+  @@index([workspaceId, brandId])
+  @@index([status])
+  @@index([createdByUserId])
+  @@map("projects")
+}
+
+model TaskStatus {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String? // null = workspace-level status
+
+  group      TaskStatusGroup
+  key        String // NOT_STARTED, IN_PROGRESS, COMPLETED, etc.
+  label      String // User-facing label
+  color      String? // Hex color or token
+  isDefault  Boolean @default(false)
+  isSystem   Boolean @default(false) // System-created, cannot be deleted
+  isActive   Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand     Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([workspaceId, brandId, group])
+  @@index([workspaceId, group, isDefault])
+  @@map("task_statuses")
+}
+
+model Task {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String?
+  projectId   String?
+  statusId    String
+
+  taskNumber  Int     // Sequential number per workspace, starting from 1
+  title       String
+  description String?
+  priority    TaskPriority @default(MEDIUM)
+
+  assigneeUserId String?
+  dueDate        DateTime?
+
+  createdByUserId String
+  updatedByUserId String?
+
+  deletedAt DateTime? // Soft delete
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand           Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  project         Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status          TaskStatus          @relation(fields: [statusId], references: [id])
+  assigneeUser    User?               @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  createdByUser   User                @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser   User?               @relation("TaskUpdatedBy", fields: [updatedByUserId], references: [id])
+  checklistItems  TaskChecklistItem[]
+  attachments     TaskAttachment[]
+
+  @@unique([workspaceId, taskNumber])
+  @@index([workspaceId, brandId])
+  @@index([projectId])
+  @@index([statusId])
+  @@index([assigneeUserId])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+model TaskChecklistItem {
+  id       String  @id @default(cuid())
+  taskId   String
+  title    String
+  isCompleted Boolean @default(false)
+  sortOrder   Int     @default(0)
+
+  createdByUserId   String
+  completedAt       DateTime?
+  completedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task            Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdByUser   User  @relation("ChecklistItemCreatedBy", fields: [createdByUserId], references: [id])
+  completedByUser User? @relation("ChecklistItemCompletedBy", fields: [completedByUserId], references: [id])
+
+  @@index([taskId])
+  @@map("task_checklist_items")
+}
+
+model TaskAttachment {
+  id      String  @id @default(cuid())
+  taskId  String
+  mediaId String
+  title   String?
+
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task          Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  media         Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdByUser User  @relation("TaskAttachmentCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([taskId])
+  @@index([mediaId])
+  @@map("task_attachments")
+}
+
+/// ============================================================================
+/// COMMENT MODEL - Global polymorphic comment system
+/// ============================================================================
+
+model Comment {
+  id          String  @id @default(cuid())
+  workspaceId String
+  brandId     String?
+
+  /// Entity this comment is attached to (e.g., "TASK", "CONTENT", "CRM_CONTACT")
+  entityType String
+  /// ID of the entity this comment is attached to
+  entityId   String
+
+  authorUserId String
+  body         String @db.Text
+
+  /// Thread/reply support - parent comment ID
+  parentId String?
+
+  isEdited  Boolean   @default(false)
+  editedAt  DateTime?
+  deletedAt DateTime? // Soft delete
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand      Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  authorUser User      @relation("CommentAuthor", fields: [authorUserId], references: [id])
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[] @relation("CommentReplies")
+
+  @@index([workspaceId, brandId])
+  @@index([entityType, entityId])
+  @@index([parentId])
+  @@index([deletedAt])
+  @@map("comments")
 }

@@ -12,6 +12,11 @@ import { registerWorkspaceRoutes } from '../../modules/workspace/workspace.route
 import { registerBrandRoutes } from '../../modules/brand/brand.routes.js';
 import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerUserRoutes } from '../../modules/user/user.routes.js';
+import { registerCommentRoutes } from '../../modules/comment/comment.routes.js';
+import { registerProjectRoutes } from '../../modules/project/project.routes.js';
+import { registerTaskRoutes } from '../../modules/task/task.routes.js';
+import { registerTaskStatusRoutes } from '../../modules/task/task-status.routes.js';
+import { registerTaskWebSocketRoutes } from '../../modules/task/task-websocket.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -69,6 +74,11 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerWorkspaceRoutes(app);
   await registerBrandRoutes(app);
   await registerMediaRoutes(app);
+  await registerCommentRoutes(app);
+  await registerProjectRoutes(app);
+  await registerTaskRoutes(app);
+  await registerTaskStatusRoutes(app);
+  await registerTaskWebSocketRoutes(app);
 
   return app;
 }

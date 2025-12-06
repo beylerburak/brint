@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRef, useCallback } from "react"
 import {
   closestCenter,
   DndContext,
@@ -21,6 +22,9 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  IconArrowsSort,
+  IconArrowUp,
+  IconArrowDown,
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
@@ -28,11 +32,14 @@ import {
   IconChevronsRight,
   IconCircleCheckFilled,
   IconDotsVertical,
+  IconFlagFilled,
   IconGripVertical,
   IconLayoutColumns,
   IconLoader,
+  IconMessage,
   IconPlus,
   IconTrendingUp,
+  IconX,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -54,8 +61,10 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Status, StatusIndicator, StatusLabel } from "@/components/kibo-ui/status"
 import {
   ChartConfig,
   ChartContainer,
@@ -105,16 +114,108 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { apiClient } from "@/lib/api-client"
+import {
+  DataTableActionBar,
+  DataTableActionBarAction,
+  DataTableActionBarSelection,
+} from "@/components/data-table/data-table-action-bar"
 
 export const schema = z.object({
   id: z.number(),
+  taskNumber: z.number().optional(),
   header: z.string(),
   type: z.string(),
+  priority: z.string(),
   status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
+  dueDate: z.string(),
+  assignedTo: z.array(z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    avatarUrl: z.string().nullable(),
+  })),
+  commentCount: z.number().optional(),
 })
+
+// Utility function to format date based on user preferences
+function formatDate(
+  dateString: string,
+  dateFormat: "DMY" | "MDY" | "YMD",
+  timeFormat: "H24" | "H12"
+): string {
+  const date = new Date(dateString)
+  
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  
+  // Format time
+  let timeStr = ""
+  if (timeFormat === "H12") {
+    const period = hours >= 12 ? "PM" : "AM"
+    const displayHours = hours % 12 || 12
+    timeStr = `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
+  } else {
+    timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
+  }
+  
+  // Format date based on preference
+  let dateStr = ""
+  if (dateFormat === "DMY") {
+    dateStr = `${day}/${month}/${year}`
+  } else if (dateFormat === "MDY") {
+    dateStr = `${month}/${day}/${year}`
+  } else if (dateFormat === "YMD") {
+    dateStr = `${year}/${month}/${day}`
+  }
+  
+  return `${dateStr} ${timeStr}`
+}
+
+// Utility function to get relative time
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000)
+  
+  const seconds = Math.abs(diffInSeconds)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+  
+  const isPast = diffInSeconds < 0
+  const prefix = isPast ? "" : "in "
+  const suffix = isPast ? " ago" : ""
+  
+  if (years > 0) {
+    return `${prefix}${years} year${years > 1 ? "s" : ""}${suffix}`
+  } else if (months > 0) {
+    return `${prefix}${months} month${months > 1 ? "s" : ""}${suffix}`
+  } else if (weeks > 0) {
+    return `${prefix}${weeks} week${weeks > 1 ? "s" : ""}${suffix}`
+  } else if (days > 0) {
+    return `${prefix}${days} day${days > 1 ? "s" : ""}${suffix}`
+  } else if (hours > 0) {
+    return `${prefix}${hours} hour${hours > 1 ? "s" : ""}${suffix}`
+  } else if (minutes > 0) {
+    return `${prefix}${minutes} minute${minutes > 1 ? "s" : ""}${suffix}`
+  } else if (seconds > 10) {
+    return `${prefix}${seconds} second${seconds > 1 ? "s" : ""}${suffix}`
+  } else {
+    return isPast ? "just now" : "now"
+  }
+}
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
@@ -136,12 +237,50 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
+// Sortable header component
+function SortableHeader({ column, children }: { column: any; children: React.ReactNode }) {
+  const canSort = column.getCanSort()
+  const sortDirection = column.getIsSorted()
+  
+  if (!canSort) {
+    return <>{children}</>
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+          {children}
+          {sortDirection === "asc" ? (
+            <IconArrowUp className="h-3.5 w-3.5" />
+          ) : sortDirection === "desc" ? (
+            <IconArrowDown className="h-3.5 w-3.5" />
+          ) : (
+            <IconArrowsSort className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
+          <IconArrowUp className="h-4 w-4 mr-2" />
+          Ascending
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
+          <IconArrowDown className="h-4 w-4 mr-2" />
+          Descending
+        </DropdownMenuItem>
+        {sortDirection && (
+          <DropdownMenuItem onClick={() => column.clearSorting()}>
+            <IconX className="h-4 w-4 mr-2" />
+            Reset
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
   {
     id: "select",
     header: ({ table }) => (
@@ -169,119 +308,204 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "header",
-    header: "Header",
+    accessorKey: "taskNumber",
+    header: ({ column }) => (
+      <SortableHeader column={column}>#</SortableHeader>
+    ),
+    size: 60,
+    maxSize: 80,
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      return (
+        <div className="flex items-center justify-start">
+          <span className="text-sm text-muted-foreground">
+            {row.original.taskNumber ? `TAS-${row.original.taskNumber}` : '-'}
+          </span>
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "header",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Title</SortableHeader>
+    ),
+    minSize: 200,
+    size: 400,
+    maxSize: 600,
+    cell: ({ row }) => {
+      const commentCount = row.original.commentCount || 0
+      return (
+        <div className="flex items-center justify-between w-full min-w-0">
+          <div className="min-w-0 flex-1 max-w-[550px]">
+            <TableCellViewer item={row.original} />
+          </div>
+          {commentCount > 0 && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs ml-2 flex-shrink-0">
+              <IconMessage className="h-3 w-3" />
+              <span>{commentCount}</span>
+            </Badge>
+          )}
+        </div>
+      )
     },
     enableHiding: false,
   },
   {
-    accessorKey: "type",
-    header: "Section Type",
-    cell: ({ row }) => (
-      <div className="w-32">
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.type}
-        </Badge>
-      </div>
+    accessorKey: "assignedTo",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Assigned to</SortableHeader>
     ),
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.assignedTo?.length || 0
+      const b = rowB.original.assignedTo?.length || 0
+      return a - b
+    },
+    cell: ({ row }) => {
+      const assignedUsers = row.original.assignedTo || []
+      
+      if (assignedUsers.length === 0) {
+        return <span className="text-muted-foreground text-sm">Unassigned</span>
+      }
+      
+      const firstUser = assignedUsers[0]
+      const remainingCount = assignedUsers.length - 1
+      
+      return (
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              {firstUser.avatarUrl && (
+                <AvatarImage src={firstUser.avatarUrl} alt={firstUser.name || ""} />
+              )}
+              <AvatarFallback className="text-xs">
+                {firstUser.name
+                  ? firstUser.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm">{firstUser.name || "Unknown"}</span>
+          </div>
+          {remainingCount > 0 && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              +{remainingCount}
+            </Badge>
+          )}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "priority",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Priority</SortableHeader>
+    ),
+    sortingFn: (rowA, rowB) => {
+      const priorityOrder = { "High": 3, "Medium": 2, "Low": 1 }
+      const a = priorityOrder[rowA.original.priority as keyof typeof priorityOrder] || 0
+      const b = priorityOrder[rowB.original.priority as keyof typeof priorityOrder] || 0
+      return a - b
+    },
+    cell: ({ row }) => {
+      const priorityMap: Record<string, { label: string; color: string }> = {
+        "Low": { label: "Low", color: "text-green-500" },
+        "Medium": { label: "Medium", color: "text-yellow-500" },
+        "High": { label: "High", color: "text-red-500" },
+      }
+      const priority = priorityMap[row.original.priority] || priorityMap["Low"]
+      
+      return (
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          <IconFlagFilled className={`h-3.5 w-3.5 ${priority.color}`} />
+          <span>{priority.label}</span>
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <IconLoader />
-        )}
-        {row.original.status}
-      </Badge>
+    header: ({ column }) => (
+      <SortableHeader column={column}>Status</SortableHeader>
     ),
-  },
-  {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Reviewer",
-    cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
-
-      if (isAssigned) {
-        return row.original.reviewer
+    sortingFn: (rowA, rowB) => {
+      const statusOrder = { "Not Started": 1, "In Progress": 2, "Done": 3 }
+      const a = statusOrder[rowA.original.status as keyof typeof statusOrder] || 0
+      const b = statusOrder[rowB.original.status as keyof typeof statusOrder] || 0
+      return a - b
+    },
+    cell: ({ row, table }) => {
+      const statusMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+        "Done": "online",
+        "In Progress": "maintenance",
+        "Not Started": "offline",
       }
-
+      const status = statusMap[row.original.status] || "offline"
+      const updateStatus = (table.options.meta as any)?.updateStatus
+      
+      const availableStatuses = ["Not Started", "In Progress", "Done"]
+      
       return (
-        <>
-          <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
-          </Label>
-          <Select>
-            <SelectTrigger
-              className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
-              id={`${row.original.id}-reviewer`}
-            >
-              <SelectValue placeholder="Assign reviewer" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-              <SelectItem value="Jamik Tashpulatov">
-                Jamik Tashpulatov
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+              <Status status={status}>
+                <StatusIndicator />
+                <StatusLabel>{row.original.status}</StatusLabel>
+              </Status>
+              <IconChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {availableStatuses.map((statusOption) => (
+              <DropdownMenuItem
+                key={statusOption}
+                onClick={() => updateStatus?.(row.original.id, statusOption)}
+                className={row.original.status === statusOption ? "bg-muted" : ""}
+              >
+                <Status status={statusMap[statusOption] || "offline"}>
+                  <StatusIndicator />
+                  <StatusLabel>{statusOption}</StatusLabel>
+                </Status>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
+  },
+  {
+    accessorKey: "dueDate",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Due Date</SortableHeader>
+    ),
+    sortingFn: (rowA, rowB) => {
+      const a = new Date(rowA.original.dueDate).getTime()
+      const b = new Date(rowB.original.dueDate).getTime()
+      return a - b
+    },
+    cell: ({ row, table }) => {
+      const userPrefs = (table.options.meta as any)?.userPrefs
+      const dateFormat = userPrefs?.dateFormat || "DMY"
+      const timeFormat = userPrefs?.timeFormat || "H24"
+      
+      const relativeTime = getRelativeTime(row.original.dueDate)
+      const fullDate = formatDate(row.original.dueDate, dateFormat, timeFormat)
+      
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger className="cursor-help">
+              {relativeTime}
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{fullDate}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )
     },
   },
@@ -311,17 +535,38 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({ 
+  row, 
+  onRowClick 
+}: { 
+  row: Row<z.infer<typeof schema>>
+  onRowClick?: (row: z.infer<typeof schema>) => void
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't trigger row click if clicking on interactive elements
+    const target = e.target as HTMLElement
+    if (
+      target.closest('button') ||
+      target.closest('[role="checkbox"]') ||
+      target.closest('[role="menu"]') ||
+      target.closest('[data-slot="dropdown-menu"]')
+    ) {
+      return
+    }
+    onRowClick?.(row.original)
+  }
 
   return (
     <TableRow
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      onClick={handleClick}
+      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 cursor-pointer"
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
@@ -338,10 +583,26 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 
 export function DataTable({
   data: initialData,
+  onLoadMore,
+  hasMore = false,
+  isLoading = false,
+  onRowClick,
 }: {
   data: z.infer<typeof schema>[]
+  onLoadMore?: () => void
+  hasMore?: boolean
+  isLoading?: boolean
+  onRowClick?: (row: z.infer<typeof schema>) => void
 }) {
   const [data, setData] = React.useState(() => initialData)
+  
+  // Update data when initialData prop changes
+  React.useEffect(() => {
+    setData(initialData)
+    // Clear selection when data changes (e.g., filter changes)
+    setRowSelection({})
+  }, [initialData])
+  
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -353,6 +614,11 @@ export function DataTable({
     pageIndex: 0,
     pageSize: 10,
   })
+  const [userPrefs, setUserPrefs] = React.useState<{
+    dateFormat: "DMY" | "MDY" | "YMD"
+    timeFormat: "H24" | "H12"
+  } | null>(null)
+  
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -360,14 +626,48 @@ export function DataTable({
     useSensor(KeyboardSensor, {})
   )
 
+  // Fetch user preferences
+  React.useEffect(() => {
+    async function fetchUserPrefs() {
+      try {
+        const response = await apiClient.getMe()
+        setUserPrefs({
+          dateFormat: response.user.dateFormat,
+          timeFormat: response.user.timeFormat,
+        })
+      } catch (error) {
+        // Fallback to defaults if fetch fails
+        setUserPrefs({
+          dateFormat: "DMY",
+          timeFormat: "H24",
+        })
+      }
+    }
+    fetchUserPrefs()
+  }, [])
+
   const dataIds = React.useMemo<UniqueIdentifier[]>(
     () => data?.map(({ id }) => id) || [],
     [data]
   )
 
+  const updateStatus = React.useCallback((taskId: number, newStatus: string) => {
+    setData((prevData) =>
+      prevData.map((item) =>
+        item.id === taskId ? { ...item, status: newStatus } : item
+      )
+    )
+  }, [])
+
+  const tableMeta = React.useMemo(() => ({
+    userPrefs: userPrefs || { dateFormat: "DMY", timeFormat: "H24" },
+    updateStatus,
+  }), [userPrefs, updateStatus])
+
   const table = useReactTable({
     data,
     columns,
+    meta: tableMeta,
     state: {
       sorting,
       columnVisibility,
@@ -401,85 +701,57 @@ export function DataTable({
     }
   }
 
+  // Infinite scroll
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const rows = table.getRowModel().rows
+  const isLoadingRef = useRef(false)
+
+  // Infinite scroll handler with debounce
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current || !onLoadMore || isLoadingRef.current || !hasMore) return
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current
+    const threshold = 300 // Load more when 300px from bottom
+
+    if (scrollHeight - scrollTop - clientHeight < threshold) {
+      isLoadingRef.current = true
+      onLoadMore()
+      // Reset loading flag after a delay to prevent rapid firing
+      setTimeout(() => {
+        isLoadingRef.current = false
+      }, 1000)
+    }
+  }, [onLoadMore, hasMore])
+
+  React.useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    let ticking = false
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll()
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [handleScroll])
+
+  // Update loading ref when isLoading prop changes
+  React.useEffect(() => {
+    if (!isLoading) {
+      isLoadingRef.current = false
+    }
+  }, [isLoading])
+
   return (
-    <Tabs
-      defaultValue="outline"
-      className="w-full flex-col justify-start gap-6"
-    >
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger
-            className="flex w-fit @4xl/main:hidden"
-            size="sm"
-            id="view-selector"
-          >
-            <SelectValue placeholder="Select a view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">Outline</SelectItem>
-            <SelectItem value="past-performance">Past Performance</SelectItem>
-            <SelectItem value="key-personnel">Key Personnel</SelectItem>
-            <SelectItem value="focus-documents">Focus Documents</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm">
-            <IconPlus />
-            <span className="hidden lg:inline">Add Section</span>
-          </Button>
-        </div>
-      </div>
-      <TabsContent
-        value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
-        <div className="overflow-hidden rounded-lg border">
+    <div className="w-full py-6 flex flex-col min-h-0 flex-1">
+        <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
           <DndContext
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
@@ -488,7 +760,7 @@ export function DataTable({
             id={sortableId}
           >
             <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
+              <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
@@ -507,14 +779,25 @@ export function DataTable({
                 ))}
               </TableHeader>
               <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
+                {rows?.length ? (
                   <SortableContext
                     items={dataIds}
                     strategy={verticalListSortingStrategy}
                   >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
+                    {rows.map((row) => (
+                      <DraggableRow key={row.id} row={row} onRowClick={onRowClick} />
                     ))}
+                    {isLoading && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          className="h-12 text-center"
+                        >
+                          <IconLoader className="h-4 w-4 animate-spin inline-block mr-2" />
+                          Loading more...
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </SortableContext>
                 ) : (
                   <TableRow>
@@ -530,100 +813,14 @@ export function DataTable({
             </Table>
           </DndContext>
         </div>
-        <div className="flex items-center justify-between px-4">
-          <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
-          </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
-            <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                Rows per page
-              </Label>
-              <Select
-                value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
-                }}
-              >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
-            </div>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
-              <Button
-                variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Go to first page</span>
-                <IconChevronsLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Go to previous page</span>
-                <IconChevronLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to next page</span>
-                <IconChevronRight />
-              </Button>
-              <Button
-                variant="outline"
-                className="hidden size-8 lg:flex"
-                size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to last page</span>
-                <IconChevronsRight />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </TabsContent>
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-    </Tabs>
+        <DataTableActionBar table={table}>
+          <DataTableActionBarSelection table={table} />
+          <DataTableActionBarAction tooltip="Delete selected">
+            <IconDotsVertical className="h-3.5 w-3.5" />
+            Delete
+          </DataTableActionBarAction>
+        </DataTableActionBar>
+      </div>
   )
 }
 
@@ -648,160 +845,9 @@ const chartConfig = {
 } satisfies ChartConfig
 
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
-
   return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.header}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Showing total visitors for the last 6 months
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          {!isMobile && (
-            <>
-              <ChartContainer config={chartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    hide
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="mobile"
-                    type="natural"
-                    fill="var(--color-mobile)"
-                    fillOpacity={0.6}
-                    stroke="var(--color-mobile)"
-                    stackId="a"
-                  />
-                  <Area
-                    dataKey="desktop"
-                    type="natural"
-                    fill="var(--color-desktop)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-desktop)"
-                    stackId="a"
-                  />
-                </AreaChart>
-              </ChartContainer>
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
-                </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
-                <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                  <SelectItem value="Jamik Tashpulatov">
-                    Jamik Tashpulatov
-                  </SelectItem>
-                  <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-        </div>
-        <DrawerFooter>
-          <Button>Submit</Button>
-          <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+    <span className="text-foreground truncate block w-full">
+      {item.header}
+    </span>
   )
 }

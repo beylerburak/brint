@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
 import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
 import { updateWorkspace, isSlugAvailable } from './workspace-update.service.js';
+import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 
 /**
  * Registers workspace routes
@@ -324,6 +325,108 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
         },
       });
     }
+  });
+
+  // GET /workspaces/:workspaceId/members - List workspace members
+  app.get('/workspaces/:workspaceId/members', {
+    preHandler: requireWorkspaceRoleFor('workspace:view'),
+    schema: {
+      tags: ['Workspace'],
+      summary: 'List workspace members',
+      description: 'Returns all members of a workspace. Requires VIEWER role or higher.',
+      params: {
+        type: 'object',
+        properties: {
+          workspaceId: { type: 'string' },
+        },
+        required: ['workspaceId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            members: {
+              type: 'array',
+              items: {
+                type: 'object',
+                  properties: {
+                  id: { type: 'string' },
+                  name: { type: ['string', 'null'] },
+                  email: { type: 'string' },
+                  avatarMediaId: { type: ['string', 'null'] },
+                  avatarUrl: { type: ['string', 'null'] },
+                  role: { type: 'string' },
+                },
+                required: ['id', 'email', 'role'],
+              },
+            },
+          },
+          required: ['success', 'members'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                id: true,
+                bucket: true,
+                variants: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    const membersWithAvatars = await Promise.all(
+      members.map(async (member) => {
+        let avatarUrl: string | null = null;
+        
+        if (member.user.avatarMediaId && member.user.avatarMedia) {
+          try {
+            const isPublic = false; // User avatars are typically private
+            avatarUrl = await getMediaVariantUrlAsync(
+              member.user.avatarMedia.bucket,
+              member.user.avatarMedia.variants,
+              'thumbnail',
+              isPublic
+            );
+          } catch (error) {
+            // If URL generation fails, avatarUrl remains null
+            console.error('Failed to generate avatar URL:', error);
+          }
+        }
+        
+        return {
+          id: member.user.id,
+          name: member.user.name,
+          email: member.user.email,
+          avatarMediaId: member.user.avatarMediaId,
+          avatarUrl,
+          role: member.role,
+        };
+      })
+    );
+
+    return reply.status(200).send({
+      success: true,
+      members: membersWithAvatars,
+    });
   });
 }
 

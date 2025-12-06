@@ -49,6 +49,56 @@ async function main() {
   });
   console.log('✅ WorkspaceMember created with OWNER role');
 
+  // 4. Default Task Statuses
+  const existingStatuses = await prisma.taskStatus.findMany({
+    where: { workspaceId: workspace.id },
+  });
+
+  if (existingStatuses.length === 0) {
+    const defaultStatuses = [
+      {
+        workspaceId: workspace.id,
+        brandId: null,
+        group: 'TODO' as const,
+        key: 'NOT_STARTED',
+        label: 'Not Started',
+        color: '#94a3b8',
+        isDefault: true,
+        isSystem: true,
+        sortOrder: 0,
+      },
+      {
+        workspaceId: workspace.id,
+        brandId: null,
+        group: 'IN_PROGRESS' as const,
+        key: 'IN_PROGRESS',
+        label: 'In Progress',
+        color: '#3b82f6',
+        isDefault: true,
+        isSystem: true,
+        sortOrder: 0,
+      },
+      {
+        workspaceId: workspace.id,
+        brandId: null,
+        group: 'DONE' as const,
+        key: 'COMPLETED',
+        label: 'Completed',
+        color: '#22c55e',
+        isDefault: true,
+        isSystem: true,
+        sortOrder: 0,
+      },
+    ];
+
+    await prisma.taskStatus.createMany({
+      data: defaultStatuses,
+    });
+    console.log('✅ Default task statuses created (NOT_STARTED, IN_PROGRESS, COMPLETED)');
+  } else {
+    console.log('ℹ️  Task statuses already exist, skipping');
+  }
+
   console.log('🎉 Seed completed successfully!');
 }
 

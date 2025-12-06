@@ -101,6 +101,33 @@
         "socialAccounts": "Sosyal Hesaplar",
         "contacts": "Kişiler"
       },
+      "tasks": {
+        "title": "Görevler",
+        "newTask": "Yeni Görev",
+        "tabs": {
+          "overview": "Genel Bakış",
+          "backlog": "Beklemede",
+          "kanban": "Kanban",
+          "calendar": "Takvim",
+          "list": "Liste"
+        },
+        "toolbar": {
+          "searchPlaceholder": "Görev ara...",
+          "searchPlaceholderShort": "Ara...",
+          "filter": "Filtre",
+          "priority": "Öncelik",
+          "assignee": "Atanan",
+          "viewTable": "Tablo",
+          "viewKanban": "Kanban",
+          "tabs": {
+            "todo": "Yapılacaklar",
+            "inProgress": "Devam Ediyor",
+            "overdue": "Gecikmiş",
+            "completed": "Tamamlanan",
+            "all": "Tümü"
+          }
+        }
+      },
       "brandProfile": {
         "overview": {
           "optimizationScore": "Marka Optimizasyon Skoru",

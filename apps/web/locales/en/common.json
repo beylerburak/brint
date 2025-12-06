@@ -101,6 +101,33 @@
         "socialAccounts": "Social Accounts",
         "contacts": "Contacts"
       },
+      "tasks": {
+        "title": "Tasks",
+        "newTask": "New Task",
+        "tabs": {
+          "overview": "Overview",
+          "backlog": "Backlog",
+          "kanban": "Kanban",
+          "calendar": "Calendar",
+          "list": "List"
+        },
+        "toolbar": {
+          "searchPlaceholder": "Search tasks...",
+          "searchPlaceholderShort": "Search...",
+          "filter": "Filter",
+          "priority": "Priority",
+          "assignee": "Assignee",
+          "viewTable": "Table",
+          "viewKanban": "Kanban",
+          "tabs": {
+            "todo": "To Do",
+            "inProgress": "In Progress",
+            "overdue": "Overdue",
+            "completed": "Completed",
+            "all": "All"
+          }
+        }
+      },
       "brandProfile": {
         "overview": {
           "optimizationScore": "Brand Optimization Score",

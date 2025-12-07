@@ -20,7 +20,15 @@ interface UseTaskDetailProps {
     brandId?: string
     open: boolean
     isCreateMode?: boolean
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
     onTaskCreate?: (task: BaseTask) => void
 }
 
@@ -91,9 +99,12 @@ export function useTaskDetail({
             : (task?.status || "Not Started")
         return statusValue
     })
-    const [currentPriority, setCurrentPriority] = useState<"High" | "Medium" | "Low">(
-        (task?.priority as "High" | "Medium" | "Low") || "Medium"
-    )
+    const [currentPriority, setCurrentPriority] = useState<"High" | "Medium" | "Low">(() => {
+        const p = task?.priority as string
+        if (p === 'HIGH' || p === 'High') return 'High'
+        if (p === 'LOW' || p === 'Low') return 'Low'
+        return 'Medium'
+    })
     const [currentDueDate, setCurrentDueDate] = useState(task?.dueDate || null)
     const [currentAssigneeId, setCurrentAssigneeId] = useState<string | null>(null)
     const [currentAssigneeName, setCurrentAssigneeName] = useState<string | null>(null)
@@ -222,7 +233,7 @@ export function useTaskDetail({
                             let avatarUrl = comment.author.avatarUrl
                             if (!avatarUrl && comment.author.avatarMediaId) {
                                 // Try without variant first (some media might not have variants)
-                                avatarUrl = apiClient.getMediaUrl(workspaceId, comment.author.avatarMediaId)
+                                avatarUrl = apiClient.getMediaUrl(workspaceId, comment.author.avatarMediaId, 'thumbnail')
                             }
 
                             return {
@@ -257,7 +268,7 @@ export function useTaskDetail({
                             // Get avatar URL from avatarMediaId if avatarUrl is not available
                             let avatarUrl = activity.actor?.avatarUrl || null
                             if (activity.actor && !avatarUrl && activity.actor.avatarMediaId) {
-                                avatarUrl = apiClient.getMediaUrl(workspaceId, activity.actor.avatarMediaId)
+                                avatarUrl = apiClient.getMediaUrl(workspaceId, activity.actor.avatarMediaId, 'thumbnail')
                             }
 
                             return {
@@ -322,7 +333,12 @@ export function useTaskDetail({
         }
 
         if (!isPriorityChanging) {
-            setCurrentPriority((task?.priority as "High" | "Medium" | "Low") || "Medium")
+            const p = task?.priority as string
+            let newPriority: "High" | "Medium" | "Low" = "Medium"
+            if (p === 'HIGH' || p === 'High') newPriority = 'High'
+            else if (p === 'LOW' || p === 'Low') newPriority = 'Low'
+
+            setCurrentPriority(newPriority)
         }
 
         setCurrentDueDate(task?.dueDate || null)
@@ -475,7 +491,8 @@ export function useTaskDetail({
                 setCurrentStatus(newStatus)
                 onTaskUpdate?.(String(response.task.id), {
                     title: response.task.title,
-                    description: response.task.description
+                    description: response.task.description,
+                    status: response.task.status
                 })
                 setTimeout(() => {
                     setIsStatusChanging(false)
@@ -511,7 +528,8 @@ export function useTaskDetail({
                 setCurrentPriority(newPriority as "High" | "Medium" | "Low")
                 onTaskUpdate?.(String(response.task.id), {
                     title: response.task.title,
-                    description: response.task.description
+                    description: response.task.description,
+                    priority: newPriority
                 })
                 setTimeout(() => {
                     setIsPriorityChanging(false)
@@ -541,7 +559,8 @@ export function useTaskDetail({
                 setCurrentDueDate(newDate)
                 onTaskUpdate?.(String(response.task.id), {
                     title: response.task.title,
-                    description: response.task.description
+                    description: response.task.description,
+                    dueDate: newDate
                 })
             }
         } catch (error: any) {
@@ -561,7 +580,7 @@ export function useTaskDetail({
             setCurrentAssigneeName(assignee?.name || assignee?.email || null)
 
             const response = await apiClient.updateTask(workspaceId, String(task.id), {
-                assigneeUserId: newAssigneeId || undefined,
+                assigneeUserId: newAssigneeId,
             })
 
             if (response?.task) {
@@ -571,7 +590,9 @@ export function useTaskDetail({
                 setCurrentAssigneeName(updatedAssignee?.name || updatedAssignee?.email || null)
                 onTaskUpdate?.(String(response.task.id), {
                     title: response.task.title,
-                    description: response.task.description
+                    description: response.task.description,
+                    assigneeUserId: updatedAssigneeId,
+                    assignedTo: updatedAssignee ? [updatedAssignee] : []
                 })
                 setTimeout(() => {
                     setIsAssigneeChanging(false)

@@ -24,9 +24,7 @@ export function TaskComments({
     const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
     const taskId = task?.id
-    if (!taskId) {
-        return null
-    }
+
 
     // Get current user ID
     useEffect(() => {
@@ -42,6 +40,10 @@ export function TaskComments({
         }
         fetchCurrentUser()
     }, [])
+
+    if (!taskId) {
+        return null
+    }
 
     const handleAddComment = async () => {
         if (!newCommentBody.trim()) {
@@ -121,11 +123,11 @@ export function TaskComments({
                 const updatedComments = comments.map((c) =>
                     c.id === commentId
                         ? {
-                              ...c,
-                              body: data.comment.body,
-                              isEdited: true,
-                              updatedAt: data.comment.updatedAt,
-                          }
+                            ...c,
+                            body: data.comment.body,
+                            isEdited: true,
+                            updatedAt: data.comment.updatedAt,
+                        }
                         : c
                 )
                 onCommentsUpdate(updatedComments)
@@ -205,10 +207,10 @@ export function TaskComments({
                             {(() => {
                                 // Get avatar URL - either from avatarUrl or from avatarMediaId
                                 let avatarUrl = comment.author.avatarUrl
-                                
+
                                 // If no avatarUrl but we have avatarMediaId, generate URL
                                 if (!avatarUrl && comment.author.avatarMediaId) {
-                                    avatarUrl = apiClient.getMediaUrl(workspaceId, comment.author.avatarMediaId)
+                                    avatarUrl = apiClient.getMediaUrl(workspaceId, comment.author.avatarMediaId, 'thumbnail')
                                 }
 
                                 const initials = (comment.author.name || comment.author.email || "U")
@@ -218,8 +220,8 @@ export function TaskComments({
                                 return (
                                     <>
                                         {avatarUrl && (
-                                            <AvatarImage 
-                                                src={avatarUrl} 
+                                            <AvatarImage
+                                                src={avatarUrl}
                                                 alt={comment.author.name || comment.author.email}
                                             />
                                         )}

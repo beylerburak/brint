@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useTranslations } from "next-intl"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -43,6 +44,7 @@ export function PropertyItem({
     onAssigneeChange,
     workspaceMembers = [],
 }: PropertyItemProps) {
+    const t = useTranslations("tasks")
     // Move useState outside of render function to fix React hooks violation
     const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false)
 
@@ -61,7 +63,7 @@ export function PropertyItem({
                             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                 <Status status={status}>
                                     <StatusIndicator />
-                                    <StatusLabel>{statusValue}</StatusLabel>
+                                    <StatusLabel>{t(`status.${statusValue}`) || statusValue}</StatusLabel>
                                 </Status>
                             </button>
                         </DropdownMenuTrigger>
@@ -74,7 +76,7 @@ export function PropertyItem({
                                 >
                                     <Status status={STATUS_MAP[statusOption] || "offline"}>
                                         <StatusIndicator />
-                                        <StatusLabel>{statusOption}</StatusLabel>
+                                        <StatusLabel>{t(`status.${statusOption}`)}</StatusLabel>
                                     </Status>
                                 </DropdownMenuItem>
                             ))}
@@ -91,7 +93,7 @@ export function PropertyItem({
                             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                 <Badge variant="outline" className="text-muted-foreground px-1.5">
                                     <IconFlagFilled className={`h-3.5 w-3.5 ${priority.color}`} />
-                                    <span>{priority.label}</span>
+                                    <span>{t(`priority.${priority.label}`) || priority.label}</span>
                                 </Badge>
                             </button>
                         </DropdownMenuTrigger>
@@ -106,7 +108,7 @@ export function PropertyItem({
                                     >
                                         <Badge variant="outline" className="text-muted-foreground px-1.5">
                                             <IconFlagFilled className={`h-3.5 w-3.5 ${p.color}`} />
-                                            <span>{p.label}</span>
+                                            <span>{t(`priority.${p.label}`) || p.label}</span>
                                         </Badge>
                                     </DropdownMenuItem>
                                 )
@@ -135,7 +137,7 @@ export function PropertyItem({
                 )
             }
             case 'assignee': {
-                const assigneeValue = value && value !== 'null' && value !== 'Unassigned' ? value : 'Unassigned'
+                const assigneeValue = value && value !== 'null' && value !== 'Unassigned' ? value : t("detail.unassigned")
                 const currentAssigneeId = workspaceMembers.find(m => m.name === value || m.email === value)?.id || null
                 const currentAssignee = currentAssigneeId ? workspaceMembers.find(m => m.id === currentAssigneeId) : null
 
@@ -165,9 +167,9 @@ export function PropertyItem({
                         </PopoverTrigger>
                         <PopoverContent className="w-[200px] p-0" align="start">
                             <Command>
-                                <CommandInput placeholder="Search members..." />
+                                <CommandInput placeholder={t("detail.searchMembers")} />
                                 <CommandList>
-                                    <CommandEmpty>No members found.</CommandEmpty>
+                                    <CommandEmpty>{t("detail.noMembers")}</CommandEmpty>
                                     <CommandGroup>
                                         <CommandItem
                                             onSelect={() => {
@@ -177,7 +179,7 @@ export function PropertyItem({
                                             className={!value || value === 'Unassigned' ? "bg-muted" : ""}
                                         >
                                             <IconUser className="h-4 w-4" />
-                                            Unassigned
+                                            {t("detail.unassigned")}
                                         </CommandItem>
                                         {workspaceMembers.map((member) => (
                                             <CommandItem

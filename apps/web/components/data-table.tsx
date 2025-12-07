@@ -535,7 +535,11 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             {availableStatuses.map((statusOption) => (
               <DropdownMenuItem
                 key={statusOption}
-                onClick={() => updateStatus?.(row.original.id, statusOption)}
+                onClick={() => {
+                  // updateStatus?.(row.original.id, statusOption) // Removed redundant call, let meta.onStatusChange handle it
+                  const onStatusChange = (table.options.meta as any)?.onStatusChange
+                  onStatusChange?.(row.original.id, statusOption)
+                }}
                 className={row.original.status === statusOption ? "bg-muted" : ""}
               >
                 <Status status={statusMap[statusOption] || "offline"}>
@@ -640,6 +644,8 @@ export function DataTable({
   isLoading = false,
   onRowClick,
   onDeleteTask,
+  onStatusChange,
+  ...props
 }: {
   data: z.infer<typeof schema>[]
   onLoadMore?: () => void
@@ -647,6 +653,7 @@ export function DataTable({
   isLoading?: boolean
   onRowClick?: (row: z.infer<typeof schema>) => void
   onDeleteTask?: (taskId: string | number) => void
+  onStatusChange?: (taskId: string | number, newStatus: string) => void
 }) {
   const [data, setData] = React.useState(() => initialData)
 
@@ -717,7 +724,13 @@ export function DataTable({
     userPrefs: userPrefs || { dateFormat: "DMY", timeFormat: "H24" },
     updateStatus,
     onDeleteTask,
-  }), [userPrefs, updateStatus, onDeleteTask])
+    onStatusChange: (taskId: string | number, newStatus: string) => {
+      // Also update local state for immediate feedback
+      updateStatus(taskId, newStatus)
+      // Call external handler
+      onStatusChange?.(taskId, newStatus)
+    }
+  }), [userPrefs, updateStatus, onDeleteTask, onStatusChange])
 
   const table = useReactTable({
     data,

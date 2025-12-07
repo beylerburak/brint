@@ -99,9 +99,12 @@ export function DatePickerWithTime({
                         newDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0)
                         onDateChange?.(newDate.toISOString())
                     } else {
-                        const newDate = new Date(selectedDate)
-                        newDate.setUTCHours(0, 0, 0, 0)
-                        onDateChange?.(newDate.toISOString())
+                        // Create UTC midnight date to signal "Date Only"
+                        const year = selectedDate.getFullYear()
+                        const month = selectedDate.getMonth()
+                        const day = selectedDate.getDate()
+                        const utcDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0))
+                        onDateChange?.(utcDate.toISOString())
                     }
                 } else {
                     onDateChange?.(null)

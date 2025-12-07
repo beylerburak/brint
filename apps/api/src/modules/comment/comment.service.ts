@@ -10,6 +10,7 @@ import { TaskRepository } from '../task/task.repository.js';
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { logActivity } from '../../core/activity/activity-log.service.js';
+import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 import { ActivityActorType, ActivityEntityType } from '@prisma/client';
 import type {
   CreateCommentInput,
@@ -130,6 +131,47 @@ async function assertCanAccessEntityForComment(
 }
 
 /**
+ * Convert Prisma comment to DTO with avatar URL generation
+ */
+async function toCommentDto(comment: any): Promise<CommentWithAuthorDto> {
+  let avatarUrl = comment.authorUser.avatarUrl;
+
+  if (!avatarUrl && comment.authorUser.avatarMediaId && comment.authorUser.avatarMedia) {
+    try {
+      const { bucket, variants } = comment.authorUser.avatarMedia;
+      if (bucket && variants) {
+        avatarUrl = await getMediaVariantUrlAsync(bucket, variants, 'thumbnail', false);
+      }
+    } catch (error) {
+      // Ignore error, keep null
+    }
+  }
+
+  return {
+    id: comment.id,
+    workspaceId: comment.workspaceId,
+    brandId: comment.brandId,
+    entityType: comment.entityType,
+    entityId: comment.entityId,
+    authorUserId: comment.authorUserId,
+    body: comment.body,
+    parentId: comment.parentId,
+    isEdited: comment.isEdited,
+    editedAt: comment.editedAt?.toISOString() ?? null,
+    deletedAt: comment.deletedAt?.toISOString() ?? null,
+    createdAt: comment.createdAt.toISOString(),
+    updatedAt: comment.updatedAt.toISOString(),
+    author: {
+      id: comment.authorUser.id,
+      name: comment.authorUser.name,
+      email: comment.authorUser.email,
+      avatarUrl,
+      avatarMediaId: comment.authorUser.avatarMediaId,
+    },
+  };
+}
+
+/**
  * List comments for a specific entity
  */
 export async function listCommentsForEntity(
@@ -160,28 +202,7 @@ export async function listCommentsForEntity(
     limit,
   });
 
-  const comments: CommentWithAuthorDto[] = result.comments.map((comment) => ({
-    id: comment.id,
-    workspaceId: comment.workspaceId,
-    brandId: comment.brandId,
-    entityType: comment.entityType,
-    entityId: comment.entityId,
-    authorUserId: comment.authorUserId,
-    body: comment.body,
-    parentId: comment.parentId,
-    isEdited: comment.isEdited,
-    editedAt: comment.editedAt?.toISOString() ?? null,
-    deletedAt: comment.deletedAt?.toISOString() ?? null,
-    createdAt: comment.createdAt.toISOString(),
-    updatedAt: comment.updatedAt.toISOString(),
-    author: {
-      id: comment.authorUser.id,
-      name: comment.authorUser.name,
-      email: comment.authorUser.email,
-      avatarUrl: comment.authorUser.avatarUrl,
-      avatarMediaId: comment.authorUser.avatarMediaId,
-    },
-  }));
+  const comments = await Promise.all(result.comments.map(toCommentDto));
 
   return {
     comments,
@@ -256,28 +277,7 @@ export async function createComment(
     payload: activityPayload,
   });
 
-  return {
-    id: comment.id,
-    workspaceId: comment.workspaceId,
-    brandId: comment.brandId,
-    entityType: comment.entityType,
-    entityId: comment.entityId,
-    authorUserId: comment.authorUserId,
-    body: comment.body,
-    parentId: comment.parentId,
-    isEdited: comment.isEdited,
-    editedAt: comment.editedAt?.toISOString() ?? null,
-    deletedAt: comment.deletedAt?.toISOString() ?? null,
-    createdAt: comment.createdAt.toISOString(),
-    updatedAt: comment.updatedAt.toISOString(),
-    author: {
-      id: comment.authorUser.id,
-      name: comment.authorUser.name,
-      email: comment.authorUser.email,
-      avatarUrl: comment.authorUser.avatarUrl,
-      avatarMediaId: comment.authorUser.avatarMediaId,
-    },
-  };
+  return toCommentDto(comment);
 }
 
 /**
@@ -355,27 +355,7 @@ export async function updateComment(
     payload: activityPayload,
   });
 
-  return {
-    id: updatedComment.id,
-    workspaceId: updatedComment.workspaceId,
-    brandId: updatedComment.brandId,
-    entityType: updatedComment.entityType,
-    entityId: updatedComment.entityId,
-    authorUserId: updatedComment.authorUserId,
-    body: updatedComment.body,
-    parentId: updatedComment.parentId,
-    isEdited: updatedComment.isEdited,
-    editedAt: updatedComment.editedAt?.toISOString() ?? null,
-    deletedAt: updatedComment.deletedAt?.toISOString() ?? null,
-    createdAt: updatedComment.createdAt.toISOString(),
-    updatedAt: updatedComment.updatedAt.toISOString(),
-    author: {
-      id: updatedComment.authorUser.id,
-      name: updatedComment.authorUser.name,
-      email: updatedComment.authorUser.email,
-      avatarUrl: updatedComment.authorUser.avatarUrl,
-    },
-  };
+  return toCommentDto(updatedComment);
 }
 
 /**
@@ -468,27 +448,6 @@ export async function getCommentById(
     return null;
   }
 
-  return {
-    id: comment.id,
-    workspaceId: comment.workspaceId,
-    brandId: comment.brandId,
-    entityType: comment.entityType,
-    entityId: comment.entityId,
-    authorUserId: comment.authorUserId,
-    body: comment.body,
-    parentId: comment.parentId,
-    isEdited: comment.isEdited,
-    editedAt: comment.editedAt?.toISOString() ?? null,
-    deletedAt: comment.deletedAt?.toISOString() ?? null,
-    createdAt: comment.createdAt.toISOString(),
-    updatedAt: comment.updatedAt.toISOString(),
-    author: {
-      id: comment.authorUser.id,
-      name: comment.authorUser.name,
-      email: comment.authorUser.email,
-      avatarUrl: comment.authorUser.avatarUrl,
-      avatarMediaId: comment.authorUser.avatarMediaId,
-    },
-  };
+  return toCommentDto(comment);
 }
 

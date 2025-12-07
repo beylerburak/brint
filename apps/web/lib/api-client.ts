@@ -1009,7 +1009,7 @@ export const apiClient = {
       description?: string;
       statusId?: string;
       priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-      assigneeUserId?: string;
+      assigneeUserId?: string | null;
       dueDate?: string;
       checklistItems?: Array<{
         id?: string;

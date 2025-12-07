@@ -47,13 +47,13 @@ export function TaskActivityFeed({
         <div className="flex flex-col gap-4 px-0 overflow-y-auto">
             {activities.map((activity) => {
                 // Get actor name and avatar
-                const actorName = activity.actor 
+                const actorName = activity.actor
                     ? (activity.actor.name || activity.actor.email || "Unknown")
                     : (activity.actorLabel || "System")
-                
+
                 let actorAvatarUrl = activity.actor?.avatarUrl || null
                 if (!actorAvatarUrl && activity.actor?.avatarMediaId) {
-                    actorAvatarUrl = apiClient.getMediaUrl(workspaceId, activity.actor.avatarMediaId)
+                    actorAvatarUrl = apiClient.getMediaUrl(workspaceId, activity.actor.avatarMediaId, 'thumbnail')
                 }
 
                 const initials = actorName.substring(0, 2).toUpperCase()
@@ -61,8 +61,8 @@ export function TaskActivityFeed({
                 return (
                     <div key={activity.id} className="flex gap-3 group pt-2">
                         <Avatar className="h-8 w-8 flex-shrink-0">
-                            <AvatarImage 
-                                src={actorAvatarUrl || undefined} 
+                            <AvatarImage
+                                src={actorAvatarUrl || undefined}
                                 alt={actorName}
                             />
                             <AvatarFallback className="text-[10px] font-semibold">

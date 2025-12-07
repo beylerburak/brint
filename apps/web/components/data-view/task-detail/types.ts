@@ -113,7 +113,16 @@ export interface TaskDetailModalProps {
     brandName?: string
     brandLogoUrl?: string | null
     isCreateMode?: boolean
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        statusId?: string;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
     onTaskCreate?: (task: BaseTask) => void
 }
 
@@ -137,7 +146,16 @@ export interface SortableChecklistItemProps {
     checklistItems: ChecklistItem[]
     onUpdate: (items: ChecklistItem[]) => void
     onDelete: (itemId: string) => void
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string | undefined }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        statusId?: string;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
 }
 
 // Date Picker Props
@@ -152,7 +170,16 @@ export interface TaskChecklistProps {
     workspaceId: string
     checklistItems: ChecklistItem[]
     onChecklistUpdate: (items: ChecklistItem[]) => void
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        statusId?: string;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
 }
 
 // Task Properties Props
@@ -186,7 +213,16 @@ export interface TaskCommentsProps {
     workspaceId: string
     comments: CommentItem[]
     onCommentsUpdate: (comments: CommentItem[]) => void
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        statusId?: string;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
 }
 
 // Task Activity Tabs Props
@@ -197,5 +233,14 @@ export interface TaskActivityTabsProps {
     onCommentsUpdate: (comments: CommentItem[]) => void
     activities: ActivityItem[]
     onActivitiesUpdate: (activities: ActivityItem[]) => void
-    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+    onTaskUpdate?: (taskId: string, updates: {
+        title?: string;
+        description?: string;
+        status?: any;
+        statusId?: string;
+        priority?: string;
+        dueDate?: string | null;
+        assigneeUserId?: string | null;
+        assignedTo?: any[];
+    }) => void
 }

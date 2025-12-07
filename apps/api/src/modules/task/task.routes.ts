@@ -7,6 +7,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
 import { getWorkspaceIdFromRequest } from '../../core/auth/workspace-context.js';
+import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 import { prisma } from '../../lib/prisma.js';
 import {
   createTask,
@@ -146,7 +147,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
       broadcastTaskEvent(workspaceId, {
         type: 'task.created',
         data: task,
-      }, input.brandId);
+      }, input.brandId || undefined);
 
       return reply.status(201).send({
         success: true,
@@ -302,7 +303,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
           projectId: { type: 'string' },
           statusId: { type: 'string' },
           priority: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
-          assigneeUserId: { type: 'string' },
+          assigneeUserId: { type: 'string', nullable: true },
           dueDate: { type: 'string', format: 'date-time' },
           checklistItems: {
             type: 'array',
@@ -451,7 +452,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
     try {
       // Get task before deletion to get brandId for WebSocket broadcast
       const task = await getTaskById({ userId, workspaceId }, taskId);
-      
+
       await deleteTask(
         { userId, workspaceId },
         taskId
@@ -461,7 +462,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
       broadcastTaskEvent(workspaceId, {
         type: 'task.deleted',
         data: { id: taskId },
-      }, task.brandId || undefined);
+      }, task?.brandId || undefined);
 
       return reply.status(200).send({
         success: true,
@@ -887,25 +888,45 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
 
       const actorUsers = actorUserIds.length > 0
         ? await prisma.user.findMany({
-            where: {
-              id: { in: actorUserIds },
+          where: {
+            id: { in: actorUserIds },
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              },
             },
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatarUrl: true,
-              avatarMediaId: true,
-            },
-          })
+          },
+        })
         : [];
+
+      // Generate avatar URLs for users
+      await Promise.all(actorUsers.map(async (user: any) => {
+        if (!user.avatarUrl && user.avatarMediaId && user.avatarMedia) {
+          try {
+            const { bucket, variants } = user.avatarMedia;
+            if (bucket && variants) {
+              user.avatarUrl = await getMediaVariantUrlAsync(bucket, variants, 'thumbnail', false);
+            }
+          } catch (error) {
+            // Ignore error, keep null
+          }
+        }
+      }));
 
       const actorUserMap = new Map(actorUsers.map(user => [user.id, user]));
 
       // Format activity logs with actor information
       const formattedLogs = activityLogs.map(log => {
         const actorUser = log.actorUserId ? actorUserMap.get(log.actorUserId) : null;
-        
+
         return {
           id: log.id,
           eventKey: log.eventKey,

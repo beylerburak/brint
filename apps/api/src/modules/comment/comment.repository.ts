@@ -42,6 +42,12 @@ export class CommentRepository {
               email: true,
               avatarUrl: true,
               avatarMediaId: true,
+              avatarMedia: {
+                select: {
+                  bucket: true,
+                  variants: true,
+                }
+              },
             },
           },
         },
@@ -76,6 +82,13 @@ export class CommentRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              }
+            },
           },
         },
       },
@@ -105,6 +118,13 @@ export class CommentRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              }
+            },
           },
         },
       },
@@ -140,6 +160,13 @@ export class CommentRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              }
+            },
           },
         },
       },
@@ -164,6 +191,13 @@ export class CommentRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              }
+            },
           },
         },
       },
@@ -219,6 +253,13 @@ export class CommentRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              }
+            },
           },
         },
       },

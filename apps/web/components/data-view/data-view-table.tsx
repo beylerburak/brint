@@ -25,7 +25,8 @@ export const DataViewTable = memo(function DataViewTable({
   className = "",
   onTaskClick,
   onDeleteTask,
-}: DataViewTableProps) {
+  onStatusChange,
+}: DataViewTableProps & { onStatusChange?: (taskId: string | number, newStatus: string) => void }) {
   // Filter data based on filterTab
   const filteredData = useMemo(() => {
     return filterTasksByTab<TableTask>(data, filterTab)
@@ -40,6 +41,7 @@ export const DataViewTable = memo(function DataViewTable({
         isLoading={isLoading}
         onRowClick={(row) => onTaskClick?.(row as unknown as TableTask)}
         onDeleteTask={onDeleteTask}
+        onStatusChange={onStatusChange}
       />
     </div>
   )

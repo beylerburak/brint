@@ -88,6 +88,11 @@ export default function BrandTasksPage() {
     total: 0,
     totalPages: 0,
   })
+  const [taskStatuses, setTaskStatuses] = useState<{
+    TODO: Array<{ id: string; label: string }>;
+    IN_PROGRESS: Array<{ id: string; label: string }>;
+    DONE: Array<{ id: string; label: string }>;
+  } | null>(null)
 
   // Refs for preventing duplicate API calls
   const initFetchingRef = useRef(false)
@@ -308,7 +313,7 @@ export default function BrandTasksPage() {
       setPagination(response.pagination)
     } catch (error: any) {
       console.error("Failed to load more tasks:", error)
-      toast.error("Failed to load more tasks")
+      toast.error(t("errors.loadMore"))
     } finally {
       setIsLoadingMore(false)
     }
@@ -339,7 +344,7 @@ export default function BrandTasksPage() {
         const brandsResponse = await apiClient.listBrands(currentWorkspace.id)
         const brand = brandsResponse.brands.find((b) => b.slug === brandSlug)
         if (!brand) {
-          toast.error("Brand not found")
+          toast.error(t("errors.brandNotFound"))
           return
         }
 
@@ -361,11 +366,15 @@ export default function BrandTasksPage() {
         setTasks(tasksResponse.tasks)
         setPagination(tasksResponse.pagination)
 
+        // Fetch task statuses
+        const statusesResponse = await apiClient.listTaskStatuses(currentWorkspace.id, brand.id)
+        setTaskStatuses(statusesResponse.statuses)
+
         // Mark as fetched for this key
         initFetchedForRef.current = fetchKey
       } catch (error: any) {
         console.error("Failed to initialize:", error)
-        toast.error("Failed to load page data")
+        toast.error(t("errors.loadPageData"))
       } finally {
         setIsLoadingTasks(false)
         initFetchingRef.current = false
@@ -536,6 +545,94 @@ export default function BrandTasksPage() {
     },
   })
 
+  // Handle status change from table view
+  const handleStatusChange = useCallback(async (taskId: string | number, newStatus: string) => {
+    if (!currentWorkspace) return
+
+    try {
+      // Find the task to get its current status ID if needed, or just use the label
+      const task = tasks.find(t => String(t.id) === String(taskId))
+      if (!task) return
+
+      // Optimistic update
+      setTasks(prev => prev.map(t => {
+        if (String(t.id) === String(taskId)) {
+          return {
+            ...t,
+            status: {
+              ...t.status,
+              label: newStatus
+            }
+          }
+        }
+        return t
+      }))
+
+      // Find status ID from label
+      let statusId = ''
+      if (taskStatuses) {
+        // Map UI labels back to groups
+        const uiStatusToGroup: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+          "Not Started": "TODO",
+          "In Progress": "IN_PROGRESS",
+          "Done": "DONE"
+        }
+
+        const targetGroup = uiStatusToGroup[newStatus]
+
+        if (targetGroup) {
+          // Find the default or first status in the target group
+          const groupStatuses = taskStatuses[targetGroup]
+          // Try to find default one first, otherwise take the first one
+          // The API doesn't explicitly return isDefault in the type definition above but usually it's there
+          // If not, just taking the first one is a safe bet for these standard groups
+          if (groupStatuses && groupStatuses.length > 0) {
+            statusId = groupStatuses[0].id
+          }
+        } else {
+          // Fallback: try to find by label directly (in case newStatus is not one of the mapped ones)
+          const allStatuses = [
+            ...taskStatuses.TODO,
+            ...taskStatuses.IN_PROGRESS,
+            ...taskStatuses.DONE
+          ]
+          const statusObj = allStatuses.find(s => s.label === newStatus)
+          if (statusObj) {
+            statusId = statusObj.id
+          }
+        }
+      }
+
+      // If we couldn't find the ID (e.g. statuses not loaded yet), we might fail
+      // But let's try to proceed if we have an ID, or log error
+      if (!statusId) {
+        console.error("Could not find status ID for label:", newStatus)
+        toast.error(t("errors.statusIdNotFound"))
+        return
+      }
+
+      await apiClient.updateTask(currentWorkspace.id, String(taskId), {
+        statusId: statusId
+      })
+
+      toast.success(t("success.updateStatus"))
+    } catch (error) {
+      console.error("Failed to update status:", error)
+      toast.error(t("errors.updateStatus"))
+
+      // Revert optimistic update (optional, or just reload)
+      if (brandId) {
+        const response = await apiClient.listTasks({
+          workspaceId: currentWorkspace.id,
+          brandId,
+          page: pagination.page,
+          limit: pagination.limit,
+        })
+        setTasks(response.tasks)
+      }
+    }
+  }, [currentWorkspace, tasks, brandId, pagination, taskStatuses])
+
   return (
     <div className="w-full flex flex-col min-h-0" style={{ height: "100vh" }}>
       {/* Header */}
@@ -550,7 +647,7 @@ export default function BrandTasksPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => setShowSummary(!showSummary)}>
-                {showSummary ? "Özeti gizle" : "Özeti göster"}
+                {showSummary ? t("summary.hide") : t("summary.show")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -641,7 +738,7 @@ export default function BrandTasksPage() {
       <div className={`w-full sm:px-6 ${viewMode === "kanban" ? "px-6" : "px-0"} flex-1 min-h-0 flex flex-col`}>
         {isLoadingTasks ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Loading tasks...</div>
+            <div className="text-muted-foreground">{t("loading")}</div>
           </div>
         ) : viewMode === "table" ? (
           <DataViewTable
@@ -660,28 +757,28 @@ export default function BrandTasksPage() {
 
               try {
                 await apiClient.deleteTask(currentWorkspace.id, String(taskId))
-                
+
                 // Remove task from list
                 setTasks((prev) => prev.filter((task) => task.id !== String(taskId)))
-                
+
                 // Close modal if deleted task is selected
                 if (selectedTask && String(selectedTask.id) === String(taskId)) {
                   setIsTaskModalOpen(false)
                   setSelectedTask(null)
                 }
-                
+
                 // Update pagination total
                 setPagination((prev) => ({
                   ...prev,
                   total: Math.max(0, prev.total - 1),
                 }))
-                
-                toast.success("Task başarıyla silindi")
+
+                toast.success(t("success.deleteTask"))
               } catch (error: any) {
-                console.error("Failed to delete task:", error)
-                toast.error("Task silinirken bir hata oluştu")
+                toast.error(t("errors.deleteTask"))
               }
             }}
+            onStatusChange={handleStatusChange}
           />
         ) : (
           <DataViewKanban
@@ -768,8 +865,17 @@ export default function BrandTasksPage() {
               const updatedTasks = [...prevTasks]
               updatedTasks[taskIndex] = {
                 ...updatedTasks[taskIndex],
-                ...(updates.title && { title: updates.title }),
+                ...(updates.title !== undefined && { title: updates.title }),
                 ...(updates.description !== undefined && { description: updates.description }),
+                ...(updates.status !== undefined && {
+                  status: typeof updates.status === 'string'
+                    ? { ...updatedTasks[taskIndex].status, label: updates.status }
+                    : { ...updatedTasks[taskIndex].status, ...updates.status }
+                }),
+                ...(updates.priority !== undefined && { priority: updates.priority === 'High' ? 'HIGH' : updates.priority === 'Low' ? 'LOW' : 'MEDIUM' }),
+                ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+                ...(updates.assigneeUserId !== undefined && { assigneeUserId: updates.assigneeUserId }),
+                ...(updates.assignedTo !== undefined && { assignedTo: updates.assignedTo }),
               }
 
               console.log('[TaskUpdate] Task updated:', {
@@ -788,6 +894,11 @@ export default function BrandTasksPage() {
                 ...prev!,
                 ...(updates.title && { title: updates.title }),
                 ...(updates.description !== undefined && { description: updates.description }),
+                ...(updates.status && { status: updates.status }),
+                ...(updates.priority && { priority: updates.priority }),
+                ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+                ...(updates.assigneeUserId !== undefined && { assigneeUserId: updates.assigneeUserId }),
+                ...(updates.assignedTo !== undefined && { assignedTo: updates.assignedTo }),
               }))
             }
           }}

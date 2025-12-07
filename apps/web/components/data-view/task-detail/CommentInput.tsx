@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { IconPlus, IconMoodSmile, IconAt, IconBolt, IconCircleX, IconSend } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
@@ -17,10 +18,12 @@ export function CommentInput({
     value,
     onChange,
     onSubmit,
-    placeholder = "Add comment or update...",
+    placeholder,
     className,
 }: CommentInputProps) {
+    const t = useTranslations("tasks")
     const [isFocused, setIsFocused] = useState(false)
+    const defaultPlaceholder = placeholder || t("comments.addCommentPlaceholder")
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -107,7 +110,7 @@ export function CommentInput({
                         onKeyDown={handleKeyDown}
                         onFocus={handleFocus}
                         onBlur={handleBlur}
-                        placeholder={placeholder}
+                        placeholder={defaultPlaceholder}
                         className={cn(
                             "w-full max-h-[200px] px-4 text-sm bg-transparent border-0 resize-none focus:outline-none focus:ring-0 placeholder:text-muted-foreground transition-all duration-200",
                             isExpanded ? "min-h-[80px] pt-3 pb-2 rounded-t-lg" : "h-10 py-2 rounded-lg"
@@ -188,7 +191,7 @@ export function CommentInput({
                             variant={value.trim() ? "default" : "ghost"}
                         >
                             <IconSend className="h-3.5 w-3.5" />
-                            Comment
+                            {t("comments.comment")}
                         </Button>
                     </div>
                 )}

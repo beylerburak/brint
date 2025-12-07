@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -18,6 +19,7 @@ export function TaskComments({
     onCommentsUpdate,
     onTaskUpdate,
 }: TaskCommentsProps) {
+    const t = useTranslations("tasks")
     const [newCommentBody, setNewCommentBody] = useState("")
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
     const [editCommentBody, setEditCommentBody] = useState("")
@@ -87,7 +89,7 @@ export function TaskComments({
             }
         } catch (error: any) {
             console.error("Failed to add comment:", error)
-            toast.error(error?.message || "Failed to add comment")
+            toast.error(error?.message || t("comments.addError"))
             setNewCommentBody(commentBody) // Restore comment on error
         }
     }
@@ -133,11 +135,11 @@ export function TaskComments({
                 onCommentsUpdate(updatedComments)
                 setEditingCommentId(null)
                 setEditCommentBody("")
-                toast.success("Comment updated")
+                toast.success(t("comments.updateSuccess"))
             }
         } catch (error: any) {
             console.error("Failed to update comment:", error)
-            toast.error(error?.message || "Failed to update comment")
+            toast.error(error?.message || t("comments.updateError"))
         }
     }
 
@@ -159,10 +161,10 @@ export function TaskComments({
 
             const updatedComments = comments.filter((c) => c.id !== commentId)
             onCommentsUpdate(updatedComments)
-            toast.success("Comment deleted")
+            toast.success(t("comments.deleteSuccess"))
         } catch (error: any) {
             console.error("Failed to delete comment:", error)
-            toast.error(error?.message || "Failed to delete comment")
+            toast.error(error?.message || t("comments.deleteError"))
         }
     }
 
@@ -184,10 +186,10 @@ export function TaskComments({
         const diffHours = Math.floor(diffMs / 3600000)
         const diffDays = Math.floor(diffMs / 86400000)
 
-        if (diffMins < 1) return "Just now"
-        if (diffMins < 60) return `${diffMins}m ago`
-        if (diffHours < 24) return `${diffHours}h ago`
-        if (diffDays < 7) return `${diffDays}d ago`
+        if (diffMins < 1) return t("comments.time.justNow")
+        if (diffMins < 60) return t("comments.time.minutesAgo", { count: diffMins })
+        if (diffHours < 24) return t("comments.time.hoursAgo", { count: diffHours })
+        if (diffDays < 7) return t("comments.time.daysAgo", { count: diffDays })
         return date.toLocaleDateString()
     }
 
@@ -197,7 +199,7 @@ export function TaskComments({
             <div className="flex flex-col gap-1 flex-1 min-h-0 overflow-y-auto overflow-x-visible">
                 {comments.length === 0 && (
                     <div className="text-sm text-muted-foreground py-2 px-2 text-center">
-                        No comments yet.
+                        {t("comments.noComments")}
                     </div>
                 )}
                 {comments.map((comment) => (
@@ -243,7 +245,7 @@ export function TaskComments({
                                     {formatDate(comment.createdAt)}
                                 </span>
                                 {comment.isEdited && (
-                                    <span className="text-xs text-muted-foreground">(edited)</span>
+                                    <span className="text-xs text-muted-foreground">{t("comments.edited")}</span>
                                 )}
                             </div>
 
@@ -271,7 +273,7 @@ export function TaskComments({
                                             onClick={() => handleEditComment(comment.id)}
                                         >
                                             <IconSend className="h-3 w-3" />
-                                            Save
+                                            {t("comments.save")}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -279,7 +281,7 @@ export function TaskComments({
                                             className="h-7 px-2 text-xs"
                                             onClick={cancelEdit}
                                         >
-                                            Cancel
+                                            {t("comments.cancel")}
                                         </Button>
                                     </div>
                                 </div>
@@ -325,7 +327,7 @@ export function TaskComments({
                     value={newCommentBody}
                     onChange={setNewCommentBody}
                     onSubmit={handleAddComment}
-                    placeholder="Add comment or update..."
+                    placeholder={t("comments.addCommentPlaceholder")}
                 />
             </div>
         </div>

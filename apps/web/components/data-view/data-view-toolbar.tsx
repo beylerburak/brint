@@ -26,8 +26,6 @@ import {
   IconTable,
   IconLayoutKanban,
   IconFilter,
-  IconFlag,
-  IconUser,
   IconListCheck,
   IconClock,
   IconAlertCircle,
@@ -242,46 +240,13 @@ export function DataViewToolbar({
           </DropdownMenu>
         </div>
 
-        {/* Right side: Filter buttons and New Task */}
+        {/* Right side: Filter button and New Task */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Filter buttons - visible on larger screens */}
-          <div className="hidden lg:flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <IconFilter className="h-4 w-4" />
-              {filterLabels.filter}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <IconUser className="h-4 w-4" />
-              {filterLabels.assignee}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <IconFlag className="h-4 w-4" />
-              {filterLabels.priority}
-            </Button>
-          </div>
-
-          {/* Filter dropdown - visible on smaller screens */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="lg:hidden gap-2">
-                <IconFilter className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <IconFilter className="h-4 w-4" />
-                <span>{filterLabels.filter}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconUser className="h-4 w-4" />
-                <span>{filterLabels.assignee}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconFlag className="h-4 w-4" />
-                <span>{filterLabels.priority}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Filter button */}
+          <Button variant="outline" size="sm" className="gap-2">
+            <IconFilter className="h-4 w-4" />
+            {filterLabels.filter}
+          </Button>
 
           {onNewTask && (
             <Button size="sm" className="flex-shrink-0" onClick={onNewTask}>
@@ -398,14 +363,6 @@ export function DataViewToolbar({
               <Button variant="outline" size="sm" className="gap-2 justify-start">
                 <IconFilter className="h-4 w-4" />
                 {filterLabels.filter}
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2 justify-start">
-                <IconUser className="h-4 w-4" />
-                {filterLabels.assignee}
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2 justify-start">
-                <IconFlag className="h-4 w-4" />
-                {filterLabels.priority}
               </Button>
             </div>
           </div>

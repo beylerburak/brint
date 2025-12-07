@@ -153,6 +153,13 @@
       "dueDate": "Due Date",
       "unassigned": "Unassigned",
       "unknown": "Unknown",
+      "columns": {
+        "title": "Title",
+        "assignedTo": "Assigned to",
+        "priority": "Priority",
+        "status": "Status",
+        "dueDate": "Due Date"
+      },
       "time": {
         "justNow": "just now",
         "now": "now",
@@ -195,6 +202,50 @@
       "noMembers": "No members found.",
       "unassigned": "Unassigned"
     },
+    "checklist": {
+      "title": "Checklist",
+      "addItem": "Add item",
+      "addItemPlaceholder": "Add checklist item...",
+      "reorderError": "Failed to reorder checklist items",
+      "addError": "Failed to add checklist item"
+    },
+    "attachments": {
+      "title": "Attachments",
+      "uploadSuccess": "Successfully uploaded {count} file(s)",
+      "uploadError": "Failed to upload attachment",
+      "deleteSuccess": "Attachment deleted successfully",
+      "deleteError": "Failed to delete attachment",
+      "attachmentLabel": "Attachment {id}"
+    },
+    "activity": {
+      "title": "Activity",
+      "comments": "Comments",
+      "activity": "Activity",
+      "workLog": "Work Log",
+      "workLogComingSoon": "Work log coming soon...",
+      "noActivity": "No activity yet",
+      "unknown": "Unknown",
+      "system": "System"
+    },
+    "comments": {
+      "noComments": "No comments yet.",
+      "addCommentPlaceholder": "Add comment or update...",
+      "edited": "(edited)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "comment": "Comment",
+      "updateSuccess": "Comment updated",
+      "deleteSuccess": "Comment deleted",
+      "addError": "Failed to add comment",
+      "updateError": "Failed to update comment",
+      "deleteError": "Failed to delete comment",
+      "time": {
+        "justNow": "Just now",
+        "minutesAgo": "{count}m ago",
+        "hoursAgo": "{count}h ago",
+        "daysAgo": "{count}d ago"
+      }
+    },
     "priority": {
       "Low": "Low",
       "Medium": "Medium",
@@ -207,6 +258,23 @@
       "TODO": "To Do",
       "IN_PROGRESS": "In Progress",
       "DONE": "Done"
+    },
+    "type": {
+      "task": "Task"
+    },
+    "dueDate": {
+      "noDueDate": "No due date",
+      "inDays": "in {count} days",
+      "inDays_one": "in {count} day",
+      "inDays_other": "in {count} days"
+    },
+    "kanban": {
+      "columns": {
+        "todo": "To Do",
+        "inProgress": "In Progress",
+        "overdue": "Overdue",
+        "completed": "Completed"
+      }
     },
     "actions": {
       "edit": "Edit",

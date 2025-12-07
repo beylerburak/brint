@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { useTranslations } from "next-intl"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { apiClient } from "@/lib/api-client"
 import { BaseTask } from "../types"
@@ -19,6 +20,7 @@ export function TaskActivityFeed({
     activities,
     onActivitiesUpdate,
 }: TaskActivityFeedProps) {
+    const t = useTranslations("tasks")
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
@@ -28,17 +30,17 @@ export function TaskActivityFeed({
         const diffHours = Math.floor(diffMs / 3600000)
         const diffDays = Math.floor(diffMs / 86400000)
 
-        if (diffMins < 1) return "Just now"
-        if (diffMins < 60) return `${diffMins}m ago`
-        if (diffHours < 24) return `${diffHours}h ago`
-        if (diffDays < 7) return `${diffDays}d ago`
+        if (diffMins < 1) return t("comments.time.justNow")
+        if (diffMins < 60) return t("comments.time.minutesAgo", { count: diffMins })
+        if (diffHours < 24) return t("comments.time.hoursAgo", { count: diffHours })
+        if (diffDays < 7) return t("comments.time.daysAgo", { count: diffDays })
         return date.toLocaleDateString()
     }
 
     if (activities.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground py-8">
-                No activity yet
+                {t("activity.noActivity")}
             </div>
         )
     }
@@ -48,8 +50,8 @@ export function TaskActivityFeed({
             {activities.map((activity) => {
                 // Get actor name and avatar
                 const actorName = activity.actor
-                    ? (activity.actor.name || activity.actor.email || "Unknown")
-                    : (activity.actorLabel || "System")
+                    ? (activity.actor.name || activity.actor.email || t("activity.unknown"))
+                    : (activity.actorLabel || t("activity.system"))
 
                 let actorAvatarUrl = activity.actor?.avatarUrl || null
                 if (!actorAvatarUrl && activity.actor?.avatarMediaId) {

@@ -227,6 +227,7 @@ export function TaskDetailModal({
               <TaskProperties
                 task={task}
                 workspaceId={workspaceId}
+                brandId={brandId}
                 currentStatus={currentStatus}
                 currentPriority={currentPriority}
                 currentDueDate={currentDueDate}
@@ -289,7 +290,7 @@ export function TaskDetailModal({
                         setIsEditingTitle(true)
                       }}
                     >
-                      {editedTitle || task?.title || "Untitled Task"}
+                      {editedTitle || task?.title || t("detail.untitled")}
                     </h2>
                   )}
                   {isEditingDescription ? (
@@ -319,7 +320,7 @@ export function TaskDetailModal({
                         }
                       }}
                     >
-                      {editedDescription || task?.description || "No description"}
+                      {editedDescription || task?.description || t("detail.noDescription")}
                     </div>
                   )}
                 </div>

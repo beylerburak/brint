@@ -153,6 +153,13 @@
       "dueDate": "Bitiş Tarihi",
       "unassigned": "Atanmamış",
       "unknown": "Bilinmiyor",
+      "columns": {
+        "title": "Başlık",
+        "assignedTo": "Atanan",
+        "priority": "Öncelik",
+        "status": "Durum",
+        "dueDate": "Bitiş Tarihi"
+      },
       "time": {
         "justNow": "az önce",
         "now": "şimdi",
@@ -195,6 +202,50 @@
       "noMembers": "Üye bulunamadı.",
       "unassigned": "Atanmamış"
     },
+    "checklist": {
+      "title": "Kontrol Listesi",
+      "addItem": "Öğe ekle",
+      "addItemPlaceholder": "Kontrol listesi öğesi ekle...",
+      "reorderError": "Kontrol listesi öğeleri yeniden sıralanamadı",
+      "addError": "Kontrol listesi öğesi eklenemedi"
+    },
+    "attachments": {
+      "title": "Ekler",
+      "uploadSuccess": "{count} dosya başarıyla yüklendi",
+      "uploadError": "Eklenti yüklenemedi",
+      "deleteSuccess": "Eklenti başarıyla silindi",
+      "deleteError": "Eklenti silinemedi",
+      "attachmentLabel": "Eklenti {id}"
+    },
+    "activity": {
+      "title": "Aktivite",
+      "comments": "Yorumlar",
+      "activity": "Aktivite",
+      "workLog": "İş Günlüğü",
+      "workLogComingSoon": "İş günlüğü yakında...",
+      "noActivity": "Henüz aktivite yok",
+      "unknown": "Bilinmiyor",
+      "system": "Sistem"
+    },
+    "comments": {
+      "noComments": "Henüz yorum yok.",
+      "addCommentPlaceholder": "Yorum ekle veya güncelle...",
+      "edited": "(düzenlendi)",
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "comment": "Yorum",
+      "updateSuccess": "Yorum güncellendi",
+      "deleteSuccess": "Yorum silindi",
+      "addError": "Yorum eklenemedi",
+      "updateError": "Yorum güncellenemedi",
+      "deleteError": "Yorum silinemedi",
+      "time": {
+        "justNow": "Az önce",
+        "minutesAgo": "{count} dk önce",
+        "hoursAgo": "{count} sa önce",
+        "daysAgo": "{count} gün önce"
+      }
+    },
     "priority": {
       "Low": "Düşük",
       "Medium": "Orta",
@@ -207,6 +258,23 @@
       "TODO": "Yapılacak",
       "IN_PROGRESS": "Devam Ediyor",
       "DONE": "Tamamlandı"
+    },
+    "type": {
+      "task": "Görev"
+    },
+    "dueDate": {
+      "noDueDate": "Bitiş tarihi yok",
+      "inDays": "{count} gün içinde",
+      "inDays_one": "{count} gün içinde",
+      "inDays_other": "{count} gün içinde"
+    },
+    "kanban": {
+      "columns": {
+        "todo": "Yapılacaklar",
+        "inProgress": "Devam Ediyor",
+        "overdue": "Gecikmiş",
+        "completed": "Tamamlanan"
+      }
     },
     "actions": {
       "edit": "Düzenle",

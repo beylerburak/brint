@@ -136,6 +136,7 @@ export interface PropertyItemProps {
     onDateChange?: (newDate: string | null) => void
     onAssigneeChange?: (newAssigneeId: string | null) => void
     workspaceMembers?: WorkspaceMember[]
+    availableStatuses?: Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>
 }
 
 // Sortable Checklist Item Props
@@ -186,6 +187,7 @@ export interface TaskChecklistProps {
 export interface TaskPropertiesProps {
     task: BaseTask | null
     workspaceId: string
+    brandId?: string
     currentStatus: string
     currentPriority: "High" | "Medium" | "Low"
     currentDueDate: string | null

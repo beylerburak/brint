@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useTranslations } from "next-intl"
 import {
     DndContext,
     closestCenter,
@@ -31,6 +32,7 @@ export function TaskChecklist({
     onChecklistUpdate,
     onTaskUpdate,
 }: TaskChecklistProps) {
+    const t = useTranslations("tasks")
     const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("")
     const [isAddingChecklistItem, setIsAddingChecklistItem] = useState(false)
 
@@ -77,7 +79,7 @@ export function TaskChecklist({
             } catch (error: any) {
                 console.error("Failed to reorder checklist items:", error)
                 onChecklistUpdate(task?.checklistItems || [])
-                toast.error(error?.message || "Failed to reorder checklist items")
+                toast.error(error?.message || t("checklist.reorderError"))
             }
         }
     }
@@ -129,7 +131,7 @@ export function TaskChecklist({
         } catch (error: any) {
             console.error("Failed to add checklist item:", error)
             onChecklistUpdate(task?.checklistItems || [])
-            toast.error(error?.message || "Failed to add checklist item")
+            toast.error(error?.message || t("checklist.addError"))
             setIsAddingChecklistItem(false)
             setNewChecklistItemTitle("")
         }
@@ -142,7 +144,7 @@ export function TaskChecklist({
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium flex items-center gap-1.5">
                     <IconListCheck className="h-4 w-4" />
-                    Checklist
+                    {t("checklist.title")}
                 </h3>
                 {!isAddingChecklistItem && (
                     <Button
@@ -155,7 +157,7 @@ export function TaskChecklist({
                         }}
                     >
                         <IconPlus className="h-3.5 w-3.5" />
-                        Add item
+                        {t("checklist.addItem")}
                     </Button>
                 )}
             </div>
@@ -204,7 +206,7 @@ export function TaskChecklist({
                                 setIsAddingChecklistItem(false)
                             }
                         }}
-                        placeholder="Add checklist item..."
+                        placeholder={t("checklist.addItemPlaceholder")}
                         className="flex-1 text-sm font-medium h-auto py-0 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-0 text-foreground"
                         autoFocus
                     />

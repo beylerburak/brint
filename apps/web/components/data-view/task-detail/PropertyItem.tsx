@@ -43,6 +43,7 @@ export function PropertyItem({
     onDateChange,
     onAssigneeChange,
     workspaceMembers = [],
+    availableStatuses,
 }: PropertyItemProps) {
     const t = useTranslations("tasks")
     // Move useState outside of render function to fix React hooks violation
@@ -55,7 +56,101 @@ export function PropertyItem({
                     ? (value as any).label
                     : String(value)
 
-                const status = STATUS_MAP[statusValue] || "offline"
+                // Use available statuses from API if provided, otherwise fall back to AVAILABLE_STATUSES
+                const statusesToUse = availableStatuses && availableStatuses.length > 0
+                    ? availableStatuses.map(s => s.label)
+                    : AVAILABLE_STATUSES
+
+                // Display status: if using API statuses, show the actual label, otherwise translate
+                const isUsingApiStatuses = availableStatuses && availableStatuses.length > 0
+                
+                // If statusValue is a translation key (e.g., "Done"), find the actual label from API statuses
+                let displayStatus = statusValue
+                if (isUsingApiStatuses) {
+                    // Check if statusValue is a translation key (one of the standard statuses)
+                    const isTranslationKey = AVAILABLE_STATUSES.includes(statusValue as any)
+                    if (isTranslationKey) {
+                        // Map translation key to status group and find the actual label
+                        const statusGroupMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+                            "Not Started": "TODO",
+                            "In Progress": "IN_PROGRESS",
+                            "Done": "DONE",
+                            // Also check translated versions
+                            [t("status.Not Started")]: "TODO",
+                            [t("status.In Progress")]: "IN_PROGRESS",
+                            [t("status.Done")]: "DONE",
+                        }
+                        const targetGroup = statusGroupMap[statusValue]
+                        if (targetGroup) {
+                            const groupStatuses = availableStatuses.filter(s => s.group === targetGroup)
+                            if (groupStatuses.length > 0) {
+                                // Use default status if available, otherwise first one
+                                displayStatus = groupStatuses.find(s => s.isDefault)?.label || groupStatuses[0].label
+                            }
+                        } else {
+                            // Try to find by label directly
+                            const foundStatus = availableStatuses.find(s => s.label === statusValue)
+                            if (foundStatus) {
+                                displayStatus = foundStatus.label
+                            }
+                        }
+                    } else {
+                        // statusValue is already the actual label (e.g., "Completed")
+                        displayStatus = statusValue
+                    }
+                } else {
+                    // Fallback to translation if API statuses not available
+                    displayStatus = AVAILABLE_STATUSES.includes(statusValue as any) ? t(`status.${statusValue}`) : statusValue
+                }
+
+                // Determine status color based on status group
+                const getStatusColor = (label: string, group?: 'TODO' | 'IN_PROGRESS' | 'DONE'): "online" | "offline" | "maintenance" | "degraded" => {
+                    // If group is available, use it directly
+                    if (group) {
+                        const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
+                            TODO: "offline",
+                            IN_PROGRESS: "maintenance",
+                            DONE: "online",
+                        }
+                        return groupColorMap[group]
+                    }
+                    
+                    // Map label to English key if it's a translation
+                    const translatedNotStarted = t("status.Not Started")
+                    const translatedInProgress = t("status.In Progress")
+                    const translatedDone = t("status.Done")
+                    
+                    // Try to map from label (supports both English and translated values)
+                    const statusGroupMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+                        // Translated values
+                        [translatedNotStarted]: "offline",
+                        [translatedInProgress]: "maintenance",
+                        [translatedDone]: "online",
+                        // English keys
+                        "Not Started": "offline",
+                        "In Progress": "maintenance",
+                        "Done": "online",
+                    }
+                    
+                    // Check if label matches any translation or English key
+                    if (statusGroupMap[label]) {
+                        return statusGroupMap[label]
+                    }
+                    
+                    // Fallback: try to match with statusValue
+                    if (statusGroupMap[statusValue]) {
+                        return statusGroupMap[statusValue]
+                    }
+                    
+                    // Default fallback
+                    return "offline"
+                }
+                
+                // Find status group for current status value
+                const currentStatusObj = availableStatuses?.find(s => s.label === statusValue)
+                const currentStatusGroup = currentStatusObj?.group
+
+                const status = getStatusColor(statusValue, currentStatusGroup)
 
                 return (
                     <DropdownMenu>
@@ -63,29 +158,57 @@ export function PropertyItem({
                             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                 <Status status={status}>
                                     <StatusIndicator />
-                                    <StatusLabel>{t(`status.${statusValue}`) || statusValue}</StatusLabel>
+                                    <StatusLabel>{displayStatus}</StatusLabel>
                                 </Status>
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
-                            {AVAILABLE_STATUSES.map((statusOption) => (
-                                <DropdownMenuItem
-                                    key={statusOption}
-                                    onClick={() => onStatusChange?.(statusOption)}
-                                    className={statusValue === statusOption ? "bg-muted" : ""}
-                                >
-                                    <Status status={STATUS_MAP[statusOption] || "offline"}>
-                                        <StatusIndicator />
-                                        <StatusLabel>{t(`status.${statusOption}`)}</StatusLabel>
-                                    </Status>
-                                </DropdownMenuItem>
-                            ))}
+                            {statusesToUse.map((statusOption) => {
+                                // If using API statuses, use the label directly (e.g., "Completed"), otherwise translate
+                                const isUsingApiStatuses = availableStatuses && availableStatuses.length > 0
+                                const displayLabel = isUsingApiStatuses
+                                    ? statusOption  // Direct API label (e.g., "Completed")
+                                    : t(`status.${statusOption}`)  // Translate standard statuses
+                                
+                                // Find status group for this option
+                                const statusOptionObj = availableStatuses?.find(s => s.label === statusOption)
+                                const statusOptionGroup = statusOptionObj?.group
+                                const statusColor = getStatusColor(statusOption, statusOptionGroup)
+                                
+                                return (
+                                    <DropdownMenuItem
+                                        key={statusOption}
+                                        onClick={() => onStatusChange?.(statusOption)}
+                                        className={statusValue === statusOption ? "bg-muted" : ""}
+                                    >
+                                        <Status status={statusColor}>
+                                            <StatusIndicator />
+                                            <StatusLabel>{displayLabel}</StatusLabel>
+                                        </Status>
+                                    </DropdownMenuItem>
+                                )
+                            })}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )
             }
             case 'priority': {
-                const priority = PRIORITY_MAP[value] || PRIORITY_MAP["Medium"]
+                // Map value to English key if it's a translation
+                const translatedLow = t("priority.Low")
+                const translatedMedium = t("priority.Medium")
+                const translatedHigh = t("priority.High")
+                
+                // Check if value is a translation and map to English key
+                let priorityKey = value
+                if (value === translatedLow) {
+                    priorityKey = "Low"
+                } else if (value === translatedMedium) {
+                    priorityKey = "Medium"
+                } else if (value === translatedHigh) {
+                    priorityKey = "High"
+                }
+                
+                const priority = PRIORITY_MAP[priorityKey] || PRIORITY_MAP["Medium"]
 
                 return (
                     <DropdownMenu>
@@ -100,11 +223,17 @@ export function PropertyItem({
                         <DropdownMenuContent align="start">
                             {AVAILABLE_PRIORITIES.map((priorityOption) => {
                                 const p = PRIORITY_MAP[priorityOption]
+                                // Check if current value matches this option (considering translations)
+                                const isSelected = value === priorityOption || 
+                                    (value === translatedLow && priorityOption === "Low") ||
+                                    (value === translatedMedium && priorityOption === "Medium") ||
+                                    (value === translatedHigh && priorityOption === "High")
+                                
                                 return (
                                     <DropdownMenuItem
                                         key={priorityOption}
                                         onClick={() => onPriorityChange?.(priorityOption)}
-                                        className={value === priorityOption ? "bg-muted" : ""}
+                                        className={isSelected ? "bg-muted" : ""}
                                     >
                                         <Badge variant="outline" className="text-muted-foreground px-1.5">
                                             <IconFlagFilled className={`h-3.5 w-3.5 ${p.color}`} />

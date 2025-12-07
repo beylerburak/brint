@@ -1,11 +1,15 @@
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
+import { apiClient } from "@/lib/api-client"
 import { PropertyItem } from "./PropertyItem"
 import type { TaskPropertiesProps } from "./types"
 
 export function TaskProperties({
+    task,
+    workspaceId,
+    brandId,
     currentStatus,
     currentPriority,
     currentDueDate,
@@ -17,6 +21,29 @@ export function TaskProperties({
     onAssigneeChange,
 }: TaskPropertiesProps) {
     const t = useTranslations("tasks")
+    const [availableStatuses, setAvailableStatuses] = useState<Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>>([])
+
+    // Fetch available statuses from API
+    useEffect(() => {
+        async function fetchStatuses() {
+            try {
+                const response = await apiClient.listTaskStatuses(workspaceId, brandId)
+                // Map statuses with their group information
+                const statusesWithGroup = [
+                    ...response.statuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
+                    ...response.statuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
+                    ...response.statuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
+                ]
+                setAvailableStatuses(statusesWithGroup)
+            } catch (error) {
+                console.error("Failed to fetch task statuses:", error)
+                // Keep empty array, will fall back to AVAILABLE_STATUSES
+            }
+        }
+        if (workspaceId) {
+            fetchStatuses()
+        }
+    }, [workspaceId, brandId])
 
     return (
         <div className="flex flex-col gap-1 pl-0 md:pl-2">
@@ -25,6 +52,7 @@ export function TaskProperties({
                 value={currentStatus}
                 type="status"
                 onStatusChange={onStatusChange}
+                availableStatuses={availableStatuses}
             />
             <PropertyItem
                 label={t("detail.properties.priority")}

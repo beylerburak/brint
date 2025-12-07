@@ -137,17 +137,17 @@ export default function BrandTasksPage() {
   // Transform API tasks to TableTask format
   const tasksData = useMemo(() => {
     return filteredTasks.map((task) => {
-      const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', "Low" | "Medium" | "High"> = {
-        LOW: "Low",
-        MEDIUM: "Medium",
-        HIGH: "High",
-        CRITICAL: "High",
+      const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+        LOW: t("priority.Low"),
+        MEDIUM: t("priority.Medium"),
+        HIGH: t("priority.High"),
+        CRITICAL: t("priority.High"),
       }
 
       const statusMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', string> = {
-        TODO: "Not Started",
-        IN_PROGRESS: "In Progress",
-        DONE: "Done",
+        TODO: t("status.Not Started"),
+        IN_PROGRESS: t("status.In Progress"),
+        DONE: t("status.Done"),
       }
 
       return {
@@ -156,29 +156,30 @@ export default function BrandTasksPage() {
         title: task.title,
         description: task.description,
         header: task.title,
-        type: "Task", // Default type, can be enhanced later
-        priority: priorityMap[task.priority] || "Medium",
+        type: t("type.task"),
+        priority: priorityMap[task.priority] || t("priority.Medium"),
         status: statusMap[task.status.group] || task.status.label,
         dueDate: task.dueDate || new Date().toISOString(),
         assignedTo: (task as any).assignedTo || [], // Use assignedTo from API or empty array
         commentCount: (task as any)._count?.comments || 0,
       } as TableTask
     })
-  }, [filteredTasks])
+  }, [filteredTasks, t])
 
   // Transform API tasks to KanbanTask format
   const kanbanTasks = useMemo(() => {
-    const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', "Low" | "Medium" | "High"> = {
-      LOW: "Low",
-      MEDIUM: "Medium",
-      HIGH: "High",
-      CRITICAL: "High",
+    const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+      LOW: t("priority.Low"),
+      MEDIUM: t("priority.Medium"),
+      HIGH: t("priority.High"),
+      CRITICAL: t("priority.High"),
     }
 
-    const priorityColors = {
-      Low: "text-green-500",
-      Medium: "text-yellow-500",
-      High: "text-red-500",
+    const priorityColorMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+      LOW: "text-green-500",
+      MEDIUM: "text-yellow-500",
+      HIGH: "text-red-500",
+      CRITICAL: "text-red-500",
     }
 
     const todo: KanbanTask[] = []
@@ -189,10 +190,15 @@ export default function BrandTasksPage() {
     const now = new Date()
 
     filteredTasks.forEach((task) => {
-      const priority = priorityMap[task.priority] || "Medium"
-      const priorityColor = priorityColors[priority]
+      const priority = priorityMap[task.priority] || t("priority.Medium")
+      const priorityColor = priorityColorMap[task.priority] || "text-yellow-500"
       const dueDate = task.dueDate ? new Date(task.dueDate) : null
       const isOverdue = dueDate && dueDate < now && task.status.group !== 'DONE'
+
+      const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null
+      const dueDateDisplay = daysUntilDue !== null 
+        ? t("dueDate.inDays", { count: daysUntilDue })
+        : t("dueDate.noDueDate")
 
       const kanbanTask: KanbanTask = {
         id: task.id,
@@ -203,10 +209,10 @@ export default function BrandTasksPage() {
         priorityColor,
         status: task.status.label,
         dueDate: task.dueDate || '', // Keep raw ISO date for modal
-        dueDateDisplay: dueDate ? `in ${Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days` : "No due date",
+        dueDateDisplay,
         commentCount: (task as any)._count?.comments || 0,
         assignedTo: (task as any).assignedTo || [], // Use assignedTo from API or empty array
-        user: task.assigneeUserId || "Unassigned",
+        user: task.assigneeUserId || t("table.unassigned"),
         userSeed: task.assigneeUserId || "unassigned",
       }
 
@@ -222,15 +228,15 @@ export default function BrandTasksPage() {
     })
 
     return { todo, inProgress, overdue, completed }
-  }, [filteredTasks])
+  }, [filteredTasks, t])
 
   // Summary stats
   const summaryStats: SummaryStats = useMemo(() => {
-    const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', "Low" | "Medium" | "High"> = {
-      LOW: "Low",
-      MEDIUM: "Medium",
-      HIGH: "High",
-      CRITICAL: "High",
+    const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+      LOW: t("priority.Low"),
+      MEDIUM: t("priority.Medium"),
+      HIGH: t("priority.High"),
+      CRITICAL: t("priority.High"),
     }
 
     const now = new Date()
@@ -240,10 +246,14 @@ export default function BrandTasksPage() {
     let totalDone = 0
     let overdue = 0
 
+    const lowPriorityLabel = t("priority.Low")
+    const mediumPriorityLabel = t("priority.Medium")
+    const highPriorityLabel = t("priority.High")
+
     filteredTasks.forEach((task) => {
-      const priority = priorityMap[task.priority] || "Medium"
-      if (priority === "Low") lowPriority++
-      else if (priority === "Medium") mediumPriority++
+      const priority = priorityMap[task.priority] || mediumPriorityLabel
+      if (priority === lowPriorityLabel) lowPriority++
+      else if (priority === mediumPriorityLabel) mediumPriority++
       else highPriority++
 
       if (task.status.group === 'DONE') totalDone++
@@ -260,41 +270,41 @@ export default function BrandTasksPage() {
       totalDone,
       overdue,
     }
-  }, [filteredTasks])
+  }, [filteredTasks, t])
 
   // Kanban columns configuration
   const kanbanColumns = useMemo(
     () => [
       {
         id: "todo",
-        label: "To Do",
+        label: t("kanban.columns.todo"),
         icon: <IconListCheck className="h-4 w-4 shrink-0 text-blue-500" />,
         iconColor: "text-blue-500",
         tasks: kanbanTasks.todo,
       },
       {
         id: "inProgress",
-        label: "In Progress",
+        label: t("kanban.columns.inProgress"),
         icon: <IconClock className="h-4 w-4 shrink-0 text-yellow-500" />,
         iconColor: "text-yellow-500",
         tasks: kanbanTasks.inProgress,
       },
       {
         id: "overdue",
-        label: "Overdue",
+        label: t("kanban.columns.overdue"),
         icon: <IconAlertCircle className="h-4 w-4 shrink-0 text-red-500" />,
         iconColor: "text-red-500",
         tasks: kanbanTasks.overdue,
       },
       {
         id: "completed",
-        label: "Completed",
+        label: t("kanban.columns.completed"),
         icon: <IconCheck className="h-4 w-4 shrink-0 text-green-500" />,
         iconColor: "text-green-500",
         tasks: kanbanTasks.completed,
       },
     ],
-    [kanbanTasks]
+    [kanbanTasks, t]
   )
 
   // Load more data function
@@ -571,35 +581,40 @@ export default function BrandTasksPage() {
       // Find status ID from label
       let statusId = ''
       if (taskStatuses) {
-        // Map UI labels back to groups
-        const uiStatusToGroup: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
-          "Not Started": "TODO",
-          "In Progress": "IN_PROGRESS",
-          "Done": "DONE"
+        // First, try to find by label directly (e.g., "Completed" from API)
+        const allStatuses = [
+          ...taskStatuses.TODO,
+          ...taskStatuses.IN_PROGRESS,
+          ...taskStatuses.DONE
+        ]
+        let statusObj = allStatuses.find(s => s.label === newStatus)
+        
+        // If not found by direct label, try translation key mapping
+        if (!statusObj) {
+          // Map UI labels back to groups
+          const uiStatusToGroup: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+            [t("status.Not Started")]: "TODO",
+            [t("status.In Progress")]: "IN_PROGRESS",
+            [t("status.Done")]: "DONE",
+            // English keys
+            "Not Started": "TODO",
+            "In Progress": "IN_PROGRESS",
+            "Done": "DONE",
+          }
+
+          const targetGroup = uiStatusToGroup[newStatus]
+
+          if (targetGroup) {
+            // Find the default or first status in the target group
+            const groupStatuses = taskStatuses[targetGroup]
+            if (groupStatuses && groupStatuses.length > 0) {
+              statusObj = groupStatuses.find((s: any) => s.isDefault) || groupStatuses[0]
+            }
+          }
         }
-
-        const targetGroup = uiStatusToGroup[newStatus]
-
-        if (targetGroup) {
-          // Find the default or first status in the target group
-          const groupStatuses = taskStatuses[targetGroup]
-          // Try to find default one first, otherwise take the first one
-          // The API doesn't explicitly return isDefault in the type definition above but usually it's there
-          // If not, just taking the first one is a safe bet for these standard groups
-          if (groupStatuses && groupStatuses.length > 0) {
-            statusId = groupStatuses[0].id
-          }
-        } else {
-          // Fallback: try to find by label directly (in case newStatus is not one of the mapped ones)
-          const allStatuses = [
-            ...taskStatuses.TODO,
-            ...taskStatuses.IN_PROGRESS,
-            ...taskStatuses.DONE
-          ]
-          const statusObj = allStatuses.find(s => s.label === newStatus)
-          if (statusObj) {
-            statusId = statusObj.id
-          }
+        
+        if (statusObj) {
+          statusId = statusObj.id
         }
       }
 
@@ -631,7 +646,7 @@ export default function BrandTasksPage() {
         setTasks(response.tasks)
       }
     }
-  }, [currentWorkspace, tasks, brandId, pagination, taskStatuses])
+  }, [currentWorkspace, tasks, brandId, pagination, taskStatuses, t])
 
   return (
     <div className="w-full flex flex-col min-h-0" style={{ height: "100vh" }}>
@@ -747,6 +762,8 @@ export default function BrandTasksPage() {
             onLoadMore={loadMoreTableData}
             hasMore={pagination.page < pagination.totalPages}
             isLoading={isLoadingMore}
+            workspaceId={currentWorkspace?.id}
+            brandId={brandId || undefined}
             onTaskClick={(task) => {
               // Just select the task and open modal - hook handles fetching
               setSelectedTask(task)
@@ -863,20 +880,37 @@ export default function BrandTasksPage() {
               }
 
               const updatedTasks = [...prevTasks]
-              updatedTasks[taskIndex] = {
-                ...updatedTasks[taskIndex],
-                ...(updates.title !== undefined && { title: updates.title }),
-                ...(updates.description !== undefined && { description: updates.description }),
-                ...(updates.status !== undefined && {
-                  status: typeof updates.status === 'string'
-                    ? { ...updatedTasks[taskIndex].status, label: updates.status }
-                    : { ...updatedTasks[taskIndex].status, ...updates.status }
-                }),
-                ...(updates.priority !== undefined && { priority: updates.priority === 'High' ? 'HIGH' : updates.priority === 'Low' ? 'LOW' : 'MEDIUM' }),
-                ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
-                ...(updates.assigneeUserId !== undefined && { assigneeUserId: updates.assigneeUserId }),
-                ...(updates.assignedTo !== undefined && { assignedTo: updates.assignedTo }),
+              const currentTask = updatedTasks[taskIndex]
+              
+              // Only update properties that are explicitly provided in updates
+              // This ensures other properties are preserved
+              const updatedTask = { ...currentTask }
+              
+              if (updates.title !== undefined) {
+                updatedTask.title = updates.title
               }
+              if (updates.description !== undefined) {
+                updatedTask.description = updates.description
+              }
+              if (updates.status !== undefined) {
+                updatedTask.status = typeof updates.status === 'string'
+                  ? { ...currentTask.status, label: updates.status }
+                  : { ...currentTask.status, ...updates.status }
+              }
+              if (updates.priority !== undefined) {
+                updatedTask.priority = updates.priority === 'High' ? 'HIGH' : updates.priority === 'Low' ? 'LOW' : 'MEDIUM'
+              }
+              if (updates.dueDate !== undefined) {
+                updatedTask.dueDate = updates.dueDate
+              }
+              if (updates.assigneeUserId !== undefined) {
+                updatedTask.assigneeUserId = updates.assigneeUserId
+              }
+              if (updates.assignedTo !== undefined) {
+                updatedTask.assignedTo = updates.assignedTo
+              }
+              
+              updatedTasks[taskIndex] = updatedTask
 
               console.log('[TaskUpdate] Task updated:', {
                 taskId,
@@ -888,18 +922,41 @@ export default function BrandTasksPage() {
             })
 
             // Update selected task if it's the one being edited
+            // Only update properties that are explicitly provided in updates
             if (selectedTask && String(selectedTask.id) === String(taskId)) {
               console.log('[TaskUpdate] Updating selected task')
-              setSelectedTask((prev) => ({
-                ...prev!,
-                ...(updates.title && { title: updates.title }),
-                ...(updates.description !== undefined && { description: updates.description }),
-                ...(updates.status && { status: updates.status }),
-                ...(updates.priority && { priority: updates.priority }),
-                ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
-                ...(updates.assigneeUserId !== undefined && { assigneeUserId: updates.assigneeUserId }),
-                ...(updates.assignedTo !== undefined && { assignedTo: updates.assignedTo }),
-              }))
+              setSelectedTask((prev) => {
+                if (!prev) return prev
+                
+                const updated: typeof prev = { ...prev }
+                
+                // Only update properties that are explicitly provided
+                if (updates.title !== undefined) {
+                  updated.title = updates.title
+                }
+                if (updates.description !== undefined) {
+                  updated.description = updates.description
+                }
+                if (updates.status !== undefined) {
+                  updated.status = typeof updates.status === 'string'
+                    ? { ...prev.status, label: updates.status }
+                    : { ...prev.status, ...updates.status }
+                }
+                if (updates.priority !== undefined) {
+                  updated.priority = updates.priority === 'High' ? 'HIGH' : updates.priority === 'Low' ? 'LOW' : 'MEDIUM'
+                }
+                if (updates.dueDate !== undefined) {
+                  updated.dueDate = updates.dueDate
+                }
+                if (updates.assigneeUserId !== undefined) {
+                  updated.assigneeUserId = updates.assigneeUserId
+                }
+                if (updates.assignedTo !== undefined) {
+                  updated.assignedTo = updates.assignedTo
+                }
+                
+                return updated
+              })
             }
           }}
         />

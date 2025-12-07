@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useRef } from "react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { IconPaperclip, IconFile, IconDownload, IconUpload, IconTrash } from "@tabler/icons-react"
@@ -17,6 +18,7 @@ export function TaskAttachments({
     onAttachmentsUpdate,
     onAttachmentDetailsUpdate,
 }: TaskAttachmentsProps) {
+    const t = useTranslations("tasks")
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const formatFileSize = (bytes: number): string => {
@@ -152,11 +154,11 @@ export function TaskAttachments({
             }
 
             onAttachmentsUpdate(mergedAttachments)
-            toast.success(`Successfully uploaded ${files.length} file(s)`)
+            toast.success(t("attachments.uploadSuccess", { count: files.length }))
         } catch (error: any) {
             console.error("Failed to upload attachment:", error)
             onAttachmentsUpdate(attachments)
-            toast.error(error?.message || "Failed to upload attachment")
+            toast.error(error?.message || t("attachments.uploadError"))
         } finally {
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
@@ -206,10 +208,10 @@ export function TaskAttachments({
                 })
             }
 
-            toast.success("Attachment deleted successfully")
+            toast.success(t("attachments.deleteSuccess"))
         } catch (error: any) {
             console.error("Failed to delete attachment:", error)
-            toast.error(error?.message || "Failed to delete attachment")
+            toast.error(error?.message || t("attachments.deleteError"))
             onAttachmentsUpdate(attachments)
         }
     }
@@ -219,7 +221,7 @@ export function TaskAttachments({
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium flex items-center gap-1.5">
                     <IconPaperclip className="h-4 w-4" />
-                    Attachments
+                    {t("attachments.title")}
                     {attachments.length > 0 && (
                         <Badge variant="secondary" className="ml-1">
                             {attachments.length}
@@ -248,7 +250,7 @@ export function TaskAttachments({
                     {attachments.map((attachment) => {
                         const details = attachmentDetails.get(attachment.mediaId)
                         const sizeBytes = attachment.sizeBytes || details?.sizeBytes || 0
-                        const fileName = attachment.title || details?.originalFilename || `Attachment ${attachment.id.slice(0, 8)}`
+                        const fileName = attachment.title || details?.originalFilename || t("attachments.attachmentLabel", { id: attachment.id.slice(0, 8) })
                         const fileExtension = getFileExtension(fileName)
 
                         return (

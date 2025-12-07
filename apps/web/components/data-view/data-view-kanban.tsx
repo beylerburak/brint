@@ -133,7 +133,7 @@ function KanbanColumnContent({
                       <IconFlagFilled className={`h-3.5 w-3.5 ${task.priorityColor}`} />
                       <span>{task.priority}</span>
                     </Badge>
-                    {task.commentCount && task.commentCount > 0 && (
+                    {typeof task.commentCount === 'number' && task.commentCount > 0 && (
                       <Badge variant="secondary" className="h-5 px-1.5 text-xs">
                         <IconMessage className="h-3 w-3" />
                         <span>{task.commentCount}</span>

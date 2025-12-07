@@ -85,28 +85,55 @@ export function useTaskDetail({
     onTaskUpdate,
     onTaskCreate,
 }: UseTaskDetailProps): UseTaskDetailReturn {
+    // Previous property values refs to prevent unnecessary updates
+    const prevStatusRef = useRef<string | null>(null)
+    const prevPriorityRef = useRef<string | null>(null)
+    const prevDueDateRef = useRef<string | null>(null)
+    const prevAssigneeIdRef = useRef<string | null>(null)
+    const prevTitleRef = useRef<string>("")
+    const prevDescriptionRef = useRef<string>("")
+
     // Editing states
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
     const [isEditingTitle, setIsEditingTitle] = useState(false)
     const [isEditingDescription, setIsEditingDescription] = useState(false)
-    const [editedTitle, setEditedTitle] = useState(task?.title || "")
-    const [editedDescription, setEditedDescription] = useState(task?.description || "")
+    const [editedTitle, setEditedTitle] = useState(() => {
+        const title = task?.title || ""
+        prevTitleRef.current = title
+        return title
+    })
+    const [editedDescription, setEditedDescription] = useState(() => {
+        const description = task?.description || ""
+        prevDescriptionRef.current = description
+        return description
+    })
 
     // Task property states
     const [currentStatus, setCurrentStatus] = useState(() => {
         const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
             ? (task.status as any).label
             : (task?.status || "Not Started")
+        prevStatusRef.current = statusValue
         return statusValue
     })
     const [currentPriority, setCurrentPriority] = useState<"High" | "Medium" | "Low">(() => {
         const p = task?.priority as string
-        if (p === 'HIGH' || p === 'High') return 'High'
-        if (p === 'LOW' || p === 'Low') return 'Low'
-        return 'Medium'
+        let priority: "High" | "Medium" | "Low" = "Medium"
+        if (p === 'HIGH' || p === 'High') priority = 'High'
+        if (p === 'LOW' || p === 'Low') priority = 'Low'
+        prevPriorityRef.current = priority
+        return priority
     })
-    const [currentDueDate, setCurrentDueDate] = useState(task?.dueDate || null)
-    const [currentAssigneeId, setCurrentAssigneeId] = useState<string | null>(null)
+    const [currentDueDate, setCurrentDueDate] = useState(() => {
+        const dueDate = task?.dueDate || null
+        prevDueDateRef.current = dueDate
+        return dueDate
+    })
+    const [currentAssigneeId, setCurrentAssigneeId] = useState<string | null>(() => {
+        const assigneeId = task?.assignedTo && task.assignedTo.length > 0 ? task.assignedTo[0].id : null
+        prevAssigneeIdRef.current = assigneeId
+        return assigneeId
+    })
     const [currentAssigneeName, setCurrentAssigneeName] = useState<string | null>(null)
 
     // Changing flags
@@ -132,6 +159,9 @@ export function useTaskDetail({
     // Task fetching deduplication refs
     const taskFetchingRef = useRef(false)
     const taskFetchedForRef = useRef<string | null>(null)
+    
+    // Track previous task to detect which properties actually changed
+    const prevTaskRef = useRef<BaseTask | null>(null)
 
     // Fetch workspace members with cache
     useEffect(() => {
@@ -320,44 +350,128 @@ export function useTaskDetail({
         }
     }, [open, task?.id, workspaceId])
 
-    // Update states when task changes
+    // Update states when task changes - only update changed properties
     useEffect(() => {
-        setEditedTitle(task?.title || "")
-        setEditedDescription(task?.description || "")
-
-        if (!isStatusChanging) {
-            const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
-                ? (task.status as any).label
-                : (task?.status || "Not Started")
-            setCurrentStatus(statusValue)
+        if (!task) {
+            prevTaskRef.current = null
+            return
         }
 
-        if (!isPriorityChanging) {
-            const p = task?.priority as string
-            let newPriority: "High" | "Medium" | "Low" = "Medium"
-            if (p === 'HIGH' || p === 'High') newPriority = 'High'
-            else if (p === 'LOW' || p === 'Low') newPriority = 'Low'
-
-            setCurrentPriority(newPriority)
+        const prevTask = prevTaskRef.current
+        
+        // If prevTask is null or task ID changed, this is initial load - initialize all properties
+        const isInitialLoad = prevTask === null || (prevTask.id !== task.id)
+        
+        if (isInitialLoad) {
+            // Initialize prevTaskRef with current task
+            prevTaskRef.current = { ...task }
         }
 
-        setCurrentDueDate(task?.dueDate || null)
-
-        if (!isAssigneeChanging) {
-            if (task?.assignedTo && task.assignedTo.length > 0) {
-                const assigneeId = task.assignedTo[0].id
-                setCurrentAssigneeId(assigneeId)
-                const assignee = workspaceMembers.find(m => m.id === assigneeId)
-                setCurrentAssigneeName(assignee?.name || assignee?.email || task.assignedTo[0].name || null)
-            } else {
-                setCurrentAssigneeId(null)
-                setCurrentAssigneeName(null)
+        // Update title only if it actually changed and not currently editing
+        if (!isEditingTitle && (isInitialLoad || prevTask?.title !== task.title)) {
+            const newTitle = task.title || ""
+            if (newTitle !== prevTitleRef.current) {
+                setEditedTitle(newTitle)
+                prevTitleRef.current = newTitle
             }
         }
+
+        // Update description only if it actually changed and not currently editing
+        if (!isEditingDescription && (isInitialLoad || prevTask?.description !== task.description)) {
+            const newDescription = task.description || ""
+            if (newDescription !== prevDescriptionRef.current) {
+                setEditedDescription(newDescription)
+                prevDescriptionRef.current = newDescription
+            }
+        }
+
+        // Update status only if it actually changed and not currently changing
+        if (!isStatusChanging) {
+            const prevStatusLabel = prevTask?.status 
+                ? (typeof prevTask.status === 'object' && prevTask.status !== null && 'label' in prevTask.status
+                    ? (prevTask.status as any).label
+                    : prevTask.status)
+                : null
+            const currentStatusLabel = typeof task.status === 'object' && task.status !== null && 'label' in task.status
+                ? (task.status as any).label
+                : (task.status || "Not Started")
+            
+            // Only update if status actually changed (not on initial load unless different)
+            if (isInitialLoad || prevStatusLabel !== currentStatusLabel) {
+                if (currentStatusLabel !== prevStatusRef.current) {
+                    setCurrentStatus(currentStatusLabel)
+                    prevStatusRef.current = currentStatusLabel
+                }
+            }
+        }
+
+        // Update priority only if it actually changed and not currently changing
+        if (!isPriorityChanging) {
+            const prevPriority = prevTask?.priority
+            const currentPriority = task.priority
+            
+            // Only update if priority actually changed (not on initial load unless different)
+            if (isInitialLoad || prevPriority !== currentPriority) {
+                const p = currentPriority as string
+                let newPriority: "High" | "Medium" | "Low" = "Medium"
+                if (p === 'HIGH' || p === 'High') newPriority = 'High'
+                else if (p === 'LOW' || p === 'Low') newPriority = 'Low'
+
+                if (newPriority !== prevPriorityRef.current) {
+                    setCurrentPriority(newPriority)
+                    prevPriorityRef.current = newPriority
+                }
+            }
+        }
+
+        // Update due date only if it actually changed
+        // On initial load, always update. Otherwise, only update if it changed
+        if (isInitialLoad) {
+            // Initial load - always set due date
+            const newDueDate = task.dueDate || null
+            setCurrentDueDate(newDueDate)
+            prevDueDateRef.current = newDueDate
+        } else if (prevTask?.dueDate !== task.dueDate) {
+            // Only update if dueDate actually changed
+            const newDueDate = task.dueDate || null
+            if (newDueDate !== prevDueDateRef.current) {
+                setCurrentDueDate(newDueDate)
+                prevDueDateRef.current = newDueDate
+            }
+        }
+
+        // Update assignee only if it actually changed and not currently changing
+        if (!isAssigneeChanging) {
+            const prevAssigneeId = prevTask?.assignedTo && prevTask.assignedTo.length > 0 
+                ? prevTask.assignedTo[0].id 
+                : null
+            const currentAssigneeId = task.assignedTo && task.assignedTo.length > 0 
+                ? task.assignedTo[0].id 
+                : null
+            
+            // Only update if assignee actually changed (not on initial load unless different)
+            if (isInitialLoad || prevAssigneeId !== currentAssigneeId) {
+                if (currentAssigneeId !== prevAssigneeIdRef.current) {
+                    setCurrentAssigneeId(currentAssigneeId)
+                    if (currentAssigneeId) {
+                        const assignee = workspaceMembers.find(m => m.id === currentAssigneeId)
+                        setCurrentAssigneeName(assignee?.name || assignee?.email || task.assignedTo[0].name || null)
+                    } else {
+                        setCurrentAssigneeName(null)
+                    }
+                    prevAssigneeIdRef.current = currentAssigneeId
+                }
+            }
+        }
+        
+        // Update prevTaskRef for next comparison
+        // Always update to track the current state
+        prevTaskRef.current = { ...task }
+        
         // NOTE: Attachments are intentionally NOT reset here
         // They are managed by the modal's fetchTaskDetails and attachment update handlers
         // Resetting them on task prop change would cause data loss after any update
-    }, [task, isStatusChanging, isPriorityChanging, isAssigneeChanging, workspaceMembers])
+    }, [task, isStatusChanging, isPriorityChanging, isAssigneeChanging, isEditingTitle, isEditingDescription, workspaceMembers])
 
     // Handlers
     const handleSaveTitle = useCallback(async () => {
@@ -416,15 +530,17 @@ export function useTaskDetail({
             const response = await apiClient.updateTask(workspaceId, String(taskId), {
                 title: editedTitle,
             })
+            const savedTitle = response?.task?.title || editedTitle
+            setEditedTitle(savedTitle)
+            prevTitleRef.current = savedTitle
+            // Only pass the changed property to onTaskUpdate
             if (response?.task) {
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description
+                    title: savedTitle
                 })
             } else {
-                onTaskUpdate?.(String(taskId), { title: editedTitle })
+                onTaskUpdate?.(String(taskId), { title: savedTitle })
             }
-            setEditedTitle(response?.task?.title || editedTitle)
         } catch (error: any) {
             console.error("Failed to save title:", error)
             setEditedTitle(task?.title || "")
@@ -444,15 +560,17 @@ export function useTaskDetail({
             const response = await apiClient.updateTask(workspaceId, String(task.id), {
                 description: editedDescription || undefined,
             })
+            const savedDescription = response?.task?.description || editedDescription
+            setEditedDescription(savedDescription)
+            prevDescriptionRef.current = savedDescription
+            // Only pass the changed property to onTaskUpdate
             if (response?.task) {
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description
+                    description: savedDescription
                 })
             } else {
-                onTaskUpdate?.(String(task.id), { description: editedDescription })
+                onTaskUpdate?.(String(task.id), { description: savedDescription })
             }
-            setEditedDescription(response?.task?.description || editedDescription)
         } catch (error: any) {
             console.error("Failed to save description:", error)
             setEditedDescription(task.description || "")
@@ -470,9 +588,35 @@ export function useTaskDetail({
         try {
             setCurrentStatus(newStatus)
 
-            const statusesResponse = await apiClient.listTaskStatuses(workspaceId)
+            // Fetch statuses with brandId if available
+            const statusesResponse = await apiClient.listTaskStatuses(workspaceId, brandId)
             const allStatuses = Object.values(statusesResponse.statuses).flat()
-            const statusObj = allStatuses.find((s: any) => s.label === newStatus)
+            
+            // newStatus might be a translated value (e.g., "Tamamlandı" in Turkish)
+            // or a translation key (e.g., "Done" in English)
+            // Try to find by label first
+            let statusObj = allStatuses.find((s: any) => s.label === newStatus)
+            
+            // If not found, try to map from translation keys to actual status labels
+            if (!statusObj) {
+                // Map translation keys to status groups
+                const statusGroupMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+                    "Not Started": "TODO",
+                    "In Progress": "IN_PROGRESS",
+                    "Done": "DONE",
+                    // Turkish translations
+                    "Başlanmadı": "TODO",
+                    "Devam Ediyor": "IN_PROGRESS",
+                    "Tamamlandı": "DONE",
+                }
+                
+                const targetGroup = statusGroupMap[newStatus]
+                if (targetGroup && statusesResponse.statuses[targetGroup]?.length > 0) {
+                    // Use the first/default status in the target group
+                    const groupStatuses = statusesResponse.statuses[targetGroup]
+                    statusObj = groupStatuses.find((s: any) => s.isDefault) || groupStatuses[0]
+                }
+            }
 
             if (!statusObj) {
                 const statusValue = typeof task?.status === 'object' && task?.status !== null && 'label' in task.status
@@ -488,11 +632,20 @@ export function useTaskDetail({
             })
 
             if (response?.task) {
-                setCurrentStatus(newStatus)
+                // Use the actual status label from the found status object (e.g., "Completed" instead of "Done")
+                const actualStatusLabel = statusObj.label
+                setCurrentStatus(actualStatusLabel)
+                prevStatusRef.current = actualStatusLabel
+                // Ensure we pass the correct status object with the actual label
+                const statusUpdate = response.task.status 
+                    ? {
+                        ...response.task.status,
+                        label: actualStatusLabel
+                    }
+                    : { label: actualStatusLabel }
+                // Only pass the changed property to onTaskUpdate
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description,
-                    status: response.task.status
+                    status: statusUpdate
                 })
                 setTimeout(() => {
                     setIsStatusChanging(false)
@@ -509,7 +662,7 @@ export function useTaskDetail({
             setIsStatusChanging(false)
             toast.error(error?.message || "Failed to change status")
         }
-    }, [task, workspaceId, onTaskUpdate])
+    }, [task, workspaceId, brandId, onTaskUpdate])
 
     const handlePriorityChange = useCallback(async (newPriority: string) => {
         if (!task) return
@@ -526,9 +679,9 @@ export function useTaskDetail({
 
             if (response?.task) {
                 setCurrentPriority(newPriority as "High" | "Medium" | "Low")
+                prevPriorityRef.current = newPriority
+                // Only pass the changed property to onTaskUpdate
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description,
                     priority: newPriority
                 })
                 setTimeout(() => {
@@ -557,9 +710,9 @@ export function useTaskDetail({
 
             if (response?.task) {
                 setCurrentDueDate(newDate)
+                prevDueDateRef.current = newDate
+                // Only pass the changed property to onTaskUpdate
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description,
                     dueDate: newDate
                 })
             }
@@ -588,9 +741,9 @@ export function useTaskDetail({
                 const updatedAssignee = updatedAssigneeId ? workspaceMembers.find(m => m.id === updatedAssigneeId) : null
                 setCurrentAssigneeId(updatedAssigneeId)
                 setCurrentAssigneeName(updatedAssignee?.name || updatedAssignee?.email || null)
+                prevAssigneeIdRef.current = updatedAssigneeId
+                // Only pass the changed property to onTaskUpdate
                 onTaskUpdate?.(String(response.task.id), {
-                    title: response.task.title,
-                    description: response.task.description,
                     assigneeUserId: updatedAssigneeId,
                     assignedTo: updatedAssignee ? [updatedAssignee] : []
                 })

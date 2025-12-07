@@ -136,6 +136,7 @@ import {
   DataTableActionBarAction,
   DataTableActionBarSelection,
 } from "@/components/data-table/data-table-action-bar"
+import { useTranslations } from "next-intl"
 
 export const schema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -191,7 +192,7 @@ function formatDate(
 }
 
 // Utility function to get relative time
-function getRelativeTime(dateString: string): string {
+function getRelativeTime(dateString: string, t: (key: string) => string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000)
@@ -205,25 +206,49 @@ function getRelativeTime(dateString: string): string {
   const years = Math.floor(days / 365)
 
   const isPast = diffInSeconds < 0
-  const prefix = isPast ? "" : "in "
-  const suffix = isPast ? " ago" : ""
+  const inText = t("table.time.in")
+  const agoText = t("table.time.ago")
+  
+  // Check if "in" text is "içinde" (Turkish) - it should come after the number
+  const isTurkishFormat = inText === "içinde"
+  
+  const formatTime = (count: number, unit: string) => {
+    if (isPast) {
+      return `${count} ${unit} ${agoText}`
+    } else {
+      if (isTurkishFormat) {
+        // Turkish: "2 hafta içinde"
+        return `${count} ${unit} ${inText}`
+      } else {
+        // English: "in 2 weeks"
+        return `${inText} ${count} ${unit}`
+      }
+    }
+  }
 
   if (years > 0) {
-    return `${prefix}${years} year${years > 1 ? "s" : ""}${suffix}`
+    const unit = years > 1 ? t("table.time.years") : t("table.time.year")
+    return formatTime(years, unit)
   } else if (months > 0) {
-    return `${prefix}${months} month${months > 1 ? "s" : ""}${suffix}`
+    const unit = months > 1 ? t("table.time.months") : t("table.time.month")
+    return formatTime(months, unit)
   } else if (weeks > 0) {
-    return `${prefix}${weeks} week${weeks > 1 ? "s" : ""}${suffix}`
+    const unit = weeks > 1 ? t("table.time.weeks") : t("table.time.week")
+    return formatTime(weeks, unit)
   } else if (days > 0) {
-    return `${prefix}${days} day${days > 1 ? "s" : ""}${suffix}`
+    const unit = days > 1 ? t("table.time.days") : t("table.time.day")
+    return formatTime(days, unit)
   } else if (hours > 0) {
-    return `${prefix}${hours} hour${hours > 1 ? "s" : ""}${suffix}`
+    const unit = hours > 1 ? t("table.time.hours") : t("table.time.hour")
+    return formatTime(hours, unit)
   } else if (minutes > 0) {
-    return `${prefix}${minutes} minute${minutes > 1 ? "s" : ""}${suffix}`
+    const unit = minutes > 1 ? t("table.time.minutes") : t("table.time.minute")
+    return formatTime(minutes, unit)
   } else if (seconds > 10) {
-    return `${prefix}${seconds} second${seconds > 1 ? "s" : ""}${suffix}`
+    const unit = seconds > 1 ? t("table.time.seconds") : t("table.time.second")
+    return formatTime(seconds, unit)
   } else {
-    return isPast ? "just now" : "now"
+    return isPast ? t("table.time.justNow") : t("table.time.now")
   }
 }
 
@@ -352,7 +377,9 @@ function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: 
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+// Create columns function that uses translations
+function createColumns(t: (key: string) => string, availableStatuses?: Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>): ColumnDef<z.infer<typeof schema>>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -399,7 +426,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "header",
     header: ({ column }) => (
-      <SortableHeader column={column}>Title</SortableHeader>
+      <SortableHeader column={column}>{t("table.columns.title")}</SortableHeader>
     ),
     minSize: 200,
     size: 400,
@@ -425,7 +452,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "assignedTo",
     header: ({ column }) => (
-      <SortableHeader column={column}>Assigned to</SortableHeader>
+      <SortableHeader column={column}>{t("table.columns.assignedTo")}</SortableHeader>
     ),
     sortingFn: (rowA, rowB) => {
       const a = rowA.original.assignedTo?.length || 0
@@ -436,7 +463,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       const assignedUsers = row.original.assignedTo || []
 
       if (assignedUsers.length === 0) {
-        return <span className="text-muted-foreground text-sm">Unassigned</span>
+        return <span className="text-muted-foreground text-sm">{t("table.unassigned")}</span>
       }
 
       const firstUser = assignedUsers[0]
@@ -460,7 +487,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
                   : "?"}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm">{firstUser.name || "Unknown"}</span>
+            <span className="text-sm">{firstUser.name || t("table.unknown")}</span>
           </div>
           {remainingCount > 0 && (
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">
@@ -474,21 +501,39 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "priority",
     header: ({ column }) => (
-      <SortableHeader column={column}>Priority</SortableHeader>
+      <SortableHeader column={column}>{t("table.columns.priority")}</SortableHeader>
     ),
     sortingFn: (rowA, rowB) => {
-      const priorityOrder = { "High": 3, "Medium": 2, "Low": 1 }
-      const a = priorityOrder[rowA.original.priority as keyof typeof priorityOrder] || 0
-      const b = priorityOrder[rowB.original.priority as keyof typeof priorityOrder] || 0
+      // Support both translated and original priority values
+      const priorityOrder: Record<string, number> = { 
+        [t("priority.High")]: 3, 
+        [t("priority.Medium")]: 2, 
+        [t("priority.Low")]: 1,
+        "High": 3, 
+        "Medium": 2, 
+        "Low": 1 
+      }
+      const a = priorityOrder[rowA.original.priority] || 0
+      const b = priorityOrder[rowB.original.priority] || 0
       return a - b
     },
     cell: ({ row }) => {
       const priorityMap: Record<string, { label: string; color: string }> = {
-        "Low": { label: "Low", color: "text-green-500" },
-        "Medium": { label: "Medium", color: "text-yellow-500" },
-        "High": { label: "High", color: "text-red-500" },
+        "Low": { label: t("priority.Low"), color: "text-green-500" },
+        "Medium": { label: t("priority.Medium"), color: "text-yellow-500" },
+        "High": { label: t("priority.High"), color: "text-red-500" },
+        // API values
+        "LOW": { label: t("priority.Low"), color: "text-green-500" },
+        "MEDIUM": { label: t("priority.Medium"), color: "text-yellow-500" },
+        "HIGH": { label: t("priority.High"), color: "text-red-500" },
+        // Translated values (fallback)
+        [t("priority.Low")]: { label: t("priority.Low"), color: "text-green-500" },
+        [t("priority.Medium")]: { label: t("priority.Medium"), color: "text-yellow-500" },
+        [t("priority.High")]: { label: t("priority.High"), color: "text-red-500" },
       }
-      const priority = priorityMap[row.original.priority] || priorityMap["Low"]
+      // Check if priority is already translated or use original
+      const originalPriority = row.original.priority
+      const priority = priorityMap[originalPriority] || { label: originalPriority, color: "text-yellow-500" }
 
       return (
         <Badge variant="outline" className="text-muted-foreground px-1.5">
@@ -501,24 +546,105 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "status",
     header: ({ column }) => (
-      <SortableHeader column={column}>Status</SortableHeader>
+      <SortableHeader column={column}>{t("table.columns.status")}</SortableHeader>
     ),
     sortingFn: (rowA, rowB) => {
-      const statusOrder = { "Not Started": 1, "In Progress": 2, "Done": 3 }
-      const a = statusOrder[rowA.original.status as keyof typeof statusOrder] || 0
-      const b = statusOrder[rowB.original.status as keyof typeof statusOrder] || 0
+      // Support both translated and original status values
+      const statusOrder: Record<string, number> = {
+        [t("status.Not Started")]: 1,
+        [t("status.In Progress")]: 2,
+        [t("status.Done")]: 3,
+        "Not Started": 1,
+        "In Progress": 2,
+        "Done": 3
+      }
+      const a = statusOrder[rowA.original.status] || 0
+      const b = statusOrder[rowB.original.status] || 0
       return a - b
     },
     cell: ({ row, table }) => {
-      const statusMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+      // Create reverse mapping for status display
+      const statusDisplayMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+        [t("status.Done")]: "online",
+        [t("status.In Progress")]: "maintenance",
+        [t("status.Not Started")]: "offline",
+        // Also support English keys for backwards compatibility
         "Done": "online",
         "In Progress": "maintenance",
         "Not Started": "offline",
       }
-      const status = statusMap[row.original.status] || "offline"
-      const updateStatus = (table.options.meta as any)?.updateStatus
+      
+      // Get status for display - row.original.status might be a translation key or actual label
+      const rawStatus = row.original.status
+      
+      // If status is a translation key (e.g., "Done"), find the actual label from API statuses
+      let currentStatusDisplay = rawStatus
+      const isUsingApiStatuses = availableStatuses && availableStatuses.length > 0
+      
+      if (isUsingApiStatuses) {
+        // Check if rawStatus is a translation key (one of the standard statuses)
+        const standardStatuses = ["Not Started", "In Progress", "Done", t("status.Not Started"), t("status.In Progress"), t("status.Done")]
+        const isTranslationKey = standardStatuses.includes(rawStatus)
+        
+        if (isTranslationKey) {
+          // Map translation key to status group and find the actual label
+          const statusGroupMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+            "Not Started": "TODO",
+            "In Progress": "IN_PROGRESS",
+            "Done": "DONE",
+            // Also check translated versions
+            [t("status.Not Started")]: "TODO",
+            [t("status.In Progress")]: "IN_PROGRESS",
+            [t("status.Done")]: "DONE",
+          }
+          const targetGroup = statusGroupMap[rawStatus]
+          if (targetGroup) {
+            const groupStatuses = availableStatuses.filter(s => s.group === targetGroup)
+            if (groupStatuses.length > 0) {
+              // Use default status if available, otherwise first one
+              currentStatusDisplay = groupStatuses.find(s => s.isDefault)?.label || groupStatuses[0].label
+            }
+          } else {
+            // Try to find by label directly
+            const foundStatus = availableStatuses.find(s => s.label === rawStatus)
+            if (foundStatus) {
+              currentStatusDisplay = foundStatus.label
+            }
+          }
+        } else {
+          // rawStatus is already the actual label (e.g., "Completed")
+          currentStatusDisplay = rawStatus
+        }
+      }
+      
+      // Determine status color - prefer group-based mapping if available
+      let status: "online" | "offline" | "maintenance" | "degraded" = "offline"
+      if (isUsingApiStatuses) {
+        const foundStatus = availableStatuses.find(s => s.label === currentStatusDisplay)
+        if (foundStatus?.group) {
+          const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
+            TODO: "offline",
+            IN_PROGRESS: "maintenance",
+            DONE: "online",
+          }
+          status = groupColorMap[foundStatus.group]
+        } else {
+          // Try to map from display text (supports both English and translated values)
+          status = statusDisplayMap[currentStatusDisplay] || statusDisplayMap[rawStatus] || "offline"
+        }
+      } else {
+        // Fallback: use statusDisplayMap which includes translations
+        status = statusDisplayMap[currentStatusDisplay] || statusDisplayMap[rawStatus] || "offline"
+      }
 
-      const availableStatuses = ["Not Started", "In Progress", "Done"]
+      // Use API statuses if available, otherwise fall back to hardcoded statuses
+      const statusesToUse = availableStatuses && availableStatuses.length > 0
+        ? availableStatuses
+        : [
+            { label: t("status.Not Started"), group: 'TODO' as const },
+            { label: t("status.In Progress"), group: 'IN_PROGRESS' as const },
+            { label: t("status.Done"), group: 'DONE' as const },
+          ]
 
       return (
         <DropdownMenu>
@@ -526,28 +652,52 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
               <Status status={status}>
                 <StatusIndicator />
-                <StatusLabel>{row.original.status}</StatusLabel>
+                <StatusLabel>{currentStatusDisplay}</StatusLabel>
               </Status>
               <IconChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            {availableStatuses.map((statusOption) => (
-              <DropdownMenuItem
-                key={statusOption}
-                onClick={() => {
-                  // updateStatus?.(row.original.id, statusOption) // Removed redundant call, let meta.onStatusChange handle it
-                  const onStatusChange = (table.options.meta as any)?.onStatusChange
-                  onStatusChange?.(row.original.id, statusOption)
-                }}
-                className={row.original.status === statusOption ? "bg-muted" : ""}
-              >
-                <Status status={statusMap[statusOption] || "offline"}>
-                  <StatusIndicator />
-                  <StatusLabel>{statusOption}</StatusLabel>
-                </Status>
-              </DropdownMenuItem>
-            ))}
+            {statusesToUse.map((statusOption) => {
+              const statusLabel = typeof statusOption === 'string' 
+                ? statusOption 
+                : statusOption.label
+              const statusGroup = typeof statusOption === 'string' 
+                ? undefined 
+                : statusOption.group
+              
+              // Determine status color
+              const getStatusColor = (group?: 'TODO' | 'IN_PROGRESS' | 'DONE'): "online" | "offline" | "maintenance" | "degraded" => {
+                if (group) {
+                  const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
+                    TODO: "offline",
+                    IN_PROGRESS: "maintenance",
+                    DONE: "online",
+                  }
+                  return groupColorMap[group]
+                }
+                return statusDisplayMap[statusLabel] || "offline"
+              }
+              
+              const statusColor = getStatusColor(statusGroup)
+              
+              return (
+                <DropdownMenuItem
+                  key={statusLabel}
+                  onClick={() => {
+                    const onStatusChange = (table.options.meta as any)?.onStatusChange
+                    // Send the actual status label to API (e.g., "Completed" instead of "Done")
+                    onStatusChange?.(row.original.id, statusLabel)
+                  }}
+                  className={currentStatusDisplay === statusLabel ? "bg-muted" : ""}
+                >
+                  <Status status={statusColor}>
+                    <StatusIndicator />
+                    <StatusLabel>{statusLabel}</StatusLabel>
+                  </Status>
+                </DropdownMenuItem>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       )
@@ -556,7 +706,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "dueDate",
     header: ({ column }) => (
-      <SortableHeader column={column}>Due Date</SortableHeader>
+      <SortableHeader column={column}>{t("table.columns.dueDate")}</SortableHeader>
     ),
     sortingFn: (rowA, rowB) => {
       const a = new Date(rowA.original.dueDate).getTime()
@@ -568,7 +718,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       const dateFormat = userPrefs?.dateFormat || "DMY"
       const timeFormat = userPrefs?.timeFormat || "H24"
 
-      const relativeTime = getRelativeTime(row.original.dueDate)
+      const relativeTime = getRelativeTime(row.original.dueDate, t)
       const fullDate = formatDate(row.original.dueDate, dateFormat, timeFormat)
 
       return (
@@ -589,7 +739,8 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     id: "actions",
     cell: ({ row, table }) => <ActionsCell row={row} table={table} />,
   },
-]
+  ]
+}
 
 function DraggableRow({
   row,
@@ -645,6 +796,8 @@ export function DataTable({
   onRowClick,
   onDeleteTask,
   onStatusChange,
+  workspaceId,
+  brandId,
   ...props
 }: {
   data: z.infer<typeof schema>[]
@@ -654,8 +807,34 @@ export function DataTable({
   onRowClick?: (row: z.infer<typeof schema>) => void
   onDeleteTask?: (taskId: string | number) => void
   onStatusChange?: (taskId: string | number, newStatus: string) => void
+  workspaceId?: string
+  brandId?: string
 }) {
+  const t = useTranslations("tasks")
   const [data, setData] = React.useState(() => initialData)
+  const [availableStatuses, setAvailableStatuses] = React.useState<Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>>([])
+  
+  // Fetch available statuses from API
+  React.useEffect(() => {
+    async function fetchStatuses() {
+      if (!workspaceId) return
+      try {
+        const response = await apiClient.listTaskStatuses(workspaceId, brandId)
+        const statusesWithGroup = [
+          ...response.statuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
+          ...response.statuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
+          ...response.statuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
+        ]
+        setAvailableStatuses(statusesWithGroup)
+      } catch (error) {
+        console.error("Failed to fetch task statuses:", error)
+        // Keep empty array, will fall back to hardcoded statuses
+      }
+    }
+    fetchStatuses()
+  }, [workspaceId, brandId])
+  
+  const columns = React.useMemo(() => createColumns(t, availableStatuses), [t, availableStatuses])
 
   // Update data when initialData prop changes
   React.useEffect(() => {

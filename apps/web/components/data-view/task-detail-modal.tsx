@@ -9,7 +9,19 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { IconSquareCheck, IconX } from "@tabler/icons-react"
+import { IconSquareCheck, IconX, IconTrash } from "@tabler/icons-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { toast } from "sonner"
 import { BaseTask } from "./types"
 import {
   TaskProperties,
@@ -32,8 +44,26 @@ export function TaskDetailModal({
   isCreateMode = false,
   onTaskUpdate,
   onTaskCreate,
+  onDeleteTask,
 }: TaskDetailModalProps) {
   const t = useTranslations("tasks")
+  const { currentWorkspace } = useWorkspace()
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+
+  // Check if user can delete task (requires ADMIN or OWNER role)
+  const canDeleteTask = () => {
+    if (!currentWorkspace?.userRole) return false
+    const role = currentWorkspace.userRole
+    return role === 'OWNER' || role === 'ADMIN'
+  }
+
+  const handleDelete = () => {
+    if (onDeleteTask && task?.id) {
+      onDeleteTask(task.id)
+      setIsDeleteDialogOpen(false)
+      onOpenChange(false)
+    }
+  }
 
   const {
     // State
@@ -115,7 +145,17 @@ export function TaskDetailModal({
           </div>
 
           {/* Right side */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center gap-1">
+            {!isCreateMode && task && canDeleteTask() && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <IconTrash className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -351,6 +391,27 @@ export function TaskDetailModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("actions.deleteDialog.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("actions.deleteDialog.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("actions.deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("actions.deleteDialog.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

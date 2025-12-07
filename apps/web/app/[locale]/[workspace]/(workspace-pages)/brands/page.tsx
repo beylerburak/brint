@@ -50,8 +50,19 @@ export default function BrandsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
+  // Check if user has permission to create brand (requires ADMIN or OWNER role)
+  const canCreateBrandByRole = () => {
+    if (!currentWorkspace?.userRole) return false
+    const role = currentWorkspace.userRole
+    // OWNER and ADMIN can create brands (backend requires ADMIN, but OWNER bypasses)
+    return role === 'OWNER' || role === 'ADMIN'
+  }
+
   const canCreateBrand = () => {
     if (!currentWorkspace) return false
+    // First check role permission
+    if (!canCreateBrandByRole()) return false
+    // Then check plan limits
     const planLimit = PLAN_LIMITS[currentWorkspace.plan as PlanType]
     if (planLimit.maxBrands === -1) return true // unlimited
     return brands.length < planLimit.maxBrands
@@ -126,7 +137,10 @@ export default function BrandsPage() {
               <EmptyDescription>{t('noBrandsDesc')}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button onClick={() => setShowCreateDialog(true)}>
+              <Button 
+                onClick={() => setShowCreateDialog(true)}
+                disabled={!canCreateBrand()}
+              >
                 <IconPlus className="h-4 w-4" />
                 {t('createBrand')}
               </Button>
@@ -163,9 +177,15 @@ export default function BrandsPage() {
               if (canCreateBrand()) {
                 setShowCreateDialog(true)
               } else {
+                // If role doesn't allow, don't show upgrade dialog (it's a permission issue, not plan limit)
+                if (!canCreateBrandByRole()) {
+                  // Role-based restriction - could show a tooltip or message
+                  return
+                }
                 setShowUpgradeDialog(true)
               }
             }}
+            disabled={!canCreateBrand()}
           >
             <IconPlus className="h-4 w-4" />
             {t('createBrand')}

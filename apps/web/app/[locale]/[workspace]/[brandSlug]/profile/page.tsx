@@ -329,6 +329,14 @@ export default function BrandProfilePage() {
   const [brand, setBrand] = useState<BrandDetailDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Check if user can edit brand profile (requires ADMIN or OWNER role)
+  const canEditBrand = () => {
+    if (!currentWorkspace?.userRole) return false
+    const role = currentWorkspace.userRole
+    // Backend requires ADMIN for brand:update, but OWNER bypasses all checks
+    return role === 'OWNER' || role === 'ADMIN'
+  }
+
   // Contact channels state
   const [contactChannels, setContactChannels] = useState<BrandContactChannelDto[]>([])
   const [showAddContactDialog, setShowAddContactDialog] = useState(false)
@@ -2129,15 +2137,17 @@ export default function BrandProfilePage() {
               className="hidden"
               onChange={handleFileSelect}
             />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full shadow-sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              <IconPencil className="h-3.5 w-3.5" />
-            </Button>
+            {canEditBrand() && (
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full shadow-sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                <IconPencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
 
           {/* Brand info */}
@@ -2342,9 +2352,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.overview.brandIdentity')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenIdentityDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenIdentityDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-3">
@@ -2375,9 +2387,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.overview.contactChannels')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleAddContact}>
-                      <IconPlus className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleAddContact}>
+                        <IconPlus className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {contactChannels.length === 0 ? (
@@ -2421,24 +2435,26 @@ export default function BrandProfilePage() {
                                 {channel.label && (
                                   <Badge variant="secondary" className="text-xs">{channel.label}</Badge>
                                 )}
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => handleEditContact(channel)}
-                                  >
-                                    <IconPencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteContact(channel.id)}
-                                  >
-                                    <IconTrash className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                                {canEditBrand() && (
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => handleEditContact(channel)}
+                                    >
+                                      <IconPencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteContact(channel.id)}
+                                    >
+                                      <IconTrash className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )
@@ -2451,9 +2467,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.overview.quickFacts')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenQuickFactsDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenQuickFactsDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -2493,9 +2511,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.business.businessOverview')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBusinessOverviewDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBusinessOverviewDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-3 text-sm">
@@ -2519,9 +2539,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.business.coreOfferings')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenCoreOfferingsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenCoreOfferingsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2 text-sm">
@@ -2581,9 +2603,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.business.salesAndService')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenSalesChannelsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenSalesChannelsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2 text-sm">
@@ -2637,9 +2661,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.business.serviceRegions')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenServiceRegionsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenServiceRegionsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2 text-sm">
@@ -2684,9 +2710,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.audience.primaryPersonas')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenPersonaDialog()}>
-                    <IconPlus className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenPersonaDialog()}>
+                      <IconPlus className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {(audience.personas ?? []).length > 0 ? (
@@ -2695,14 +2723,16 @@ export default function BrandProfilePage() {
                         <div key={persona.id} className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
                           <div className="flex items-start justify-between">
                             <h4 className="font-medium text-sm">{persona.name}</h4>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenPersonaDialog(persona)}>
-                                <IconPencil className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePersona(persona.id)}>
-                                <IconTrash className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {canEditBrand() && (
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenPersonaDialog(persona)}>
+                                  <IconPencil className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePersona(persona.id)}>
+                                  <IconTrash className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground">
                             {persona.ageRange && `Age ${persona.ageRange} • `}{persona.description || 'No description'}
@@ -2736,9 +2766,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.audience.positioning')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenPositioningDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenPositioningDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -2770,9 +2802,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.audience.competitors')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenCompetitorDialog()}>
-                      <IconPlus className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenCompetitorDialog()}>
+                        <IconPlus className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {(audience.positioning?.competitors ?? []).length > 0 ? (
@@ -2785,14 +2819,16 @@ export default function BrandProfilePage() {
                                 <p className="text-xs text-muted-foreground">{competitor.note}</p>
                               )}
                             </div>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenCompetitorDialog(competitor)}>
-                                <IconPencil className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteCompetitor(competitor.id)}>
-                                <IconTrash className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {canEditBrand() && (
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenCompetitorDialog(competitor)}>
+                                  <IconPencil className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteCompetitor(competitor.id)}>
+                                  <IconTrash className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -2811,9 +2847,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.voice.toneCharacteristics.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenToneDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenToneDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -2867,9 +2905,11 @@ export default function BrandProfilePage() {
                       <IconCheck className="h-4 w-4 text-green-600" />
                       {t('brandProfile.voice.doSay.title')}
                     </CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDoSayDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDoSayDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {(voice.doSay ?? []).length > 0 ? (
@@ -2877,9 +2917,11 @@ export default function BrandProfilePage() {
                         {(voice.doSay ?? []).map((phrase, i) => (
                           <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20 text-sm group hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors">
                             <span>&quot;{phrase}&quot;</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <IconX className="h-3 w-3" />
-                            </Button>
+                            {canEditBrand() && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <IconX className="h-3 w-3" />
+                              </Button>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -2895,9 +2937,11 @@ export default function BrandProfilePage() {
                       <IconX className="h-4 w-4 text-red-600" />
                       {t('brandProfile.voice.dontSay.title')}
                     </CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDontSayDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenDontSayDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {(voice.dontSay ?? []).length > 0 ? (
@@ -2905,9 +2949,11 @@ export default function BrandProfilePage() {
                         {(voice.dontSay ?? []).map((phrase, i) => (
                           <li key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-sm group hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors">
                             <span>&quot;{phrase}&quot;</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <IconX className="h-3 w-3" />
-                            </Button>
+                            {canEditBrand() && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <IconX className="h-3 w-3" />
+                              </Button>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -2924,9 +2970,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.rules.allowedTopics.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAllowedTopicsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAllowedTopicsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {(rules.allowedTopics ?? []).length > 0 ? (
@@ -2949,9 +2997,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.rules.forbiddenTopics.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenForbiddenTopicsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenForbiddenTopicsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -2992,9 +3042,11 @@ export default function BrandProfilePage() {
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     ⚖️ {t('brandProfile.rules.legalConstraints.title')}
                   </CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenLegalConstraintDialog()}>
-                    <IconPlus className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleOpenLegalConstraintDialog()}>
+                      <IconPlus className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {(rules.legalConstraints ?? []).length > 0 ? (
@@ -3005,14 +3057,16 @@ export default function BrandProfilePage() {
                             <p className="text-sm font-medium mb-0.5">{item.title}</p>
                             <p className="text-xs text-muted-foreground">{item.description}</p>
                           </div>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-100" onClick={() => handleOpenLegalConstraintDialog(item)}>
-                              <IconPencil className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive opacity-100" onClick={() => handleDeleteLegalConstraint(item.id)}>
-                              <IconTrash className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          {canEditBrand() && (
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-100" onClick={() => handleOpenLegalConstraintDialog(item)}>
+                                <IconPencil className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive opacity-100" onClick={() => handleDeleteLegalConstraint(item.id)}>
+                                <IconTrash className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -3028,9 +3082,11 @@ export default function BrandProfilePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base font-semibold">{t('brandProfile.assets.brandColors.title')}</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBrandColorsDialog}>
-                    <IconPencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEditBrand() && (
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenBrandColorsDialog}>
+                      <IconPencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3128,9 +3184,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.assets.visualGuidelines.title')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenVisualGuidelinesDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenVisualGuidelinesDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {(assets.visualGuidelines ?? []).length > 0 ? (
@@ -3151,9 +3209,11 @@ export default function BrandProfilePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base font-semibold">{t('brandProfile.assets.aiConfiguration.title')}</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAiConfigDialog}>
-                      <IconPencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditBrand() && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleOpenAiConfigDialog}>
+                        <IconPencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">

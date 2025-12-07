@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
 import { updateWorkspace, isSlugAvailable } from './workspace-update.service.js';
 import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
+import { getPlanLimits } from '@brint/shared-config/plans';
 
 /**
  * Registers workspace routes
@@ -426,6 +427,382 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     return reply.status(200).send({
       success: true,
       members: membersWithAvatars,
+    });
+  });
+
+  // POST /workspaces/:workspaceId/members - Invite member to workspace
+  app.post('/workspaces/:workspaceId/members', {
+    preHandler: requireWorkspaceRoleFor('workspace:update'),
+    schema: {
+      tags: ['Workspace'],
+      summary: 'Invite member to workspace',
+      description: 'Invite a user to the workspace by email. Requires ADMIN role or higher.',
+      params: {
+        type: 'object',
+        properties: {
+          workspaceId: { type: 'string' },
+        },
+        required: ['workspaceId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          email: { type: 'string', format: 'email' },
+          role: { type: 'string', enum: ['ADMIN', 'EDITOR', 'VIEWER'], default: 'VIEWER' },
+        },
+        required: ['email'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            member: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: ['string', 'null'] },
+                email: { type: 'string' },
+                role: { type: 'string' },
+              },
+            },
+          },
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const { email, role = 'VIEWER' } = request.body as { email: string; role?: 'ADMIN' | 'EDITOR' | 'VIEWER' };
+    const currentUserId = request.auth!.tokenPayload!.sub;
+
+    // Fetch workspace
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      include: {
+        _count: {
+          select: { members: true },
+        },
+      },
+    });
+
+    if (!workspace) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'WORKSPACE_NOT_FOUND',
+          message: 'Workspace not found',
+        },
+      });
+    }
+
+    // Check plan limits
+    const limits = getPlanLimits(workspace.plan);
+    const currentMemberCount = workspace._count.members;
+    
+    if (limits.maxTeamMembers !== -1 && currentMemberCount >= limits.maxTeamMembers) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'MEMBER_LIMIT_REACHED',
+          message: `Plan limit reached. Maximum ${limits.maxTeamMembers} members allowed for ${workspace.plan} plan.`,
+        },
+      });
+    }
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User with this email not found',
+        },
+      });
+    }
+
+    // Check if user is already a member
+    const existingMember = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId: user.id,
+          workspaceId,
+        },
+      },
+    });
+
+    if (existingMember) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'MEMBER_ALREADY_EXISTS',
+          message: 'User is already a member of this workspace',
+        },
+      });
+    }
+
+    // Create workspace member
+    const newMember = await prisma.workspaceMember.create({
+      data: {
+        userId: user.id,
+        workspaceId,
+        role: role as 'ADMIN' | 'EDITOR' | 'VIEWER',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                bucket: true,
+                variants: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Generate avatar URL if available
+    let avatarUrl: string | null = null;
+    if (newMember.user.avatarMediaId && newMember.user.avatarMedia) {
+      try {
+        const isPublic = false;
+        avatarUrl = await getMediaVariantUrlAsync(
+          newMember.user.avatarMedia.bucket,
+          newMember.user.avatarMedia.variants,
+          'thumbnail',
+          isPublic
+        );
+      } catch (error) {
+        console.error('Failed to generate avatar URL:', error);
+      }
+    }
+
+    return reply.status(200).send({
+      success: true,
+      member: {
+        id: newMember.user.id,
+        name: newMember.user.name,
+        email: newMember.user.email,
+        avatarUrl,
+        role: newMember.role,
+      },
+    });
+  });
+
+  // PATCH /workspaces/:workspaceId/members/:userId - Update member role
+  app.patch('/workspaces/:workspaceId/members/:userId', {
+    preHandler: requireWorkspaceRoleFor('workspace:update'),
+    schema: {
+      tags: ['Workspace'],
+      summary: 'Update member role',
+      description: 'Update a workspace member\'s role. Requires ADMIN role or higher.',
+      params: {
+        type: 'object',
+        properties: {
+          workspaceId: { type: 'string' },
+          userId: { type: 'string' },
+        },
+        required: ['workspaceId', 'userId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          role: { type: 'string', enum: ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'] },
+        },
+        required: ['role'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            member: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: ['string', 'null'] },
+                email: { type: 'string' },
+                role: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
+    const { role } = request.body as { role: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER' };
+    const currentUserId = request.auth!.tokenPayload!.sub;
+
+    // Check if target member exists
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+    });
+
+    if (!targetMember) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'MEMBER_NOT_FOUND',
+          message: 'Member not found in this workspace',
+        },
+      });
+    }
+
+    // Cannot change own role
+    if (userId === currentUserId) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'CANNOT_CHANGE_OWN_ROLE',
+          message: 'Cannot change your own role',
+        },
+      });
+    }
+
+    // Update role
+    const updatedMember = await prisma.workspaceMember.update({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+      data: {
+        role,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return reply.status(200).send({
+      success: true,
+      member: {
+        id: updatedMember.user.id,
+        name: updatedMember.user.name,
+        email: updatedMember.user.email,
+        role: updatedMember.role,
+      },
+    });
+  });
+
+  // DELETE /workspaces/:workspaceId/members/:userId - Remove member
+  app.delete('/workspaces/:workspaceId/members/:userId', {
+    preHandler: requireWorkspaceRoleFor('workspace:update'),
+    schema: {
+      tags: ['Workspace'],
+      summary: 'Remove member',
+      description: 'Remove a member from the workspace. Requires ADMIN role or higher. Cannot remove OWNER.',
+      params: {
+        type: 'object',
+        properties: {
+          workspaceId: { type: 'string' },
+          userId: { type: 'string' },
+        },
+        required: ['workspaceId', 'userId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
+    const currentUserId = request.auth!.tokenPayload!.sub;
+
+    // Check if target member exists
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+    });
+
+    if (!targetMember) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'MEMBER_NOT_FOUND',
+          message: 'Member not found in this workspace',
+        },
+      });
+    }
+
+    // Cannot remove OWNER
+    if (targetMember.role === 'OWNER') {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'CANNOT_REMOVE_OWNER',
+          message: 'Cannot remove the workspace owner',
+        },
+      });
+    }
+
+    // Cannot remove yourself
+    if (userId === currentUserId) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'CANNOT_REMOVE_SELF',
+          message: 'Cannot remove yourself from the workspace',
+        },
+      });
+    }
+
+    // Remove member
+    await prisma.workspaceMember.delete({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+    });
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Member removed successfully',
     });
   });
 }

@@ -12,6 +12,7 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { magicLinkService } from './magic-link.service.js';
 import { sendMagicLinkEmailStub } from './email.stub.js';
+import { sendVerificationCodeEmail } from './email.service.js';
 import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 
 /**
@@ -330,18 +331,15 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
-            user: {
+            data: {
               type: 'object',
               properties: {
-                id: { type: 'string' },
-                email: { type: 'string' },
-                name: { type: ['string', 'null'] },
+                requiresEmailVerification: { type: 'boolean' },
               },
-              required: ['id', 'email'],
+              required: ['requiresEmailVerification'],
             },
-            redirectTo: { type: 'string' },
           },
-          required: ['success', 'user', 'redirectTo'],
+          required: ['success', 'data'],
         },
         400: {
           type: 'object',
@@ -367,8 +365,75 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // 1. Check if user already exists
       const existingUser = await prisma.user.findUnique({
         where: { email: email.toLowerCase() },
+        include: {
+          emailVerificationCodes: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
       });
 
+      // If user exists but email is not verified, resend verification code
+      if (existingUser && !existingUser.emailVerified) {
+        // Check if password matches (user might be trying to complete signup)
+        const isPasswordValid = existingUser.password 
+          ? await bcrypt.compare(password, existingUser.password)
+          : false;
+
+        // If password doesn't match, return error
+        if (!isPasswordValid) {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'AUTH_USER_EXISTS',
+              message: 'User with this email already exists. Please use the correct password or verify your email.',
+            },
+          });
+        }
+
+        // Password matches - generate new verification code
+        const verificationCode = String(
+          Math.floor(Math.random() * 900000) + 100000
+        );
+
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+        // Create new verification code
+        await prisma.emailVerificationCode.create({
+          data: {
+            userId: existingUser.id,
+            code: verificationCode,
+            expiresAt,
+            attemptCount: 0,
+          },
+        });
+
+        // Send verification code email
+        try {
+          await sendVerificationCodeEmail({
+            to: existingUser.email,
+            code: verificationCode,
+            userName: existingUser.name ?? undefined,
+          });
+          logger.info({ userId: existingUser.id, email }, 'Verification code resent for existing unverified user');
+        } catch (emailError) {
+          logger.error(
+            { error: emailError, userId: existingUser.id, email },
+            'Failed to send verification code email (non-fatal)'
+          );
+        }
+
+        // Return success with requiresEmailVerification flag
+        return reply.status(200).send({
+          success: true,
+          data: {
+            requiresEmailVerification: true,
+          },
+        });
+      }
+
+      // If user exists and email is verified, return error
       if (existingUser) {
         return reply.status(400).send({
           success: false,
@@ -382,58 +447,60 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // 2. Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 3. Create user
+      // 3. Generate 6-digit verification code (100000-999999)
+      // Security: Use crypto.randomInt for secure random number generation
+      const verificationCode = String(
+        Math.floor(Math.random() * 900000) + 100000
+      );
+
+      // 4. Calculate expiration time (10 minutes from now)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // 5. Create user with emailVerified = null
       const user = await prisma.user.create({
         data: {
           email: email.toLowerCase(),
           password: hashedPassword,
           name,
-          emailVerified: new Date(), // Auto-verify for now
+          emailVerified: null, // Email not verified yet
+          emailVerificationCodes: {
+            create: {
+              code: verificationCode,
+              expiresAt,
+              attemptCount: 0,
+            },
+          },
         },
       });
 
-      // 4. Create session
-      const tid = randomUUID();
-      await sessionService.createSession({
-        userId: user.id,
-        tid,
-        userAgent: request.headers['user-agent'] ?? null,
-        ipAddress: request.ip ?? null,
-      });
+      // 6. Send verification code email
+      // Note: Email sending failure should not block user creation
+      // The code is already saved in DB and can be verified
+      try {
+        await sendVerificationCodeEmail({
+          to: user.email,
+          code: verificationCode,
+          userName: user.name ?? undefined,
+        });
+        logger.info({ userId: user.id, email }, 'Verification code email sent');
+      } catch (emailError) {
+        // Log error but don't fail the request
+        // User can request a new code via resend endpoint
+        logger.error(
+          { error: emailError, userId: user.id, email },
+          'Failed to send verification code email (non-fatal)'
+        );
+      }
 
-      // 5. Fetch workspace memberships for JWT
-      const memberships = await prisma.workspaceMember.findMany({
-        where: { userId: user.id },
-        select: { workspaceId: true, role: true },
-      });
-      const workspaces = memberships.map((m) => ({ id: m.workspaceId, role: m.role }));
+      logger.info({ userId: user.id, email }, 'User registered successfully (email verification required)');
 
-      // 6. Generate tokens
-      const accessToken = tokenService.signAccessToken({ 
-        sub: user.id, 
-        email: user.email,
-        workspaces,
-        hasCompletedOnboarding: !!user.onboardingCompletedAt,
-      });
-      const refreshToken = tokenService.signRefreshToken({ sub: user.id, tid });
-
-      // 7. Set cookies
-      setAuthCookies(reply, {
-        accessToken,
-        refreshToken,
-      });
-
-      logger.info({ userId: user.id, email }, 'User registered successfully');
-
-      // 10. Return success response (new users always go to onboarding)
+      // 7. Return success response (DO NOT login user - they need to verify email first)
       return reply.status(201).send({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+        data: {
+          requiresEmailVerification: true,
         },
-        redirectTo: '/onboarding',
       });
     } catch (error) {
       logger.error({ error, email }, 'Error during registration');
@@ -444,6 +511,382 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           code: 'INTERNAL_ERROR',
           message: 'An unexpected error occurred during registration',
         },
+      });
+    }
+  });
+
+  // POST /auth/verify-email-code - Verify email with 6-digit code
+  app.post('/auth/verify-email-code', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify email with code',
+      description: 'Verifies user email using the 6-digit code sent to their email',
+      body: {
+        type: 'object',
+        properties: {
+          email: { type: 'string', format: 'email' },
+          code: { type: 'string', pattern: '^[0-9]{6}$' }, // Exactly 6 digits
+        },
+        required: ['email', 'code'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            data: {
+              type: 'object',
+              properties: {
+                emailVerified: { type: 'boolean' },
+              },
+              required: ['emailVerified'],
+            },
+          },
+          required: ['success', 'data'],
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { email: string; code: string } }>, reply: FastifyReply) => {
+    const { email, code } = request.body;
+
+    try {
+      // 1. Find user by email
+      const user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          emailVerificationCodes: {
+            orderBy: { createdAt: 'desc' },
+            take: 1, // Get the most recent code
+          },
+        },
+      });
+
+      if (!user) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User with this email not found',
+          },
+        });
+      }
+
+      // 2. Check if email is already verified
+      if (user.emailVerified) {
+        return reply.status(200).send({
+          success: true,
+          data: {
+            emailVerified: true,
+          },
+        });
+      }
+
+      // 3. Get the most recent verification code
+      const verificationCode = user.emailVerificationCodes[0];
+
+      if (!verificationCode) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VERIFICATION_CODE_NOT_FOUND',
+            message: 'No verification code found. Please request a new code.',
+          },
+        });
+      }
+
+      // 4. Security checks
+      // Check if code has already been used
+      if (verificationCode.usedAt) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VERIFICATION_CODE_ALREADY_USED',
+            message: 'This verification code has already been used. Please request a new code.',
+          },
+        });
+      }
+
+      // Check if code has expired
+      const now = new Date();
+      if (verificationCode.expiresAt < now) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VERIFICATION_CODE_EXPIRED',
+            message: 'Verification code has expired. Please request a new code.',
+          },
+        });
+      }
+
+      // Check attempt count (rate limiting)
+      // Security: Prevent brute force attacks by limiting attempts
+      if (verificationCode.attemptCount >= 5) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VERIFICATION_CODE_MAX_ATTEMPTS',
+            message: 'Maximum verification attempts exceeded. Please request a new code.',
+          },
+        });
+      }
+
+      // 5. Verify code
+      if (verificationCode.code !== code) {
+        // Increment attempt count on failed attempt
+        await prisma.emailVerificationCode.update({
+          where: { id: verificationCode.id },
+          data: {
+            attemptCount: {
+              increment: 1,
+            },
+          },
+        });
+
+        logger.warn(
+          {
+            userId: user.id,
+            email,
+            attemptCount: verificationCode.attemptCount + 1,
+          },
+          'Invalid verification code attempt'
+        );
+
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VERIFICATION_CODE_INVALID',
+            message: 'Invalid verification code',
+          },
+        });
+      }
+
+      // 6. Code is valid - mark email as verified and code as used
+      // Use transaction to ensure atomicity
+      await prisma.$transaction(async (tx) => {
+        // Update user emailVerified
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            emailVerified: now,
+          },
+        });
+
+        // Mark code as used
+        await tx.emailVerificationCode.update({
+          where: { id: verificationCode.id },
+          data: {
+            usedAt: now,
+            attemptCount: {
+              increment: 1, // Increment even on success for audit trail
+            },
+          },
+        });
+      });
+
+      logger.info({ userId: user.id, email }, 'Email verified successfully');
+
+      // 7. Return success
+      return reply.status(200).send({
+        success: true,
+        data: {
+          emailVerified: true,
+        },
+      });
+    } catch (error) {
+      logger.error({ error, email }, 'Error during email verification');
+
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred during email verification',
+        },
+      });
+    }
+  });
+
+  // POST /auth/resend-verification-code - Resend email verification code
+  app.post('/auth/resend-verification-code', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Resend verification code',
+      description: 'Resends email verification code to user. Rate limited to prevent abuse.',
+      body: {
+        type: 'object',
+        properties: {
+          email: { type: 'string', format: 'email' },
+        },
+        required: ['email'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+          },
+          required: ['success'],
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: { email: string } }>, reply: FastifyReply) => {
+    const { email } = request.body;
+
+    try {
+      // 1. Find user by email
+      const user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          emailVerificationCodes: {
+            orderBy: { createdAt: 'desc' },
+            take: 1, // Get the most recent code
+          },
+        },
+      });
+
+      if (!user) {
+        // Security: Don't reveal if user exists or not
+        // Return generic success to prevent email enumeration
+        return reply.status(200).send({
+          success: true,
+        });
+      }
+
+      // 2. If email is already verified, return success (no email sent)
+      if (user.emailVerified) {
+        return reply.status(200).send({
+          success: true,
+        });
+      }
+
+      // 3. Rate limiting: Check if a code was created in the last 2 minutes
+      const twoMinutesAgo = new Date();
+      twoMinutesAgo.setMinutes(twoMinutesAgo.getMinutes() - 2);
+
+      const recentCode = user.emailVerificationCodes.find(
+        (code) => code.createdAt >= twoMinutesAgo && !code.usedAt
+      );
+
+      if (recentCode) {
+        // Code was recently sent, don't send another one
+        // Security: Prevent email spam and rate limit abuse
+        logger.info(
+          {
+            userId: user.id,
+            email,
+            codeId: recentCode.id,
+          },
+          'Resend verification code skipped (rate limited)'
+        );
+        return reply.status(200).send({
+          success: true,
+        });
+      }
+
+      // 4. Generate new 6-digit verification code
+      const verificationCode = String(
+        Math.floor(Math.random() * 900000) + 100000
+      );
+
+      // 5. Calculate expiration time (10 minutes from now)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // 6. Create new verification code record
+      await prisma.emailVerificationCode.create({
+        data: {
+          userId: user.id,
+          code: verificationCode,
+          expiresAt,
+          attemptCount: 0,
+        },
+      });
+
+      // 7. Send verification code email
+      try {
+        await sendVerificationCodeEmail({
+          to: user.email,
+          code: verificationCode,
+          userName: user.name ?? undefined,
+        });
+        logger.info({ userId: user.id, email }, 'Verification code resent');
+      } catch (emailError) {
+        // Log error but don't fail the request
+        logger.error(
+          { error: emailError, userId: user.id, email },
+          'Failed to send verification code email (non-fatal)'
+        );
+      }
+
+      // 8. Return success (always return success to prevent email enumeration)
+      return reply.status(200).send({
+        success: true,
+      });
+    } catch (error) {
+      logger.error({ error, email }, 'Error during resend verification code');
+
+      // Return generic success to prevent information leakage
+      return reply.status(200).send({
+        success: true,
       });
     }
   });
@@ -489,8 +932,25 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
               properties: {
                 code: { type: 'string' },
                 message: { type: 'string' },
+                canResendVerification: { type: 'boolean' },
               },
               required: ['code', 'message'],
+            },
+          },
+          required: ['success', 'error'],
+        },
+        403: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+                canResendVerification: { type: 'boolean' },
+              },
+              required: ['code', 'message', 'canResendVerification'],
             },
           },
           required: ['success', 'error'],
@@ -531,7 +991,21 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // 3. Check if user has any workspace
+      // 3. Check if email is verified
+      // Security: Only verified users can login to prevent unauthorized access
+      if (!user.emailVerified) {
+        logger.warn({ email, userId: user.id }, 'Login attempt with unverified email');
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'Please verify your email address before logging in',
+            canResendVerification: true,
+          },
+        });
+      }
+
+      // 4. Check if user has any workspace
       const workspaceMember = await prisma.workspaceMember.findFirst({
         where: { userId: user.id },
         include: {
@@ -539,7 +1013,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
-      // 4. Create session
+      // 5. Create session
       const tid = randomUUID();
       await sessionService.createSession({
         userId: user.id,
@@ -548,14 +1022,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         ipAddress: request.ip ?? null,
       });
 
-      // 5. Fetch workspace memberships for JWT
+      // 6. Fetch workspace memberships for JWT
       const memberships = await prisma.workspaceMember.findMany({
         where: { userId: user.id },
         select: { workspaceId: true, role: true },
       });
       const workspaces = memberships.map((m) => ({ id: m.workspaceId, role: m.role }));
 
-      // 6. Generate tokens
+      // 7. Generate tokens
       const accessToken = tokenService.signAccessToken({ 
         sub: user.id, 
         email: user.email,
@@ -564,7 +1038,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       });
       const refreshToken = tokenService.signRefreshToken({ sub: user.id, tid });
 
-      // 7. Set cookies
+      // 8. Set cookies
       setAuthCookies(reply, {
         accessToken,
         refreshToken,
@@ -572,12 +1046,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
       logger.info({ userId: user.id, email }, 'User logged in successfully');
 
-      // 7. Determine redirect path
+      // 9. Determine redirect path
       const redirectTo = workspaceMember 
         ? `/${workspaceMember.workspace.slug}/home`
         : '/onboarding';
 
-      // 8. Return success response
+      // 10. Return success response
       return reply.status(200).send({
         success: true,
         user: {

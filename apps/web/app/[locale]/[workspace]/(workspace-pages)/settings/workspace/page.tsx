@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -11,15 +11,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconCheck, IconX, IconLoader2 } from "@tabler/icons-react"
+import { IconCheck, IconX, IconLoader2, IconTrash } from "@tabler/icons-react"
+import { apiClient } from "@/lib/api-client"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { getPlanLimits, PLAN_TYPES, type PlanType } from "@brint/shared-config/plans"
+import { getPlanLimits, PLAN_TYPES, type PlanType, canAddTeamMember } from "@brint/shared-config/plans"
+import { UpgradeDialog } from "@/features/workspace/upgrade-dialog"
+import { IconUserPlus } from "@tabler/icons-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 export default function WorkspaceSettingsPage() {
   const t = useTranslations('settings')
   const router = useRouter()
-  const { currentWorkspace, isLoadingWorkspace, refreshWorkspace } = useWorkspace()
+  const { currentWorkspace, isLoadingWorkspace, refreshWorkspace, user } = useWorkspace()
   
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -27,6 +57,128 @@ export default function WorkspaceSettingsPage() {
   const [isCheckingSlug, setIsCheckingSlug] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const lastWorkspaceIdRef = useRef<string | null>(null)
+  const [members, setMembers] = useState<Array<{
+    id: string
+    name: string | null
+    email: string
+    avatarUrl: string | null
+    role: string
+  }>>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
+  const [memberToUpdateRole, setMemberToUpdateRole] = useState<{ userId: string; newRole: string } | null>(null)
+  const [showInviteDialog, setShowInviteDialog] = useState(false)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'EDITOR' | 'VIEWER'>('VIEWER')
+  const [isInviting, setIsInviting] = useState(false)
+
+  // Load workspace details (including memberCount) when workspace changes
+  useEffect(() => {
+    if (currentWorkspace?.id && currentWorkspace.id !== lastWorkspaceIdRef.current) {
+      // Load workspace details to get memberCount
+      refreshWorkspace(currentWorkspace.id)
+      lastWorkspaceIdRef.current = currentWorkspace.id
+    }
+  }, [currentWorkspace?.id, refreshWorkspace])
+
+  // Load workspace members
+  useEffect(() => {
+    if (currentWorkspace?.id) {
+      loadMembers()
+    }
+  }, [currentWorkspace?.id])
+
+  const loadMembers = async () => {
+    if (!currentWorkspace?.id) return
+    setIsLoadingMembers(true)
+    try {
+      const response = await apiClient.listWorkspaceMembers(currentWorkspace.id)
+      setMembers(response.members)
+    } catch (error) {
+      console.error('Failed to load members:', error)
+      toast.error(t('failedToLoadMembers') || 'Failed to load members')
+    } finally {
+      setIsLoadingMembers(false)
+    }
+  }
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!currentWorkspace?.id) return
+    try {
+      await apiClient.removeWorkspaceMember(currentWorkspace.id, userId)
+      toast.success(t('memberRemoved'))
+      await loadMembers()
+      await refreshWorkspace(currentWorkspace.id) // Refresh member count
+      setMemberToRemove(null)
+    } catch (error: any) {
+      console.error('Failed to remove member:', error)
+      toast.error(error?.error?.message || t('failedToRemoveMember'))
+    }
+  }
+
+  const handleUpdateRole = async (userId: string, newRole: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER') => {
+    if (!currentWorkspace?.id) return
+    try {
+      await apiClient.updateWorkspaceMemberRole(currentWorkspace.id, userId, newRole)
+      toast.success(t('roleUpdated'))
+      await loadMembers()
+      setMemberToUpdateRole(null)
+    } catch (error: any) {
+      console.error('Failed to update role:', error)
+      toast.error(error?.error?.message || t('failedToUpdateRole'))
+    }
+  }
+
+  const handleInviteMember = async () => {
+    if (!currentWorkspace?.id || !inviteEmail.trim()) return
+
+    // Check plan limits
+    const planType = currentWorkspace.plan || 'FREE'
+    const plan: PlanType = PLAN_TYPES.includes(planType as PlanType) ? planType as PlanType : 'FREE'
+    const currentMemberCount = currentWorkspace.memberCount || 0
+
+    if (!canAddTeamMember(plan, currentMemberCount)) {
+      setShowInviteDialog(false)
+      setShowUpgradeDialog(true)
+      return
+    }
+
+    setIsInviting(true)
+    try {
+      await apiClient.inviteWorkspaceMember(currentWorkspace.id, inviteEmail.trim(), inviteRole)
+      toast.success(t('memberInvited') || 'Member invited successfully')
+      await loadMembers()
+      await refreshWorkspace(currentWorkspace.id) // Refresh member count
+      setShowInviteDialog(false)
+      setInviteEmail('')
+      setInviteRole('VIEWER')
+    } catch (error: any) {
+      console.error('Failed to invite member:', error)
+      const errorCode = error?.code || error?.error?.code
+      if (errorCode === 'MEMBER_LIMIT_REACHED') {
+        setShowInviteDialog(false)
+        setShowUpgradeDialog(true)
+      } else if (errorCode === 'USER_NOT_FOUND') {
+        toast.error(t('userNotFound') || 'This user is not registered in the system. They need to sign up first.')
+      } else if (errorCode === 'MEMBER_ALREADY_EXISTS') {
+        toast.error(t('memberAlreadyExists') || 'This user is already a member of this workspace.')
+      } else {
+        toast.error(error?.message || error?.error?.message || t('failedToInviteMember') || 'Failed to invite member')
+      }
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  const canManageMembers = currentWorkspace?.userRole === 'OWNER' || currentWorkspace?.userRole === 'ADMIN'
+  const getInitials = (name: string | null, email: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    }
+    return email[0].toUpperCase()
+  }
 
   // Initialize form values
   useEffect(() => {
@@ -340,13 +492,243 @@ export default function WorkspaceSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{t('totalMembers')}</p>
               <p className="text-2xl font-bold">{currentWorkspace?.memberCount || 0}</p>
             </div>
-            <Button disabled>{t('manageMembers')}</Button>
+            {canManageMembers && (
+              <Button
+                onClick={() => {
+                  const planType = currentWorkspace?.plan || 'FREE'
+                  const plan: PlanType = PLAN_TYPES.includes(planType as PlanType) ? planType as PlanType : 'FREE'
+                  const currentMemberCount = currentWorkspace?.memberCount || 0
+                  
+                  if (!canAddTeamMember(plan, currentMemberCount)) {
+                    setShowUpgradeDialog(true)
+                  } else {
+                    setShowInviteDialog(true)
+                  }
+                }}
+                size="sm"
+              >
+                <IconUserPlus className="h-4 w-4 mr-2" />
+                {t('inviteMember')}
+              </Button>
+            )}
           </div>
+
+          {isLoadingMembers ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('member')}</TableHead>
+                  <TableHead>{t('email')}</TableHead>
+                  <TableHead>{t('role')}</TableHead>
+                  {canManageMembers && <TableHead className="text-right">{t('actions')}</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={canManageMembers ? 4 : 3} className="text-center text-muted-foreground">
+                      {t('noMembers')}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  members.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.avatarUrl || undefined} />
+                            <AvatarFallback>{getInitials(member.name, member.email)}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{member.name || member.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{member.email}</TableCell>
+                      <TableCell>
+                        {canManageMembers && member.id !== user?.id ? (
+                          <Select
+                            value={member.role}
+                            onValueChange={(newRole) => {
+                              if (newRole !== member.role) {
+                                setMemberToUpdateRole({ userId: member.id, newRole: newRole as 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER' })
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="OWNER">OWNER</SelectItem>
+                              <SelectItem value="ADMIN">ADMIN</SelectItem>
+                              <SelectItem value="EDITOR">EDITOR</SelectItem>
+                              <SelectItem value="VIEWER">VIEWER</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={member.role === 'OWNER' ? 'default' : 'secondary'}>
+                            {member.role}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      {canManageMembers ? (
+                        <TableCell className="text-right">
+                          {member.id !== user?.id ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setMemberToRemove(member.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <IconTrash className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+
+          {/* Remove Member Confirmation Dialog */}
+          <AlertDialog open={memberToRemove !== null} onOpenChange={(open) => !open && setMemberToRemove(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('removeMember')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('removeMemberConfirm', { 
+                    name: members.find(m => m.id === memberToRemove)?.name || 
+                          members.find(m => m.id === memberToRemove)?.email 
+                  })}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => memberToRemove && handleRemoveMember(memberToRemove)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {t('remove')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Update Role Confirmation Dialog */}
+          <AlertDialog open={memberToUpdateRole !== null} onOpenChange={(open) => !open && setMemberToUpdateRole(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('changeRole')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('changeRoleConfirm', { 
+                    name: memberToUpdateRole ? (members.find(m => m.id === memberToUpdateRole.userId)?.name || 
+                          members.find(m => m.id === memberToUpdateRole.userId)?.email) : '',
+                    role: memberToUpdateRole?.newRole
+                  })}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => memberToUpdateRole && handleUpdateRole(memberToUpdateRole.userId, memberToUpdateRole.newRole as 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER')}
+                >
+                  {t('confirm')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Invite Member Dialog */}
+          <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('inviteMember')}</DialogTitle>
+                <DialogDescription>
+                  {t('inviteMemberDesc')}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">{t('email')}</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    disabled={isInviting}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">{t('role')}</Label>
+                  <Select
+                    value={inviteRole}
+                    onValueChange={(value) => setInviteRole(value as 'ADMIN' | 'EDITOR' | 'VIEWER')}
+                    disabled={isInviting}
+                  >
+                    <SelectTrigger id="invite-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ADMIN">ADMIN</SelectItem>
+                      <SelectItem value="EDITOR">EDITOR</SelectItem>
+                      <SelectItem value="VIEWER">VIEWER</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowInviteDialog(false)
+                    setInviteEmail('')
+                    setInviteRole('VIEWER')
+                  }}
+                  disabled={isInviting}
+                >
+                  {t('cancel')}
+                </Button>
+                <Button
+                  onClick={handleInviteMember}
+                  disabled={isInviting || !inviteEmail.trim()}
+                >
+                  {isInviting ? (
+                    <>
+                      <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {t('inviting')}
+                    </>
+                  ) : (
+                    <>
+                      <IconUserPlus className="h-4 w-4 mr-2" />
+                      {t('invite')}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Upgrade Dialog */}
+          <UpgradeDialog
+            open={showUpgradeDialog}
+            onOpenChange={setShowUpgradeDialog}
+            currentPlan={(currentWorkspace?.plan || 'FREE') as 'FREE' | 'STARTER' | 'PRO' | 'AGENCY'}
+            feature="members"
+          />
         </CardContent>
       </Card>
     </div>

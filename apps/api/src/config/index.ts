@@ -78,3 +78,15 @@ export const appUrlConfig = {
   baseUrl: env.APP_URL ?? `http://localhost:${appConfig.port}`,
 } as const;
 
+/**
+ * SMTP configuration for email sending
+ */
+export const smtpConfig = {
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: env.SMTP_SECURE,
+  user: env.SMTP_USER,
+  pass: env.SMTP_PASS,
+  from: env.SMTP_FROM,
+} as const;
+

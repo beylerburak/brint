@@ -42,6 +42,19 @@ export function LoginForm({
       const data = await response.json()
 
       if (!response.ok) {
+        // If email is not verified, redirect to signup page with email and password
+        // Password will be stored in sessionStorage temporarily for auto-login after verification
+        if (data.error?.code === 'EMAIL_NOT_VERIFIED') {
+          // Store password temporarily in sessionStorage for auto-login after verification
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('pendingLoginPassword', password)
+            sessionStorage.setItem('pendingLoginEmail', email)
+          }
+          const signupPath = locale ? `/${locale}/signup?email=${encodeURIComponent(email)}&verify=true` : `/signup?email=${encodeURIComponent(email)}&verify=true`
+          router.push(signupPath)
+          return
+        }
+        
         setError(data.error?.message || 'Login failed')
         setIsLoading(false)
         return

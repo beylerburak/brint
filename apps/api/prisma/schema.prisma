@@ -173,6 +173,9 @@ model User {
   // Comment relations
   authoredComments Comment[] @relation("CommentAuthor")
 
+  // Email verification
+  emailVerificationCodes EmailVerificationCode[]
+
   @@map("users")
 }
 
@@ -649,4 +652,24 @@ model Comment {
   @@index([parentId])
   @@index([deletedAt])
   @@map("comments")
+}
+
+/// ============================================================================
+/// EMAIL VERIFICATION MODEL
+/// ============================================================================
+
+model EmailVerificationCode {
+  id           String   @id @default(cuid())
+  userId       String
+  code         String   // 6-digit numeric code (100000-999999)
+  expiresAt    DateTime // Code expiration time (typically 10 minutes)
+  usedAt       DateTime? // When the code was successfully used (null if unused)
+  attemptCount Int      @default(0) // Number of failed verification attempts
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
+  @@map("email_verification_codes")
 }

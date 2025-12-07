@@ -861,6 +861,32 @@ export default function BrandTasksPage() {
             setSelectedTask(newTask as any)
             setIsCreateMode(false)
           }}
+          onDeleteTask={async (taskId) => {
+            if (!currentWorkspace) return
+
+            try {
+              await apiClient.deleteTask(currentWorkspace.id, String(taskId))
+
+              // Remove task from list
+              setTasks((prev) => prev.filter((task) => task.id !== String(taskId)))
+
+              // Close modal if deleted task is selected
+              if (selectedTask && String(selectedTask.id) === String(taskId)) {
+                setIsTaskModalOpen(false)
+                setSelectedTask(null)
+              }
+
+              // Update pagination total
+              setPagination((prev) => ({
+                ...prev,
+                total: Math.max(0, prev.total - 1),
+              }))
+
+              toast.success(t("success.deleteTask"))
+            } catch (error: any) {
+              toast.error(t("errors.deleteTask"))
+            }
+          }}
           onTaskUpdate={(taskId, updates) => {
             console.log('[TaskUpdate] Callback called:', { taskId, updates, currentTasksCount: tasks.length })
 

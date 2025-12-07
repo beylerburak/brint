@@ -137,6 +137,7 @@ import {
   DataTableActionBarSelection,
 } from "@/components/data-table/data-table-action-bar"
 import { useTranslations } from "next-intl"
+import { useWorkspace } from "@/contexts/workspace-context"
 
 export const schema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -319,6 +320,15 @@ function SortableHeader({ column, children }: { column: any; children: React.Rea
 function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: any }) {
   const onDeleteTask = (table.options.meta as any)?.onDeleteTask
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+  const { currentWorkspace } = useWorkspace()
+
+  // Check if user can delete task (requires ADMIN or OWNER role)
+  // Backend requires ADMIN for task:delete, but OWNER bypasses all checks
+  const canDeleteTask = () => {
+    if (!currentWorkspace?.userRole) return false
+    const role = currentWorkspace.userRole
+    return role === 'OWNER' || role === 'ADMIN'
+  }
 
   const handleDelete = () => {
     if (onDeleteTask) {
@@ -348,6 +358,7 @@ function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: 
           <DropdownMenuItem
             variant="destructive"
             onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={!canDeleteTask()}
           >
             Delete
           </DropdownMenuItem>

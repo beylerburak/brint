@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { useWorkspace } from "@/contexts/workspace-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -229,6 +230,16 @@ export function DataViewKanban({
   className = "",
   onTaskClick,
 }: DataViewKanbanProps) {
+  const { currentWorkspace } = useWorkspace()
+
+  // Check if user can delete task (requires ADMIN or OWNER role)
+  // Backend requires ADMIN for task:delete, but OWNER bypasses all checks
+  const canDeleteTask = () => {
+    if (!currentWorkspace?.userRole) return false
+    const role = currentWorkspace.userRole
+    return role === 'OWNER' || role === 'ADMIN'
+  }
+
   // Create refs for each column - use a Map to store refs
   const columnRefsMap = useMemo(() => {
     return new Map<string, React.RefObject<HTMLDivElement | null>>()
@@ -294,7 +305,10 @@ export function DataViewKanban({
                       <IconSettings className="h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive">
+                    <DropdownMenuItem 
+                      variant="destructive"
+                      disabled={!canDeleteTask()}
+                    >
                       <IconTrash className="h-4 w-4" />
                       <span>Delete</span>
                     </DropdownMenuItem>

@@ -327,6 +327,83 @@ export const apiClient = {
     return fetchApi('/workspaces');
   },
 
+
+  /**
+   * Register new user
+   */
+  async register(data: {
+    email: string;
+    password: string;
+    name: string;
+  }): Promise<{
+    success: true;
+    data: {
+      requiresEmailVerification: boolean;
+    };
+  }> {
+    return fetchApi('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuthRedirect: true, // Don't redirect on 401 for registration
+    });
+  },
+
+  /**
+   * Verify email with 6-digit code
+   */
+  async verifyEmailCode(data: {
+    email: string;
+    code: string;
+  }): Promise<{
+    success: true;
+    data: {
+      emailVerified: boolean;
+    };
+  }> {
+    return fetchApi('/auth/verify-email-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuthRedirect: true,
+    });
+  },
+
+  /**
+   * Resend verification code
+   */
+  async resendVerificationCode(data: {
+    email: string;
+  }): Promise<{
+    success: true;
+  }> {
+    return fetchApi('/auth/resend-verification-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuthRedirect: true,
+    });
+  },
+
+  /**
+   * Login user
+   */
+  async login(data: {
+    email: string;
+    password: string;
+  }): Promise<{
+    success: true;
+    user: {
+      id: string;
+      email: string;
+      name: string | null;
+    };
+    redirectTo: string;
+  }> {
+    return fetchApi('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuthRedirect: true,
+    });
+  },
+
   /**
    * Logout user
    */
@@ -625,6 +702,66 @@ export const apiClient = {
     }>;
   }> {
     return fetchApi(`/workspaces/${workspaceId}/members`);
+  },
+
+  /**
+   * Update workspace member role
+   */
+  async updateWorkspaceMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER'
+  ): Promise<{
+    success: true;
+    member: {
+      id: string;
+      name: string | null;
+      email: string;
+      role: string;
+    };
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  /**
+   * Remove member from workspace
+   */
+  async removeWorkspaceMember(
+    workspaceId: string,
+    userId: string
+  ): Promise<{
+    success: true;
+    message: string;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Invite a user to workspace by email
+   */
+  async inviteWorkspaceMember(
+    workspaceId: string,
+    email: string,
+    role: 'ADMIN' | 'EDITOR' | 'VIEWER' = 'VIEWER'
+  ): Promise<{
+    success: true;
+    member: {
+      id: string;
+      name: string | null;
+      email: string;
+      avatarUrl: string | null;
+      role: string;
+    };
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    });
   },
 
   /**

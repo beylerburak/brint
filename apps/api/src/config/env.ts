@@ -32,6 +32,13 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().url(),
   APP_URL: z.string().url().optional(),
+  // SMTP Configuration for email sending
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_SECURE: z.coerce.boolean().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().email().optional(),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -64,6 +71,13 @@ export const env = {
   GOOGLE_OAUTH_CLIENT_SECRET: rawEnv.GOOGLE_OAUTH_CLIENT_SECRET,
   GOOGLE_OAUTH_REDIRECT_URI: rawEnv.GOOGLE_OAUTH_REDIRECT_URI,
   APP_URL: rawEnv.APP_URL,
+  // SMTP Configuration
+  SMTP_HOST: rawEnv.SMTP_HOST,
+  SMTP_PORT: rawEnv.SMTP_PORT,
+  SMTP_SECURE: rawEnv.SMTP_SECURE ?? true,
+  SMTP_USER: rawEnv.SMTP_USER,
+  SMTP_PASS: rawEnv.SMTP_PASS,
+  SMTP_FROM: rawEnv.SMTP_FROM,
 } as const;
 
 export type Env = typeof env;

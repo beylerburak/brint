@@ -124,6 +124,7 @@ export interface TaskDetailModalProps {
         assignedTo?: any[];
     }) => void
     onTaskCreate?: (task: BaseTask) => void
+    onDeleteTask?: (taskId: string | number) => void
 }
 
 // Property Item Props

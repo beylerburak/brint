@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -7,18 +8,29 @@ async function main() {
   console.log('🌱 Starting seed...');
 
   // 1. User
-  const hashedPassword = await bcrypt.hash('qqwqdz65', 10);
+  // Require environment variables for seed credentials - no hardcoded defaults to prevent security issues
+  const seedEmail = process.env.SEED_USER_EMAIL;
+  const seedPassword = process.env.SEED_USER_PASSWORD;
+
+  if (!seedEmail || !seedPassword) {
+    throw new Error(
+      'SEED_USER_EMAIL and SEED_USER_PASSWORD environment variables are required. ' +
+      'Never use hardcoded credentials in seed files. Set these variables before running seed.'
+    );
+  }
+  
+  const hashedPassword = await bcrypt.hash(seedPassword, 10);
   const user = await prisma.user.upsert({
-    where: { email: 'burak@beyler.com.tr' },
+    where: { email: seedEmail },
     update: {},
     create: {
-      email: 'burak@beyler.com.tr',
-      name: 'Burak Beyler',
+      email: seedEmail,
+      name: 'Test User',
       password: hashedPassword,
       emailVerified: new Date(),
     },
   });
-  console.log('✅ User:', user.email, '(password: qqwqdz65)');
+  console.log('✅ User created:', user.email);
 
   // 2. Workspace
   const workspace = await prisma.workspace.upsert({

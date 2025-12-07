@@ -1,10 +1,8 @@
 -- AlterTable
 ALTER TABLE "tasks" ADD COLUMN "taskNumber" INTEGER NOT NULL DEFAULT 1;
 
--- CreateIndex
-CREATE UNIQUE INDEX "tasks_workspaceId_taskNumber_key" ON "tasks"("workspaceId", "taskNumber");
-
--- Update existing tasks with sequential numbers per workspace
+-- Update existing tasks with sequential numbers per workspace BEFORE creating unique index
+-- This prevents unique constraint violations when multiple tasks exist in the same workspace
 DO $$
 DECLARE
     workspace_record RECORD;
@@ -25,4 +23,7 @@ BEGIN
         END LOOP;
     END LOOP;
 END $$;
+
+-- CreateIndex (after sequential numbers are assigned to avoid unique constraint violations)
+CREATE UNIQUE INDEX "tasks_workspaceId_taskNumber_key" ON "tasks"("workspaceId", "taskNumber");
 

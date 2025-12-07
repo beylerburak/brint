@@ -17,6 +17,9 @@ import { registerProjectRoutes } from '../../modules/project/project.routes.js';
 import { registerTaskRoutes } from '../../modules/task/task.routes.js';
 import { registerTaskStatusRoutes } from '../../modules/task/task-status.routes.js';
 import { registerTaskWebSocketRoutes } from '../../modules/task/task-websocket.routes.js';
+import { registerSocialAccountRoutes } from '../../modules/social-account/social-account.routes.js';
+import { registerFacebookRoutes } from '../../modules/social-account/facebook/facebook.routes.js';
+import { registerLinkedInRoutes } from '../../modules/social-account/linkedin/linkedin.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -79,6 +82,9 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerTaskRoutes(app);
   await registerTaskStatusRoutes(app);
   await registerTaskWebSocketRoutes(app);
+  await registerSocialAccountRoutes(app);
+  await registerFacebookRoutes(app);
+  await registerLinkedInRoutes(app);
 
   return app;
 }

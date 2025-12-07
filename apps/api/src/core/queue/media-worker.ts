@@ -189,9 +189,3 @@ export function createMediaWorker() {
   return worker;
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('Shutting down media worker...');
-  await connection.quit();
-});
-

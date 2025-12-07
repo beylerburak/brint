@@ -15,6 +15,7 @@ export interface PlanLimits {
     maxStorageGB: number
     maxTeamMembers: number
     maxMonthlyPosts: number  // -1 = unlimited
+    maxSocialAccountsPerPlatform: number  // -1 = unlimited, per brand
 }
 
 // Plan configuration
@@ -24,24 +25,28 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
         maxStorageGB: 1,
         maxTeamMembers: 2,
         maxMonthlyPosts: 30,
+        maxSocialAccountsPerPlatform: 1, // 1 account per platform per brand
     },
     STARTER: {
         maxBrands: 5,
         maxStorageGB: 10,
         maxTeamMembers: 5,
         maxMonthlyPosts: 200,
+        maxSocialAccountsPerPlatform: 3, // 3 accounts per platform per brand
     },
     PRO: {
         maxBrands: 20,
         maxStorageGB: 100,
         maxTeamMembers: 20,
         maxMonthlyPosts: 1000,
+        maxSocialAccountsPerPlatform: 10, // 10 accounts per platform per brand
     },
     AGENCY: {
         maxBrands: -1, // unlimited
         maxStorageGB: 500,
         maxTeamMembers: 50,
         maxMonthlyPosts: -1, // unlimited
+        maxSocialAccountsPerPlatform: -1, // unlimited
     },
 } as const
 
@@ -103,4 +108,30 @@ export function isStorageLimitReached(plan: PlanType, usedStorageGB: number): bo
 export function getStorageUsagePercent(plan: PlanType, usedStorageGB: number): number {
     const limits = PLAN_LIMITS[plan]
     return Math.min(100, (usedStorageGB / limits.maxStorageGB) * 100)
+}
+
+/**
+ * Check if a plan allows adding more social accounts for a specific platform
+ */
+export function canAddSocialAccount(
+    plan: PlanType, 
+    platform: string, 
+    currentAccountCount: number
+): boolean {
+    const limits = PLAN_LIMITS[plan]
+    if (limits.maxSocialAccountsPerPlatform === -1) return true // unlimited
+    return currentAccountCount < limits.maxSocialAccountsPerPlatform
+}
+
+/**
+ * Get remaining social account slots for a platform
+ */
+export function getRemainingSocialAccounts(
+    plan: PlanType, 
+    platform: string, 
+    currentAccountCount: number
+): number | 'unlimited' {
+    const limits = PLAN_LIMITS[plan]
+    if (limits.maxSocialAccountsPerPlatform === -1) return 'unlimited'
+    return Math.max(0, limits.maxSocialAccountsPerPlatform - currentAccountCount)
 }

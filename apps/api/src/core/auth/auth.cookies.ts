@@ -1,10 +1,8 @@
 import type { FastifyReply } from 'fastify';
-import { authConfig } from '../../config/index.js';
+import { authConfig, appConfig } from '../../config/index.js';
 
 const ACCESS_COOKIE_NAME = 'access_token';
 const REFRESH_COOKIE_NAME = 'refresh_token';
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 export function setAuthCookies(reply: FastifyReply, tokens: {
   accessToken: string;
@@ -15,7 +13,7 @@ export function setAuthCookies(reply: FastifyReply, tokens: {
 
   const cookieOptions = {
     httpOnly: true,
-    secure: isProduction,
+    secure: appConfig.env === 'production',
     sameSite: 'lax' as const,
     path: '/',
   };
@@ -32,8 +30,15 @@ export function setAuthCookies(reply: FastifyReply, tokens: {
 }
 
 export function clearAuthCookies(reply: FastifyReply) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: appConfig.env === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+
   reply
-    .clearCookie(ACCESS_COOKIE_NAME, { path: '/' })
-    .clearCookie(REFRESH_COOKIE_NAME, { path: '/' });
+    .clearCookie(ACCESS_COOKIE_NAME, cookieOptions)
+    .clearCookie(REFRESH_COOKIE_NAME, cookieOptions);
 }
 

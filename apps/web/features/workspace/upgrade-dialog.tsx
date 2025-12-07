@@ -45,7 +45,7 @@ type UpgradeDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentPlan: string
-  feature: 'brands' | 'storage' | 'members'
+  feature: 'brands' | 'storage' | 'members' | 'socialAccounts'
 }
 
 // Plan limits and pricing (synced with backend app-config.ts)

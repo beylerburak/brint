@@ -9,6 +9,20 @@
  * node dist/worker.js
  */
 
+// Load environment variables FIRST before any other imports
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const apiDir = join(__dirname, '../');
+const rootDir = join(__dirname, '../../../');
+
+// Load apps/api/.env first (priority), then root .env
+config({ path: join(apiDir, '.env'), override: true });
+config({ path: join(rootDir, '.env') });
+
 import { createMediaWorker } from './core/queue/media-worker.js';
 import { logger } from './lib/logger.js';
 

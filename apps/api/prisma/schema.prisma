@@ -124,6 +124,23 @@ enum TaskStatusGroup {
   DONE
 }
 
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  LINKEDIN
+  X
+  YOUTUBE
+  WHATSAPP
+  PINTEREST
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -278,6 +295,9 @@ model Brand {
   taskStatuses TaskStatus[]
   tasks        Task[]
   comments     Comment[]
+  
+  // Social Account relations
+  socialAccounts SocialAccount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -672,4 +692,53 @@ model EmailVerificationCode {
   @@index([userId])
   @@index([code])
   @@map("email_verification_codes")
+}
+
+/// ============================================================================
+/// SOCIAL ACCOUNT MODEL - Brand-based social media account management
+/// ============================================================================
+
+model SocialAccount {
+  id         String   @id @default(cuid())
+  
+  // Brand relation
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  // Platform & identity
+  platform          SocialPlatform
+  platformAccountId String         // page id, ig business id, tiktok user id, pinterest board id etc.
+
+  // Display / visual info
+  displayName       String?        // page / channel / profile name
+  username          String?        // @username / phone mask etc.
+  externalAvatarUrl String?        // avatar URL from platform
+  avatarUrl         String?        // our media system copy (optional)
+
+  // Auth / Token
+  accessToken       String         @db.Text
+  refreshToken      String?        @db.Text
+  tokenExpiresAt    DateTime?
+  scopes            String[]       // platform permissions
+  tokenData         Json?          // provider specific token data (long-lived token etc.)
+
+  // Raw profile data from platform
+  rawProfile        Json?          // full profile payload snapshot
+
+  // General status
+  status            SocialAccountStatus @default(ACTIVE)
+  canPublish        Boolean             @default(true)
+
+  // Health / log / debug
+  lastSyncedAt      DateTime?
+  lastErrorCode     String?
+  lastErrorMessage  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([brandId])
+  @@index([platform, platformAccountId], name: "platform_account_idx")
+  @@unique([brandId, platform, platformAccountId], name: "brand_platform_account_unique")
+  @@map("social_accounts")
 }

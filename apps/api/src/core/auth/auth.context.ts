@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { tokenService, type AccessTokenPayload } from './token.service.js';
+import { clearAuthCookies } from './auth.cookies.js';
 
 /**
  * Auth context that is attached to each request
@@ -97,9 +98,8 @@ export default fp(async function authContextPlugin(app: FastifyInstance) {
       // Invalid/expired token - clear cookies and log
       request.log.warn({ err }, 'Failed to verify access token - clearing cookies');
       
-      // Clear invalid cookies
-      reply.clearCookie('access_token', { path: '/' });
-      reply.clearCookie('refresh_token', { path: '/' });
+      // Clear invalid cookies (uses same secure flag as when setting cookies)
+      clearAuthCookies(reply);
       
       request.auth = null;
     }

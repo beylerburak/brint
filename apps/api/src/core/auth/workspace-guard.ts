@@ -60,6 +60,13 @@ export const ENDPOINT_MIN_ROLE = {
   'comment:create': 'VIEWER', // Any workspace member can comment
   'comment:update': 'VIEWER', // Owner check in service layer
   'comment:delete': 'VIEWER', // Owner check in service layer
+
+  // Social Account management
+  'social-account:list': 'VIEWER',
+  'social-account:view': 'VIEWER',
+  'social-account:create': 'ADMIN',
+  'social-account:update': 'ADMIN',
+  'social-account:delete': 'OWNER',
 } as const;
 
 export type EndpointAction = keyof typeof ENDPOINT_MIN_ROLE;

@@ -179,6 +179,7 @@ export async function listCommentsForEntity(
       name: comment.authorUser.name,
       email: comment.authorUser.email,
       avatarUrl: comment.authorUser.avatarUrl,
+      avatarMediaId: comment.authorUser.avatarMediaId,
     },
   }));
 
@@ -274,6 +275,7 @@ export async function createComment(
       name: comment.authorUser.name,
       email: comment.authorUser.email,
       avatarUrl: comment.authorUser.avatarUrl,
+      avatarMediaId: comment.authorUser.avatarMediaId,
     },
   };
 }
@@ -485,6 +487,7 @@ export async function getCommentById(
       name: comment.authorUser.name,
       email: comment.authorUser.email,
       avatarUrl: comment.authorUser.avatarUrl,
+      avatarMediaId: comment.authorUser.avatarMediaId,
     },
   };
 }

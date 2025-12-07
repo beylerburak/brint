@@ -15,6 +15,7 @@ import {
   TaskProperties,
   TaskAttachments,
   TaskChecklist,
+  TaskActivityTabs,
   useTaskDetail,
   TaskDetailModalProps,
 } from "./task-detail"
@@ -50,6 +51,10 @@ export function TaskDetailModal({
     setAttachments,
     attachmentDetails,
     setAttachmentDetails,
+    comments,
+    setComments,
+    activities,
+    setActivities,
     workspaceMembers,
 
     // Editing state
@@ -84,7 +89,7 @@ export function TaskDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full h-full max-w-full max-h-full md:w-[70vw] md:h-[80vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none md:rounded-lg top-0 left-0 translate-x-0 translate-y-0 md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]"
+        className="w-full h-full max-w-full max-h-full md:w-[70vw] md:h-[90vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none md:rounded-lg top-0 left-0 translate-x-0 translate-y-0 md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Task Details</DialogTitle>
@@ -215,10 +220,10 @@ export function TaskDetailModal({
         </div>
 
         {/* Main Content Area */}
-        <div className="px-6 py-0 flex-1 min-h-0 overflow-hidden flex flex-col md:flex-row h-full">
-          <div className="flex gap-4 items-stretch flex-1 min-h-0 overflow-hidden md:flex-row flex-col-reverse md:flex-row h-full">
+        <div className="px-6 py-0 flex-1 min-h-0 overflow-visible flex flex-col md:flex-row h-full">
+          <div className="flex items-stretch flex-1 min-h-0 overflow-visible md:flex-row flex-col-reverse md:flex-row h-full">
             {/* Right side - Properties and Attachments (Mobile: shown first) */}
-            <div className="w-full md:w-[36%] border-t md:border-t-0 md:border-l border-muted-foreground/20 min-h-0 h-full overflow-y-auto overflow-x-hidden pl-0 md:pl-2 pt-4 md:pt-0 order-1 md:order-2">
+            <div className="w-full md:w-[36%] border-t md:border-t-0 md:border-l border-muted-foreground/20 min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pl-0 md:pl-2 pt-4 md:pt-0 order-1 md:order-2">
               <TaskProperties
                 task={task}
                 workspaceId={workspaceId}
@@ -241,10 +246,23 @@ export function TaskDetailModal({
                 onAttachmentsUpdate={setAttachments}
                 onAttachmentDetailsUpdate={setAttachmentDetails}
               />
+
+              {/* Activity Tabs - Mobile only (shown after attachments) */}
+              <div className="md:hidden mt-4">
+                <TaskActivityTabs
+                  task={task}
+                  workspaceId={workspaceId}
+                  comments={comments}
+                  onCommentsUpdate={setComments}
+                  activities={activities}
+                  onActivitiesUpdate={setActivities}
+                  onTaskUpdate={onTaskUpdate}
+                />
+              </div>
             </div>
 
             {/* Left side - Title and Description (Desktop) / Checklist */}
-            <div className="flex-1 w-full md:w-[70%] min-h-0 h-full overflow-y-auto overflow-x-hidden pr-2 md:pr-4 order-2 md:order-1">
+            <div className="flex-1 w-full md:w-[70%] min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pr-2 md:pr-4 order-2 md:order-1">
               <div className="flex flex-col gap-2">
                 {/* Title and Description - Desktop only */}
                 <div className="hidden md:flex flex-col gap-2">
@@ -314,6 +332,19 @@ export function TaskDetailModal({
                   onChecklistUpdate={setChecklistItems}
                   onTaskUpdate={onTaskUpdate}
                 />
+
+                {/* Activity Tabs (Comments, Activity, Work Log) - Desktop only */}
+                <div className="hidden md:block">
+                  <TaskActivityTabs
+                    task={task}
+                    workspaceId={workspaceId}
+                    comments={comments}
+                    onCommentsUpdate={setComments}
+                    activities={activities}
+                    onActivitiesUpdate={setActivities}
+                    onTaskUpdate={onTaskUpdate}
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -1065,6 +1065,7 @@ export const apiClient = {
         name: string | null;
         email: string;
         avatarUrl: string | null;
+        avatarMediaId: string | null;
       };
     }>;
     pagination: {
@@ -1081,6 +1082,55 @@ export const apiClient = {
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
 
     return fetchApi(`/tasks/${taskId}/comments${query}`, {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    });
+  },
+
+  /**
+   * Get activity logs for a task
+   */
+  async listTaskActivityLogs(
+    workspaceId: string,
+    taskId: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<{
+    success: true;
+    activities: Array<{
+      id: string;
+      eventKey: string;
+      message: string | null;
+      context: string | null;
+      actorType: string;
+      actorUserId: string | null;
+      actorLabel: string | null;
+      actor: {
+        id: string;
+        name: string | null;
+        email: string;
+        avatarUrl: string | null;
+        avatarMediaId: string | null;
+      } | null;
+      payload: any;
+      severity: string;
+      visibility: string;
+      createdAt: string;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+
+    return fetchApi(`/tasks/${taskId}/activity${query}`, {
       headers: {
         'X-Workspace-Id': workspaceId,
       },
@@ -1107,6 +1157,8 @@ export const apiClient = {
         id: string;
         name: string | null;
         email: string;
+        avatarUrl: string | null;
+        avatarMediaId: string | null;
       };
     };
   }> {

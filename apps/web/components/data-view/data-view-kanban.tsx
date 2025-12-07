@@ -56,11 +56,29 @@ function KanbanColumnContent({
   const displayedTasks = isExpanded ? tasks : tasks.slice(0, limit)
   const hasMore = tasks.length > limit && !isExpanded
 
+  const gapSize = 8 // gap-2 = 0.5rem = 8px
+  // Increased estimate to accommodate actual card content (title, badges, padding, etc.)
+  const estimatedCardHeight = 130
+
   const virtualizer = useVirtualizer({
     count: displayedTasks.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 100,
+    estimateSize: (index) => {
+      // Add gap to each item except the last one
+      const isLast = index === displayedTasks.length - 1
+      return estimatedCardHeight + (isLast ? 0 : gapSize)
+    },
     overscan: 5,
+    measureElement: (element, index) => {
+      if (!element) {
+        const isLast = index === displayedTasks.length - 1
+        return estimatedCardHeight + (isLast ? 0 : gapSize)
+      }
+      const height = element.getBoundingClientRect().height
+      // Add gap to measured height except for the last item
+      const isLast = index === displayedTasks.length - 1
+      return height + (isLast ? 0 : gapSize)
+    },
   })
 
   const buttonHeight = 48
@@ -79,36 +97,34 @@ function KanbanColumnContent({
           return (
             <div
               key={task.id}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              draggable
+              onDragStart={(e) => {
+                setDraggingCardId(String(task.id))
+                e.dataTransfer.effectAllowed = "move"
+              }}
+              onDragEnd={() => {
+                setDraggingCardId(null)
+              }}
+              onClick={(e) => {
+                // Don't trigger click if dragging
+                if (draggingCardId !== String(task.id)) {
+                  onTaskClick?.(task)
+                }
+              }}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: `${virtualItem.size}px`,
                 transform: `translateY(${virtualItem.start}px)`,
               }}
-              className="px-0 mb-1"
+              className={`rounded-sm border bg-card p-3 flex items-start justify-between gap-3 hover:bg-accent hover:border-border transition-all cursor-grab active:cursor-grabbing ${draggingCardId === String(task.id)
+                ? "opacity-50 scale-95 !border-2 !border-primary rotate-1"
+                : "cursor-pointer"
+                }`}
             >
-              <div
-                draggable
-                onDragStart={(e) => {
-                  setDraggingCardId(String(task.id))
-                  e.dataTransfer.effectAllowed = "move"
-                }}
-                onDragEnd={() => {
-                  setDraggingCardId(null)
-                }}
-                onClick={(e) => {
-                  // Don't trigger click if dragging
-                  if (draggingCardId !== String(task.id)) {
-                    onTaskClick?.(task)
-                  }
-                }}
-                className={`rounded-sm border bg-card p-3 flex items-start justify-between gap-3 hover:bg-accent hover:border-border transition-all cursor-grab active:cursor-grabbing ${draggingCardId === String(task.id)
-                  ? "opacity-50 scale-95 !border-2 !border-primary rotate-1"
-                  : "cursor-pointer"
-                  }`}
-              >
                 <div className="flex flex-col gap-1 flex-1 min-w-0">
                   <span className="text-sm font-medium line-clamp-2">{task.title}</span>
                   <span className="text-xs text-muted-foreground">{task.dueDateDisplay || task.dueDate}</span>
@@ -150,7 +166,6 @@ function KanbanColumnContent({
                     </Avatar>
                   )}
                 </div>
-              </div>
             </div>
           )
         })}

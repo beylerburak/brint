@@ -30,6 +30,7 @@ import {
 } from '../comment/comment.entity.js';
 import { ZodError } from 'zod';
 import { broadcastTaskEvent } from './task-websocket.routes.js';
+import { ActivityEntityType } from '@prisma/client';
 
 export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
   // GET /tasks - List tasks
@@ -793,6 +794,157 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to delete task comment',
+        },
+      });
+    }
+  });
+
+  // GET /tasks/:taskId/activity - Get task activity logs
+  app.get('/tasks/:taskId/activity', {
+    preHandler: requireWorkspaceRoleFor('task:view'),
+    schema: {
+      tags: ['Task'],
+      summary: 'Get task activity logs',
+      description: 'Returns activity logs for a specific task. Requires VIEWER role.',
+      params: {
+        type: 'object',
+        properties: {
+          taskId: { type: 'string' },
+        },
+        required: ['taskId'],
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'number', minimum: 1, default: 1 },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 50 },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = request.auth!.tokenPayload!.sub;
+    const { taskId } = request.params as { taskId: string };
+    const workspaceId = getWorkspaceIdFromRequest(request);
+    const query = request.query as { page?: number; limit?: number };
+
+    try {
+      // Verify task exists and user has access
+      const task = await getTaskById(
+        { userId, workspaceId },
+        taskId
+      );
+
+      if (!task) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'TASK_NOT_FOUND',
+            message: 'Task not found',
+          },
+        });
+      }
+
+      const page = query.page ? parseInt(String(query.page)) : 1;
+      const limit = query.limit ? parseInt(String(query.limit)) : 50;
+      const skip = (page - 1) * limit;
+
+      // Fetch activity logs for this task
+      const [activityLogs, total] = await Promise.all([
+        prisma.activityLog.findMany({
+          where: {
+            workspaceId,
+            entityType: ActivityEntityType.TASK,
+            entityId: taskId,
+          },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip,
+          take: limit,
+        }),
+        prisma.activityLog.count({
+          where: {
+            workspaceId,
+            entityType: ActivityEntityType.TASK,
+            entityId: taskId,
+          },
+        }),
+      ]);
+
+      // Fetch actor user information for USER type actors
+      const actorUserIds = activityLogs
+        .filter(log => log.actorType === 'USER' && log.actorUserId)
+        .map(log => log.actorUserId!)
+        .filter((id, index, self) => self.indexOf(id) === index); // unique
+
+      const actorUsers = actorUserIds.length > 0
+        ? await prisma.user.findMany({
+            where: {
+              id: { in: actorUserIds },
+            },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true,
+              avatarMediaId: true,
+            },
+          })
+        : [];
+
+      const actorUserMap = new Map(actorUsers.map(user => [user.id, user]));
+
+      // Format activity logs with actor information
+      const formattedLogs = activityLogs.map(log => {
+        const actorUser = log.actorUserId ? actorUserMap.get(log.actorUserId) : null;
+        
+        return {
+          id: log.id,
+          eventKey: log.eventKey,
+          message: log.message,
+          context: log.context,
+          actorType: log.actorType,
+          actorUserId: log.actorUserId,
+          actorLabel: log.actorLabel,
+          actor: actorUser ? {
+            id: actorUser.id,
+            name: actorUser.name,
+            email: actorUser.email,
+            avatarUrl: actorUser.avatarUrl,
+            avatarMediaId: actorUser.avatarMediaId,
+          } : null,
+          payload: log.payload,
+          severity: log.severity,
+          visibility: log.visibility,
+          createdAt: log.createdAt.toISOString(),
+        };
+      });
+
+      return reply.status(200).send({
+        success: true,
+        activities: formattedLogs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      request.log.error({ error, taskId }, 'Failed to get task activity logs');
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get task activity logs',
         },
       });
     }

@@ -341,7 +341,7 @@ export async function updateTask(
     'Updating task'
   );
 
-  // Find task with validation
+  // Find task with validation (include status for comparison)
   const existingTask = await taskRepository.findTaskByIdWithValidation({
     id: taskId,
     workspaceId: ctx.workspaceId,
@@ -350,6 +350,14 @@ export async function updateTask(
   if (!existingTask) {
     throw new Error('TASK_NOT_FOUND');
   }
+
+  // Store old values for activity logging
+  const oldStatusId = existingTask.statusId;
+  const oldStatusLabel = existingTask.status?.label || null;
+  const oldPriority = existingTask.priority;
+  const oldDueDate = existingTask.dueDate?.toISOString() || null;
+  const oldAssigneeUserId = existingTask.assigneeUserId;
+  const oldAssigneeName = existingTask.assigneeUser?.name || existingTask.assigneeUser?.email || null;
 
   const {
     title,
@@ -364,15 +372,22 @@ export async function updateTask(
     attachmentMediaIds,
   } = input;
 
-  // Validate status if being updated
-  if (statusId) {
-    const status = await taskStatusRepository.findStatusByIdWithValidation({
-      id: statusId,
-      workspaceId: ctx.workspaceId,
-    });
+  // Validate status if being updated and get new status info
+  let newStatusLabel: string | null = null;
+  if (statusId !== undefined) {
+    if (statusId !== oldStatusId) {
+      const status = await taskStatusRepository.findStatusByIdWithValidation({
+        id: statusId,
+        workspaceId: ctx.workspaceId,
+      });
 
-    if (!status) {
-      throw new Error('STATUS_NOT_FOUND');
+      if (!status) {
+        throw new Error('STATUS_NOT_FOUND');
+      }
+      newStatusLabel = status.label;
+    } else {
+      // Status hasn't changed, use existing label
+      newStatusLabel = oldStatusLabel;
     }
   }
 
@@ -510,25 +525,147 @@ export async function updateTask(
     }
   }
 
-  // Log activity
-  await logActivity({
-    workspaceId: ctx.workspaceId,
-    brandId: existingTask.brandId,
-    entityType: ActivityEntityType.TASK,
-    entityId: taskId,
-    eventKey: 'task.updated',
-    message: `Task updated: ${title || existingTask.title}`,
-    context: 'task',
-    actorType: ActivityActorType.USER,
-    actorUserId: ctx.userId,
-    payload: {
-      taskId,
-      changes: input,
-    },
-  });
-
-  // Fetch updated task with relations
+  // Get updated task to fetch new values
   const updatedTask = await taskRepository.findTaskById(taskId);
+
+  // Log specific activity changes
+  const activityLogs: Promise<any>[] = [];
+
+  // Status change
+  if (statusId !== undefined && statusId !== oldStatusId) {
+    activityLogs.push(
+      logActivity({
+        workspaceId: ctx.workspaceId,
+        brandId: existingTask.brandId,
+        entityType: ActivityEntityType.TASK,
+        entityId: taskId,
+        eventKey: 'task.status_changed',
+        message: `Status changed from "${oldStatusLabel || 'Unknown'}" to "${newStatusLabel || 'Unknown'}"`,
+        context: 'task',
+        actorType: ActivityActorType.USER,
+        actorUserId: ctx.userId,
+        payload: {
+          taskId,
+          oldStatusId,
+          oldStatusLabel,
+          newStatusId: statusId,
+          newStatusLabel,
+        },
+      })
+    );
+  }
+
+  // Priority change
+  if (priority !== undefined && priority !== oldPriority) {
+    activityLogs.push(
+      logActivity({
+        workspaceId: ctx.workspaceId,
+        brandId: existingTask.brandId,
+        entityType: ActivityEntityType.TASK,
+        entityId: taskId,
+        eventKey: 'task.priority_changed',
+        message: `Priority changed from "${oldPriority}" to "${priority}"`,
+        context: 'task',
+        actorType: ActivityActorType.USER,
+        actorUserId: ctx.userId,
+        payload: {
+          taskId,
+          oldPriority,
+          newPriority: priority,
+        },
+      })
+    );
+  }
+
+  // Due date change
+  const newDueDate = dueDate !== undefined ? (dueDate ? parseDueDate(dueDate)?.toISOString() || null : null) : null;
+  const oldDueDateStr = oldDueDate;
+  if (dueDate !== undefined && newDueDate !== oldDueDateStr) {
+    activityLogs.push(
+      logActivity({
+        workspaceId: ctx.workspaceId,
+        brandId: existingTask.brandId,
+        entityType: ActivityEntityType.TASK,
+        entityId: taskId,
+        eventKey: 'task.due_date_changed',
+        message: `Due date ${newDueDate ? `set to ${newDueDate}` : 'removed'}`,
+        context: 'task',
+        actorType: ActivityActorType.USER,
+        actorUserId: ctx.userId,
+        payload: {
+          taskId,
+          oldDueDate: oldDueDateStr,
+          newDueDate,
+        },
+      })
+    );
+  }
+
+  // Assignee change
+  const newAssigneeUserId = assigneeUserId !== undefined ? (assigneeUserId || null) : null;
+  if (assigneeUserId !== undefined && newAssigneeUserId !== oldAssigneeUserId) {
+    // Get new assignee info
+    let newAssigneeName: string | null = null;
+    if (newAssigneeUserId) {
+      const newAssignee = await prisma.user.findUnique({
+        where: { id: newAssigneeUserId },
+        select: { name: true, email: true },
+      });
+      newAssigneeName = newAssignee?.name || newAssignee?.email || null;
+    }
+
+    activityLogs.push(
+      logActivity({
+        workspaceId: ctx.workspaceId,
+        brandId: existingTask.brandId,
+        entityType: ActivityEntityType.TASK,
+        entityId: taskId,
+        eventKey: 'task.assignee_changed',
+        message: newAssigneeUserId 
+          ? `Assigned to ${newAssigneeName || 'Unknown'}`
+          : 'Assignee removed',
+        context: 'task',
+        actorType: ActivityActorType.USER,
+        actorUserId: ctx.userId,
+        payload: {
+          taskId,
+          oldAssigneeUserId,
+          oldAssigneeName,
+          newAssigneeUserId,
+          newAssigneeName,
+        },
+      })
+    );
+  }
+
+  // General task update (if title or description changed, or if no specific changes)
+  if (title !== undefined || description !== undefined) {
+    activityLogs.push(
+      logActivity({
+        workspaceId: ctx.workspaceId,
+        brandId: existingTask.brandId,
+        entityType: ActivityEntityType.TASK,
+        entityId: taskId,
+        eventKey: 'task.updated',
+        message: `Task updated: ${title || existingTask.title}`,
+        context: 'task',
+        actorType: ActivityActorType.USER,
+        actorUserId: ctx.userId,
+        payload: {
+          taskId,
+          changes: {
+            ...(title !== undefined && { title }),
+            ...(description !== undefined && { description }),
+          },
+        },
+      })
+    );
+  }
+
+  // Execute all activity logs in parallel
+  await Promise.all(activityLogs);
+
+  // Return updated task with relations
   return await toTaskDto(updatedTask);
 }
 

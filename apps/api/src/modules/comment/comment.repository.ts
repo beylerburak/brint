@@ -41,6 +41,7 @@ export class CommentRepository {
               name: true,
               email: true,
               avatarUrl: true,
+              avatarMediaId: true,
             },
           },
         },

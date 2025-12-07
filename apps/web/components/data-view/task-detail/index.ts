@@ -3,6 +3,9 @@ export { DatePickerWithTime } from "./DatePickerWithTime"
 export { PropertyItem } from "./PropertyItem"
 export { SortableChecklistItem } from "./SortableChecklistItem"
 export { TaskChecklist } from "./TaskChecklist"
+export { TaskComments } from "./TaskComments"
+export { CommentInput } from "./CommentInput"
+export { TaskActivityTabs } from "./TaskActivityTabs"
 export { TaskProperties } from "./TaskProperties"
 export { TaskAttachments } from "./TaskAttachments"
 export { useTaskDetail } from "./hooks/useTaskDetail"
@@ -18,9 +21,12 @@ export type {
     SortableChecklistItemProps,
     DatePickerProps,
     TaskChecklistProps,
+    TaskCommentsProps,
+    TaskActivityTabsProps,
     TaskPropertiesProps,
     TaskAttachmentsProps,
     TaskDetailModalProps,
+    CommentItem,
 } from "./types"
 
 export {

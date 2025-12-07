@@ -71,6 +71,7 @@ export type CommentWithAuthorDto = CommentDto & {
     name: string | null;
     email: string;
     avatarUrl: string | null;
+    avatarMediaId: string | null;
   };
 };
 

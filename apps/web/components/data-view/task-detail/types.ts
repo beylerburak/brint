@@ -25,6 +25,46 @@ export interface AttachmentDetails {
     originalFilename: string
 }
 
+// Comment Item
+export interface CommentItem {
+    id: string
+    body: string
+    authorUserId: string
+    parentId: string | null
+    isEdited: boolean
+    createdAt: string
+    updatedAt: string
+    author: {
+        id: string
+        name: string | null
+        email: string
+        avatarUrl: string | null
+        avatarMediaId: string | null
+    }
+}
+
+// Activity Log Item
+export interface ActivityItem {
+    id: string
+    eventKey: string
+    message: string | null
+    context: string | null
+    actorType: string
+    actorUserId: string | null
+    actorLabel: string | null
+    actor: {
+        id: string
+        name: string | null
+        email: string
+        avatarUrl: string | null
+        avatarMediaId: string | null
+    } | null
+    payload: any
+    severity: string
+    visibility: string
+    createdAt: string
+}
+
 // Workspace Member
 export interface WorkspaceMember {
     id: string
@@ -138,4 +178,24 @@ export interface TaskAttachmentsProps {
     attachmentDetails: Map<string, AttachmentDetails>
     onAttachmentsUpdate: (attachments: AttachmentItem[]) => void
     onAttachmentDetailsUpdate: (details: Map<string, AttachmentDetails> | ((prev: Map<string, AttachmentDetails>) => Map<string, AttachmentDetails>)) => void
+}
+
+// Task Comments Props
+export interface TaskCommentsProps {
+    task: BaseTask | null
+    workspaceId: string
+    comments: CommentItem[]
+    onCommentsUpdate: (comments: CommentItem[]) => void
+    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
+}
+
+// Task Activity Tabs Props
+export interface TaskActivityTabsProps {
+    task: BaseTask | null
+    workspaceId: string
+    comments: CommentItem[]
+    onCommentsUpdate: (comments: CommentItem[]) => void
+    activities: ActivityItem[]
+    onActivitiesUpdate: (activities: ActivityItem[]) => void
+    onTaskUpdate?: (taskId: string, updates: { title?: string; description?: string }) => void
 }

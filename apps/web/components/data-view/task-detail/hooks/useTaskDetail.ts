@@ -9,6 +9,8 @@ import {
     AttachmentItem,
     AttachmentDetails,
     WorkspaceMember,
+    CommentItem,
+    ActivityItem,
     API_PRIORITY_MAP
 } from "../types"
 
@@ -39,6 +41,10 @@ interface UseTaskDetailReturn {
     setAttachments: (attachments: AttachmentItem[]) => void
     attachmentDetails: Map<string, AttachmentDetails>
     setAttachmentDetails: React.Dispatch<React.SetStateAction<Map<string, AttachmentDetails>>>
+    comments: CommentItem[]
+    setComments: (comments: CommentItem[]) => void
+    activities: ActivityItem[]
+    setActivities: (activities: ActivityItem[]) => void
     workspaceMembers: WorkspaceMember[]
 
     // Editing state
@@ -105,6 +111,8 @@ export function useTaskDetail({
     const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
     const [attachments, setAttachments] = useState<AttachmentItem[]>([])
     const [attachmentDetails, setAttachmentDetails] = useState<Map<string, AttachmentDetails>>(new Map())
+    const [comments, setComments] = useState<CommentItem[]>([])
+    const [activities, setActivities] = useState<ActivityItem[]>([])
 
     // Cache refs
     const membersCacheRef = useRef<Map<string, WorkspaceMember[]>>(new Map())
@@ -203,6 +211,81 @@ export function useTaskDetail({
                     setAttachments(attachmentsWithDetails)
                 } else {
                     setAttachments(task?.attachments || [])
+                }
+
+                // Fetch comments
+                try {
+                    const commentsResponse = await apiClient.listTaskComments(workspaceId, String(task.id))
+                    if (commentsResponse?.comments) {
+                        const commentsList: CommentItem[] = commentsResponse.comments.map((comment: any) => {
+                            // Get avatar URL from avatarMediaId if avatarUrl is not available
+                            let avatarUrl = comment.author.avatarUrl
+                            if (!avatarUrl && comment.author.avatarMediaId) {
+                                // Try without variant first (some media might not have variants)
+                                avatarUrl = apiClient.getMediaUrl(workspaceId, comment.author.avatarMediaId)
+                            }
+
+                            return {
+                                id: comment.id,
+                                body: comment.body,
+                                authorUserId: comment.authorUserId,
+                                parentId: comment.parentId,
+                                isEdited: comment.isEdited,
+                                createdAt: comment.createdAt,
+                                updatedAt: comment.updatedAt || comment.createdAt,
+                                author: {
+                                    id: comment.author.id,
+                                    name: comment.author.name,
+                                    email: comment.author.email,
+                                    avatarUrl,
+                                    avatarMediaId: comment.author.avatarMediaId,
+                                },
+                            }
+                        })
+                        setComments(commentsList)
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch comments:", error)
+                    setComments([])
+                }
+
+                // Fetch activity logs
+                try {
+                    const activitiesResponse = await apiClient.listTaskActivityLogs(workspaceId, String(task.id))
+                    if (activitiesResponse?.activities) {
+                        const activitiesList: ActivityItem[] = activitiesResponse.activities.map((activity: any) => {
+                            // Get avatar URL from avatarMediaId if avatarUrl is not available
+                            let avatarUrl = activity.actor?.avatarUrl || null
+                            if (activity.actor && !avatarUrl && activity.actor.avatarMediaId) {
+                                avatarUrl = apiClient.getMediaUrl(workspaceId, activity.actor.avatarMediaId)
+                            }
+
+                            return {
+                                id: activity.id,
+                                eventKey: activity.eventKey,
+                                message: activity.message,
+                                context: activity.context,
+                                actorType: activity.actorType,
+                                actorUserId: activity.actorUserId,
+                                actorLabel: activity.actorLabel,
+                                actor: activity.actor ? {
+                                    id: activity.actor.id,
+                                    name: activity.actor.name,
+                                    email: activity.actor.email,
+                                    avatarUrl,
+                                    avatarMediaId: activity.actor.avatarMediaId,
+                                } : null,
+                                payload: activity.payload,
+                                severity: activity.severity,
+                                visibility: activity.visibility,
+                                createdAt: activity.createdAt,
+                            }
+                        })
+                        setActivities(activitiesList)
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch activity logs:", error)
+                    setActivities([])
                 }
 
                 // Mark as fetched for this key
@@ -523,6 +606,10 @@ export function useTaskDetail({
         setAttachments,
         attachmentDetails,
         setAttachmentDetails,
+        comments,
+        setComments,
+        activities,
+        setActivities,
         workspaceMembers,
 
         // Editing state

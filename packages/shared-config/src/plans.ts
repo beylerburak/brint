@@ -14,6 +14,7 @@ export interface PlanLimits {
     maxBrands: number        // -1 = unlimited
     maxStorageGB: number
     maxTeamMembers: number
+    maxMonthlyPosts: number  // -1 = unlimited
 }
 
 // Plan configuration
@@ -22,21 +23,25 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
         maxBrands: 1,
         maxStorageGB: 1,
         maxTeamMembers: 2,
+        maxMonthlyPosts: 30,
     },
     STARTER: {
         maxBrands: 5,
         maxStorageGB: 10,
         maxTeamMembers: 5,
+        maxMonthlyPosts: 200,
     },
     PRO: {
         maxBrands: 20,
         maxStorageGB: 100,
         maxTeamMembers: 20,
+        maxMonthlyPosts: 1000,
     },
     AGENCY: {
         maxBrands: -1, // unlimited
         maxStorageGB: 500,
         maxTeamMembers: 50,
+        maxMonthlyPosts: -1, // unlimited
     },
 } as const
 

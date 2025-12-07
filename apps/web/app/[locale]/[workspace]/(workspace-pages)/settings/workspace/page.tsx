@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { IconCheck, IconX, IconLoader2 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { getPlanLimits, PLAN_TYPES, type PlanType } from "@brint/shared-config/plans"
 
 export default function WorkspaceSettingsPage() {
   const t = useTranslations('settings')
@@ -241,15 +242,33 @@ export default function WorkspaceSettingsPage() {
           <div className="space-y-2">
             <Label>{t('planLimits')}</Label>
             <div className="text-sm space-y-1">
-              <p className="text-muted-foreground">
-                • Max Brands: {currentWorkspace?.plan === 'FREE' ? '1' : currentWorkspace?.plan === 'STARTER' ? '5' : currentWorkspace?.plan === 'PRO' ? '20' : 'Unlimited'}
-              </p>
-              <p className="text-muted-foreground">
-                • Max Members: {currentWorkspace?.plan === 'FREE' ? '1' : currentWorkspace?.plan === 'STARTER' ? '5' : currentWorkspace?.plan === 'PRO' ? '20' : 'Unlimited'}
-              </p>
-              <p className="text-muted-foreground">
-                • Monthly Posts: {currentWorkspace?.plan === 'FREE' ? '30' : currentWorkspace?.plan === 'STARTER' ? '200' : currentWorkspace?.plan === 'PRO' ? '1,000' : 'Unlimited'}
-              </p>
+              {(() => {
+                const planType = currentWorkspace?.plan || 'FREE'
+                // Ensure plan type is valid, fallback to FREE if not
+                const plan: PlanType = PLAN_TYPES.includes(planType as PlanType) 
+                  ? planType as PlanType 
+                  : 'FREE'
+                const limits = getPlanLimits(plan)
+                const formatLimit = (value: number | undefined | null) => {
+                  if (value === undefined || value === null) return 'N/A'
+                  if (value === -1) return 'Unlimited'
+                  if (value >= 1000) return value.toLocaleString()
+                  return String(value)
+                }
+                return (
+                  <>
+                    <p className="text-muted-foreground">
+                      • Max Brands: {formatLimit(limits?.maxBrands)}
+                    </p>
+                    <p className="text-muted-foreground">
+                      • Max Members: {formatLimit(limits?.maxTeamMembers)}
+                    </p>
+                    <p className="text-muted-foreground">
+                      • Monthly Posts: {formatLimit(limits?.maxMonthlyPosts)}
+                    </p>
+                  </>
+                )
+              })()}
             </div>
           </div>
 

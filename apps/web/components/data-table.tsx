@@ -120,6 +120,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { apiClient } from "@/lib/api-client"
 import {
   DataTableActionBar,
@@ -277,6 +287,68 @@ function SortableHeader({ column, children }: { column: any; children: React.Rea
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+// Actions cell component with delete dialog
+function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: any }) {
+  const onDeleteTask = (table.options.meta as any)?.onDeleteTask
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+
+  const handleDelete = () => {
+    if (onDeleteTask) {
+      onDeleteTask(row.original.id)
+    }
+    setIsDeleteDialogOpen(false)
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+            size="icon"
+          >
+            <IconDotsVertical />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-32">
+          <DropdownMenuItem>Edit</DropdownMenuItem>
+          <DropdownMenuItem>Make a copy</DropdownMenuItem>
+          <DropdownMenuItem>Favorite</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Task'ı sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu task'ı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -511,27 +583,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row, table }) => <ActionsCell row={row} table={table} />,
   },
 ]
 
@@ -587,12 +639,14 @@ export function DataTable({
   hasMore = false,
   isLoading = false,
   onRowClick,
+  onDeleteTask,
 }: {
   data: z.infer<typeof schema>[]
   onLoadMore?: () => void
   hasMore?: boolean
   isLoading?: boolean
   onRowClick?: (row: z.infer<typeof schema>) => void
+  onDeleteTask?: (taskId: string | number) => void
 }) {
   const [data, setData] = React.useState(() => initialData)
 
@@ -662,7 +716,8 @@ export function DataTable({
   const tableMeta = React.useMemo(() => ({
     userPrefs: userPrefs || { dateFormat: "DMY", timeFormat: "H24" },
     updateStatus,
-  }), [userPrefs, updateStatus])
+    onDeleteTask,
+  }), [userPrefs, updateStatus, onDeleteTask])
 
   const table = useReactTable({
     data,

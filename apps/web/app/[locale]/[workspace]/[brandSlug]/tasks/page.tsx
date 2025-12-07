@@ -655,6 +655,33 @@ export default function BrandTasksPage() {
               setSelectedTask(task)
               setIsTaskModalOpen(true)
             }}
+            onDeleteTask={async (taskId) => {
+              if (!currentWorkspace) return
+
+              try {
+                await apiClient.deleteTask(currentWorkspace.id, String(taskId))
+                
+                // Remove task from list
+                setTasks((prev) => prev.filter((task) => task.id !== String(taskId)))
+                
+                // Close modal if deleted task is selected
+                if (selectedTask && String(selectedTask.id) === String(taskId)) {
+                  setIsTaskModalOpen(false)
+                  setSelectedTask(null)
+                }
+                
+                // Update pagination total
+                setPagination((prev) => ({
+                  ...prev,
+                  total: Math.max(0, prev.total - 1),
+                }))
+                
+                toast.success("Task başarıyla silindi")
+              } catch (error: any) {
+                console.error("Failed to delete task:", error)
+                toast.error("Task silinirken bir hata oluştu")
+              }
+            }}
           />
         ) : (
           <DataViewKanban

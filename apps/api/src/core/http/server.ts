@@ -20,6 +20,10 @@ import { registerTaskWebSocketRoutes } from '../../modules/task/task-websocket.r
 import { registerSocialAccountRoutes } from '../../modules/social-account/social-account.routes.js';
 import { registerFacebookRoutes } from '../../modules/social-account/facebook/facebook.routes.js';
 import { registerLinkedInRoutes } from '../../modules/social-account/linkedin/linkedin.routes.js';
+import { registerXRoutes } from '../../modules/social-account/x/x.routes.js';
+import { registerTikTokRoutes } from '../../modules/social-account/tiktok/tiktok.routes.js';
+import { registerYouTubeRoutes } from '../../modules/social-account/youtube/youtube.routes.js';
+import { registerPinterestRoutes } from '../../modules/social-account/pinterest/pinterest.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -85,6 +89,10 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerSocialAccountRoutes(app);
   await registerFacebookRoutes(app);
   await registerLinkedInRoutes(app);
+  await registerXRoutes(app);
+  await registerTikTokRoutes(app);
+  await registerYouTubeRoutes(app);
+  await registerPinterestRoutes(app);
 
   return app;
 }

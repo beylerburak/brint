@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * API Client
  * 
@@ -187,7 +189,7 @@ async function fetchApi<T>(
         fullResponse: data
       });
     }
-    
+
     throw new ApiError(
       data.error?.message || data.message || 'API request failed',
       response.status,
@@ -1592,6 +1594,78 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify({ selectedIds }),
     });
+  },
+
+  /**
+   * Get X OAuth authorize URL
+   */
+  async getXAuthorizeUrl(
+    workspaceId: string,
+    brandId: string,
+    locale?: string
+  ): Promise<{
+    success: true;
+    authorizeUrl: string;
+  }> {
+    const params = new URLSearchParams();
+    if (locale) params.append('locale', locale);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/social-accounts/x/authorize${query}`);
+  },
+
+  /**
+   * Get TikTok OAuth authorize URL
+   */
+  async getTikTokAuthorizeUrl(
+    workspaceId: string,
+    brandId: string,
+    locale?: string
+  ): Promise<{
+    success: true;
+    authorizeUrl: string;
+  }> {
+    const params = new URLSearchParams();
+    if (locale) params.append('locale', locale);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/social-accounts/tiktok/authorize${query}`);
+  },
+
+  /**
+   * Get YouTube OAuth authorize URL
+   */
+  async getYouTubeAuthorizeUrl(
+    workspaceId: string,
+    brandId: string,
+    locale?: string
+  ): Promise<{
+    success: true;
+    authorizeUrl: string;
+  }> {
+    const params = new URLSearchParams();
+    if (locale) params.append('locale', locale);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/social-accounts/youtube/authorize${query}`);
+  },
+
+  /**
+   * Get Pinterest OAuth authorize URL
+   */
+  async getPinterestAuthorizeUrl(
+    workspaceId: string,
+    brandId: string,
+    locale?: string
+  ): Promise<{
+    success: true;
+    authorizeUrl: string;
+  }> {
+    const params = new URLSearchParams();
+    if (locale) params.append('locale', locale);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/social-accounts/pinterest/authorize${query}`);
   },
 };
 

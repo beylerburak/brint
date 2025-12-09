@@ -177,7 +177,15 @@ function SocialAccountCard({
   const Icon = config.icon;
 
   // Use account avatar, fallback to brand avatar, then to icon
-  const avatarUrl = account.avatarUrl || account.externalAvatarUrl || brandAvatarUrl || undefined;
+  // For YouTube, use brand avatar as fallback if external avatar is not available
+  let avatarUrl: string | undefined;
+  if (account.platform === 'YOUTUBE') {
+    // YouTube: account avatar > external avatar > brand logo > undefined (icon fallback)
+    avatarUrl = account.avatarUrl || account.externalAvatarUrl || brandAvatarUrl || undefined;
+  } else {
+    // Other platforms: account avatar > external avatar > brand logo > undefined (icon fallback)
+    avatarUrl = account.avatarUrl || account.externalAvatarUrl || brandAvatarUrl || undefined;
+  }
 
   return (
     <Card className="relative shadow-none p-3 sm:p-4 rounded-lg">
@@ -192,7 +200,7 @@ function SocialAccountCard({
           </Avatar>
           {/* Platform Icon Overlay - bottom right corner */}
           <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 p-0.5 sm:p-1 rounded-full ${config.bgColor} border-2 border-background`}>
-            <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
+            <Icon className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${account.platform === 'X' || account.platform === 'TIKTOK' ? 'text-white dark:text-black' : 'text-white'}`} />
           </div>
         </div>
 
@@ -202,7 +210,19 @@ function SocialAccountCard({
             {account.displayName || config.name}
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm text-muted-foreground truncate">
-            {account.username ? `@${account.username}` : `@${account.platformAccountId}`} {config.name.toLowerCase()}
+            {account.username 
+              ? (
+                  <>
+                    {account.platform === 'X' || account.platform === 'YOUTUBE' ? account.username : `@${account.username}`}
+                    <span className="text-muted-foreground/70"> • {config.name.toLowerCase()}</span>
+                  </>
+                )
+              : (
+                  <>
+                    <span className="text-muted-foreground/70">Username not available</span>
+                    <span className="text-muted-foreground/70"> • {config.name.toLowerCase()}</span>
+                  </>
+                )}
           </CardDescription>
         </div>
 
@@ -348,6 +368,14 @@ function ConnectAccountDialog({
   connectingMeta,
   onConnectLinkedIn,
   connectingLinkedIn,
+  onConnectX,
+  connectingX,
+  onConnectTikTok,
+  connectingTikTok,
+  onConnectYouTube,
+  connectingYouTube,
+  onConnectPinterest,
+  connectingPinterest,
   accounts,
   workspacePlan,
   onShowUpgrade,
@@ -358,6 +386,14 @@ function ConnectAccountDialog({
   connectingMeta: boolean;
   onConnectLinkedIn: () => void;
   connectingLinkedIn: boolean;
+  onConnectX: () => void;
+  connectingX: boolean;
+  onConnectTikTok: () => void;
+  connectingTikTok: boolean;
+  onConnectYouTube: () => void;
+  connectingYouTube: boolean;
+  onConnectPinterest: () => void;
+  connectingPinterest: boolean;
   accounts: SocialAccountDto[];
   workspacePlan: PlanType;
   onShowUpgrade: () => void;
@@ -403,18 +439,31 @@ function ConnectAccountDialog({
       icon: IconBrandX,
       bgColor: 'bg-black dark:bg-white',
       iconColor: 'text-white dark:text-black',
-      enabled: false,
-      onClick: () => {},
-      loading: false,
+      enabled: true,
+      platform: 'X' as SocialPlatform,
+      onClick: () => handlePlatformClick('twitter', 'X', onConnectX),
+      loading: connectingX,
     },
     {
-      id: 'google',
-      name: 'Google Business Profile',
-      icon: IconBuildingStore,
-      bgColor: 'bg-gradient-to-br from-yellow-400 to-blue-500',
-      enabled: false,
-      onClick: () => {},
-      loading: false,
+      id: 'tiktok',
+      name: 'TikTok',
+      icon: IconBrandTiktok,
+      bgColor: 'bg-black dark:bg-white',
+      iconColor: 'text-white dark:text-black',
+      enabled: true,
+      platform: 'TIKTOK' as SocialPlatform,
+      onClick: () => handlePlatformClick('tiktok', 'TIKTOK', onConnectTikTok),
+      loading: connectingTikTok,
+    },
+    {
+      id: 'youtube',
+      name: 'YouTube',
+      icon: IconBrandYoutube,
+      bgColor: 'bg-red-600',
+      enabled: true,
+      platform: 'YOUTUBE' as SocialPlatform,
+      onClick: () => handlePlatformClick('youtube', 'YOUTUBE', onConnectYouTube),
+      loading: connectingYouTube,
     },
     {
       id: 'instagram',
@@ -428,12 +477,13 @@ function ConnectAccountDialog({
     },
     {
       id: 'pinterest',
-      name: 'Pinterest Page',
+      name: 'Pinterest',
       icon: IconBrandPinterest,
       bgColor: 'bg-red-600',
-      enabled: false,
-      onClick: () => {},
-      loading: false,
+      enabled: true,
+      platform: 'PINTEREST' as SocialPlatform,
+      onClick: () => handlePlatformClick('pinterest', 'PINTEREST', onConnectPinterest),
+      loading: connectingPinterest,
     },
   ];
 
@@ -747,6 +797,10 @@ export default function BrandSocialAccountsPage() {
   const [brandId, setBrandId] = useState<string | null>(null)
   const [connectingMeta, setConnectingMeta] = useState(false)
   const [connectingLinkedIn, setConnectingLinkedIn] = useState(false)
+  const [connectingX, setConnectingX] = useState(false)
+  const [connectingTikTok, setConnectingTikTok] = useState(false)
+  const [connectingYouTube, setConnectingYouTube] = useState(false)
+  const [connectingPinterest, setConnectingPinterest] = useState(false)
   const [linkedInSelectionOpen, setLinkedInSelectionOpen] = useState(false)
   const [shouldOpenLinkedInModal, setShouldOpenLinkedInModal] = useState(false)
   const [brandAvatarUrl, setBrandAvatarUrl] = useState<string | null>(null)
@@ -817,6 +871,30 @@ export default function BrandSocialAccountsPage() {
       setShouldOpenLinkedInModal(true);
       // Refresh accounts
       fetchAccounts();
+    } else if (connected === 'x') {
+      toast.success('X account connected successfully!');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh accounts
+      fetchAccounts();
+    } else if (connected === 'tiktok') {
+      toast.success('TikTok account connected successfully!');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh accounts
+      fetchAccounts();
+    } else if (connected === 'youtube') {
+      toast.success('YouTube account connected successfully!');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh accounts
+      fetchAccounts();
+    } else if (connected === 'pinterest') {
+      toast.success('Pinterest account connected successfully!');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh accounts
+      fetchAccounts();
     }
   }, [fetchAccounts]);
 
@@ -858,6 +936,26 @@ export default function BrandSocialAccountsPage() {
   };
 
   const handleReconnect = (accountId: string, platform: SocialPlatform) => {
+    // For X, use the same connect flow
+    if (platform === 'X') {
+      handleConnectX();
+      return;
+    }
+    // For TikTok, use the same connect flow
+    if (platform === 'TIKTOK') {
+      handleConnectTikTok();
+      return;
+    }
+    // For YouTube, use the same connect flow
+    if (platform === 'YOUTUBE') {
+      handleConnectYouTube();
+      return;
+    }
+    // For Pinterest, use the same connect flow
+    if (platform === 'PINTEREST') {
+      handleConnectPinterest();
+      return;
+    }
     // For Facebook/Instagram, use the same connect flow
     if (platform === 'FACEBOOK' || platform === 'INSTAGRAM') {
       handleConnectMeta();
@@ -909,6 +1007,82 @@ export default function BrandSocialAccountsPage() {
     }
   };
 
+  const handleConnectX = async () => {
+    if (!currentWorkspace?.id || !brandId) {
+      toast.error("Workspace or brand not loaded");
+      return;
+    }
+
+    try {
+      setConnectingX(true);
+      const response = await apiClient.getXAuthorizeUrl(currentWorkspace.id, brandId, locale);
+      
+      // Redirect to X OAuth
+      window.location.href = response.authorizeUrl;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to start X connection");
+      setConnectingX(false);
+    }
+  };
+
+  const handleConnectTikTok = async () => {
+    if (!currentWorkspace?.id || !brandId) {
+      toast.error("Workspace or brand not loaded");
+      return;
+    }
+
+    try {
+      setConnectingTikTok(true);
+      const response = await apiClient.getTikTokAuthorizeUrl(currentWorkspace.id, brandId, locale);
+      
+      // Redirect to TikTok OAuth
+      window.location.href = response.authorizeUrl;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to start TikTok connection");
+      setConnectingTikTok(false);
+    }
+  };
+
+  const handleConnectYouTube = async () => {
+    if (!currentWorkspace?.id || !brandId) {
+      toast.error("Workspace or brand not loaded");
+      return;
+    }
+
+    try {
+      setConnectingYouTube(true);
+      const response = await apiClient.getYouTubeAuthorizeUrl(currentWorkspace.id, brandId, locale);
+      
+      // Redirect to YouTube OAuth
+      window.location.href = response.authorizeUrl;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to start YouTube connection");
+      setConnectingYouTube(false);
+    }
+  };
+
+  const handleConnectPinterest = async () => {
+    if (!currentWorkspace?.id || !brandId) {
+      toast.error("Workspace or brand not loaded");
+      return;
+    }
+
+    try {
+      setConnectingPinterest(true);
+      const response = await apiClient.getPinterestAuthorizeUrl(currentWorkspace.id, brandId, locale);
+      
+      // Redirect to Pinterest OAuth
+      window.location.href = response.authorizeUrl;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to start Pinterest connection");
+      setConnectingPinterest(false);
+    }
+  };
+
   const handleLinkedInSelectionSaved = () => {
     fetchAccounts();
     setShouldOpenLinkedInModal(false);
@@ -950,9 +1124,9 @@ export default function BrandSocialAccountsPage() {
           <h1 className="text-2xl font-semibold">Social Accounts</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <IconDots className="h-4 w-4" />
-              </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <IconDots className="h-4 w-4" />
+          </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {/* Add menu items here if needed in the future */}
@@ -965,12 +1139,12 @@ export default function BrandSocialAccountsPage() {
           <div className="ml-auto">
             <Button onClick={() => setConnectDialogOpen(true)}>
               <IconPlus className="h-4 w-4 mr-2" />
-              Connect Account
-            </Button>
+          Connect Account
+        </Button>
           </div>
         )}
       </div>
-
+      
       {/* Content */}
       <div className="px-6 pt-4 pb-6 space-y-6">
       {loading ? (
@@ -1013,13 +1187,21 @@ export default function BrandSocialAccountsPage() {
       </div>
 
       {/* Connect Dialog */}
-      <ConnectAccountDialog 
-        open={connectDialogOpen} 
+      <ConnectAccountDialog
+        open={connectDialogOpen}
         onOpenChange={setConnectDialogOpen}
         onConnectMeta={handleConnectMeta}
         connectingMeta={connectingMeta}
         onConnectLinkedIn={handleConnectLinkedIn}
         connectingLinkedIn={connectingLinkedIn}
+        onConnectX={handleConnectX}
+        connectingX={connectingX}
+        onConnectTikTok={handleConnectTikTok}
+        connectingTikTok={connectingTikTok}
+        onConnectYouTube={handleConnectYouTube}
+        connectingYouTube={connectingYouTube}
+        onConnectPinterest={handleConnectPinterest}
+        connectingPinterest={connectingPinterest}
         accounts={accounts}
         workspacePlan={(currentWorkspace?.plan || 'FREE') as PlanType}
         onShowUpgrade={() => setUpgradeDialogOpen(true)}

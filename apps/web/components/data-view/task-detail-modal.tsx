@@ -119,7 +119,7 @@ export function TaskDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full h-full max-w-full max-h-full md:w-[70vw] md:h-[90vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none md:rounded-lg top-0 left-0 translate-x-0 translate-y-0 md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]"
+        className="w-full h-full max-w-full max-h-full md:w-[80vw] md:h-[90vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none md:rounded-lg top-0 left-0 translate-x-0 translate-y-0 md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Task Details</DialogTitle>
@@ -263,7 +263,7 @@ export function TaskDetailModal({
         <div className="px-6 py-0 flex-1 min-h-0 overflow-visible flex flex-col md:flex-row h-full">
           <div className="flex items-stretch flex-1 min-h-0 overflow-visible md:flex-row flex-col-reverse md:flex-row h-full">
             {/* Right side - Properties and Attachments (Mobile: shown first) */}
-            <div className="w-full md:w-[36%] border-t md:border-t-0 md:border-l border-muted-foreground/20 min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pl-0 md:pl-2 pt-4 md:pt-0 order-1 md:order-2">
+            <div className="w-full md:w-[40%] border-t md:border-t-0 md:border-l border-muted-foreground/20 min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pl-0 md:pl-2 pt-4 md:pt-0 order-1 md:order-2">
               <TaskProperties
                 task={task}
                 workspaceId={workspaceId}

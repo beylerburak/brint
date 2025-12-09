@@ -4,30 +4,29 @@ import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useTranslations } from "next-intl"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { apiClient } from "@/lib/api-client"
 import {
   IconCamera,
   IconChartBar,
   IconCirclePlusFilled,
   IconDashboard,
-  IconDatabase,
   IconDots,
   IconFileAi,
   IconFileDescription,
-  IconFileWord,
   IconFolder,
   IconHelp,
   IconListDetails,
   IconMail,
-  IconReport,
   IconSearch,
   IconSettings,
   IconShare3,
-  IconTrash,
   IconUsers,
   type Icon,
 } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -154,23 +153,7 @@ export const navigationData = {
       icon: IconSearch,
     },
   ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
-  ],
+  documents: [],
 }
 
 // NavMain Component
@@ -231,66 +214,103 @@ export function NavMain() {
   )
 }
 
-// NavDocuments Component
-export function NavDocuments({
-  items,
-}: {
-  items: {
-    name: string
-    url: string
-    icon: Icon
-  }[]
-}) {
-  const { isMobile } = useSidebar()
+// NavBrands Component - Shows pinned brand or nothing
+export function NavBrands() {
+  const params = useParams()
+  const t = useTranslations('nav')
+  const { currentWorkspace } = useWorkspace()
+  const workspaceSlug = params?.workspace as string
+  const locale = (params?.locale as string) || 'en'
+  
+  // Get pinned brand from localStorage
+  const [pinnedBrand, setPinnedBrand] = React.useState<{ 
+    brandSlug: string; 
+    brandName?: string;
+    logoUrl?: string | null;
+  } | null>(null)
+
+  // Try to fetch fresh brand info if logoUrl is missing
+  React.useEffect(() => {
+    const fetchBrandInfo = async () => {
+      if (!pinnedBrand || !currentWorkspace?.id || pinnedBrand.logoUrl !== undefined) {
+        return
+      }
+
+      try {
+        const response = await apiClient.listBrands(currentWorkspace.id)
+        const brand = response.brands.find(b => b.slug === pinnedBrand.brandSlug)
+        if (brand) {
+          setPinnedBrand(prev => prev ? {
+            ...prev,
+            brandName: brand.name,
+            logoUrl: brand.logoUrl,
+          } : null)
+        }
+      } catch (error) {
+        console.error('Failed to fetch brand info:', error)
+      }
+    }
+
+    fetchBrandInfo()
+  }, [pinnedBrand, currentWorkspace?.id])
+
+  const loadPinnedBrand = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const key = `pinned-brand-${workspaceSlug}`
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        try {
+          setPinnedBrand(JSON.parse(stored))
+        } catch {
+          // Invalid JSON, ignore
+          setPinnedBrand(null)
+        }
+      } else {
+        setPinnedBrand(null)
+      }
+    }
+  }, [workspaceSlug])
+
+  React.useEffect(() => {
+    loadPinnedBrand()
+    
+    // Listen for pin changes
+    const handlePinChange = () => {
+      loadPinnedBrand()
+    }
+    
+    window.addEventListener('brand-pin-changed', handlePinChange)
+    return () => {
+      window.removeEventListener('brand-pin-changed', handlePinChange)
+    }
+  }, [loadPinnedBrand])
+
+  // Don't render if no brand is pinned
+  if (!pinnedBrand) {
+    return null
+  }
+
+  const brandUrl = `/${locale}/${workspaceSlug}/${pinnedBrand.brandSlug}/home`
+  const displayName = pinnedBrand.brandName || pinnedBrand.brandSlug
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Documents</SidebarGroupLabel>
+      <SidebarGroupLabel>{t('brands')}</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </a>
-            </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction
-                  showOnHover
-                  className="data-[state=open]:bg-accent rounded-sm"
-                >
-                  <IconDots />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-24 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <IconFolder />
-                  <span>Open</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <IconShare3 />
-                  <span>Share</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <IconTrash />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        ))}
         <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <IconDots className="text-sidebar-foreground/70" />
-            <span>More</span>
+          <SidebarMenuButton asChild>
+            <Link href={brandUrl} className="flex items-center gap-2">
+              <Avatar className="h-5 w-5 rounded-md">
+                <AvatarImage 
+                  src={pinnedBrand.logoUrl || undefined} 
+                  alt={displayName}
+                />
+                <AvatarFallback className="rounded-md text-xs">
+                  {displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span>@{pinnedBrand.brandSlug}</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

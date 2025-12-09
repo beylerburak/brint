@@ -49,6 +49,11 @@
     "quickCreate": "Hızlı Oluştur",
     "inbox": "Gelen Kutusu"
   },
+  "brandHome": {
+    "title": "Ana Sayfa",
+    "pinToMainMenu": "Ana menüye sabitle",
+    "unpinFromMainMenu": "Ana menüden kaldır"
+  },
   "brands": {
     "title": "Markalar",
     "description": "Markalarınızı ve ayarlarını yönetin",

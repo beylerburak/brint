@@ -49,6 +49,11 @@
     "quickCreate": "Quick Create",
     "inbox": "Inbox"
   },
+  "brandHome": {
+    "title": "Home",
+    "pinToMainMenu": "Pin to main menu",
+    "unpinFromMainMenu": "Unpin from main menu"
+  },
   "brands": {
     "title": "Brands",
     "description": "Manage your brands and their settings",

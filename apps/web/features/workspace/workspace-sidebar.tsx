@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { NavUser } from "@/features/workspace/workspace-nav-user"
-import { NavMain, NavDocuments, NavSecondary, navigationData } from "@/features/workspace/workspace-nav-menu"
+import { NavMain, NavBrands, NavSecondary } from "@/features/workspace/workspace-nav-menu"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -46,7 +46,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain />
-        <NavDocuments items={navigationData.documents} />
+        <NavBrands />
         <NavSecondary className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

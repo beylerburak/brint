@@ -7,3 +7,4 @@
 
 export * from './upload'
 export * from './plans'
+export * from './platform-rules'

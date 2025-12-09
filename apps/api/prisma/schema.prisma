@@ -141,6 +141,43 @@ enum SocialAccountStatus {
   REVOKED
 }
 
+enum ContentFormFactor {
+  FEED_POST
+  STORY
+  VERTICAL_VIDEO
+  BLOG_ARTICLE
+  LONG_VIDEO
+}
+
+enum ContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  PARTIALLY_PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum PublicationStatus {
+  PENDING
+  QUEUED
+  PUBLISHING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum VerticalVideoCoverMode {
+  AUTO
+  FROM_FRAME
+  CUSTOM_UPLOAD
+}
+
+enum TagEntityType {
+  CONTENT
+  TASK
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -178,14 +215,14 @@ model User {
   avatarMedia      Media?            @relation("UserAvatar", fields: [avatarMediaId], references: [id])
   
   // Project & Task relations
-  createdProjects       Project[]           @relation("ProjectCreatedBy")
-  updatedProjects       Project[]           @relation("ProjectUpdatedBy")
-  assignedTasks         Task[]              @relation("TaskAssignee")
-  createdTasks          Task[]              @relation("TaskCreatedBy")
-  updatedTasks          Task[]              @relation("TaskUpdatedBy")
-  createdChecklistItems TaskChecklistItem[] @relation("ChecklistItemCreatedBy")
+  createdProjects         Project[]           @relation("ProjectCreatedBy")
+  updatedProjects         Project[]           @relation("ProjectUpdatedBy")
+  assignedTasks           Task[]              @relation("TaskAssignee")
+  createdTasks            Task[]              @relation("TaskCreatedBy")
+  updatedTasks            Task[]              @relation("TaskUpdatedBy")
+  createdChecklistItems   TaskChecklistItem[] @relation("ChecklistItemCreatedBy")
   completedChecklistItems TaskChecklistItem[] @relation("ChecklistItemCompletedBy")
-  createdTaskAttachments TaskAttachment[]   @relation("TaskAttachmentCreatedBy")
+  createdTaskAttachments  TaskAttachment[]    @relation("TaskAttachmentCreatedBy")
   
   // Comment relations
   authoredComments Comment[] @relation("CommentAuthor")
@@ -231,6 +268,13 @@ model Workspace {
   taskStatuses TaskStatus[]
   tasks        Task[]
   comments     Comment[]
+
+  // Content relations
+  contents Content[]
+
+  // Tag relations
+  tags         Tag[]
+  tagRelations TagRelation[]
 
   @@map("workspaces")
 }
@@ -298,6 +342,9 @@ model Brand {
   
   // Social Account relations
   socialAccounts SocialAccount[]
+
+  // Content relations
+  contents Content[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -421,6 +468,10 @@ model Media {
   // Task relations
   taskAttachments TaskAttachment[]
 
+  // Content relations
+  contentMedia         ContentMedia[]
+  contentAccountCovers ContentAccountOptions[] @relation("ContentAccountCover")
+
   @@index([workspaceId])
   @@index([brandId])
   @@map("media")
@@ -507,11 +558,11 @@ model Project {
   updatedAt DateTime @updatedAt
 
   // Relations
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand           Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  createdByUser   User      @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id])
-  updatedByUser   User?     @relation("ProjectUpdatedBy", fields: [updatedByUserId], references: [id])
-  tasks           Task[]
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  createdByUser User      @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser User?     @relation("ProjectUpdatedBy", fields: [updatedByUserId], references: [id])
+  tasks         Task[]
 
   @@index([workspaceId, brandId])
   @@index([status])
@@ -524,14 +575,14 @@ model TaskStatus {
   workspaceId String
   brandId     String? // null = workspace-level status
 
-  group      TaskStatusGroup
-  key        String // NOT_STARTED, IN_PROGRESS, COMPLETED, etc.
-  label      String // User-facing label
-  color      String? // Hex color or token
-  isDefault  Boolean @default(false)
-  isSystem   Boolean @default(false) // System-created, cannot be deleted
-  isActive   Boolean @default(true)
-  sortOrder  Int     @default(0)
+  group     TaskStatusGroup
+  key       String // NOT_STARTED, IN_PROGRESS, COMPLETED, etc.
+  label     String // User-facing label
+  color     String? // Hex color or token
+  isDefault Boolean         @default(false)
+  isSystem  Boolean         @default(false) // System-created, cannot be deleted
+  isActive  Boolean         @default(true)
+  sortOrder Int             @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -553,7 +604,7 @@ model Task {
   projectId   String?
   statusId    String
 
-  taskNumber  Int     // Sequential number per workspace, starting from 1
+  taskNumber  Int // Sequential number per workspace, starting from 1
   title       String
   description String?
   priority    TaskPriority @default(MEDIUM)
@@ -570,15 +621,15 @@ model Task {
   updatedAt DateTime @updatedAt
 
   // Relations
-  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand           Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  project         Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  status          TaskStatus          @relation(fields: [statusId], references: [id])
-  assigneeUser    User?               @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
-  createdByUser   User                @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
-  updatedByUser   User?               @relation("TaskUpdatedBy", fields: [updatedByUserId], references: [id])
-  checklistItems  TaskChecklistItem[]
-  attachments     TaskAttachment[]
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand          Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  project        Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status         TaskStatus          @relation(fields: [statusId], references: [id])
+  assigneeUser   User?               @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  createdByUser  User                @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser  User?               @relation("TaskUpdatedBy", fields: [updatedByUserId], references: [id])
+  checklistItems TaskChecklistItem[]
+  attachments    TaskAttachment[]
 
   @@unique([workspaceId, taskNumber])
   @@index([workspaceId, brandId])
@@ -590,9 +641,9 @@ model Task {
 }
 
 model TaskChecklistItem {
-  id       String  @id @default(cuid())
-  taskId   String
-  title    String
+  id          String  @id @default(cuid())
+  taskId      String
+  title       String
   isCompleted Boolean @default(false)
   sortOrder   Int     @default(0)
 
@@ -679,15 +730,15 @@ model Comment {
 /// ============================================================================
 
 model EmailVerificationCode {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
-  code         String   // 6-digit numeric code (100000-999999)
+  code         String // 6-digit numeric code (100000-999999)
   expiresAt    DateTime // Code expiration time (typically 10 minutes)
   usedAt       DateTime? // When the code was successfully used (null if unused)
-  attemptCount Int      @default(0) // Number of failed verification attempts
-  createdAt    DateTime @default(now())
+  attemptCount Int       @default(0) // Number of failed verification attempts
+  createdAt    DateTime  @default(now())
   
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([code])
@@ -699,46 +750,262 @@ model EmailVerificationCode {
 /// ============================================================================
 
 model SocialAccount {
-  id         String   @id @default(cuid())
+  id String @id @default(cuid())
   
   // Brand relation
-  brandId    String
-  brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   // Platform & identity
   platform          SocialPlatform
-  platformAccountId String         // page id, ig business id, tiktok user id, pinterest board id etc.
+  platformAccountId String // page id, ig business id, tiktok user id, pinterest board id etc.
 
   // Display / visual info
-  displayName       String?        // page / channel / profile name
-  username          String?        // @username / phone mask etc.
-  externalAvatarUrl String?        // avatar URL from platform
-  avatarUrl         String?        // our media system copy (optional)
+  displayName       String? // page / channel / profile name
+  username          String? // @username / phone mask etc.
+  externalAvatarUrl String? // avatar URL from platform
+  avatarUrl         String? // our media system copy (optional)
 
   // Auth / Token
-  accessToken       String         @db.Text
-  refreshToken      String?        @db.Text
-  tokenExpiresAt    DateTime?
-  scopes            String[]       // platform permissions
-  tokenData         Json?          // provider specific token data (long-lived token etc.)
+  accessToken    String    @db.Text
+  refreshToken   String?   @db.Text
+  tokenExpiresAt DateTime?
+  scopes         String[] // platform permissions
+  tokenData      Json? // provider specific token data (long-lived token etc.)
 
   // Raw profile data from platform
-  rawProfile        Json?          // full profile payload snapshot
+  rawProfile Json? // full profile payload snapshot
 
   // General status
-  status            SocialAccountStatus @default(ACTIVE)
-  canPublish        Boolean             @default(true)
+  status     SocialAccountStatus @default(ACTIVE)
+  canPublish Boolean             @default(true)
 
   // Health / log / debug
-  lastSyncedAt      DateTime?
-  lastErrorCode     String?
-  lastErrorMessage  String?
+  lastSyncedAt     DateTime?
+  lastErrorCode    String?
+  lastErrorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Content relations
+  contentAccounts       ContentAccount[]
+  publications          Publication[]
+  contentAccountOptions ContentAccountOptions[]
+
+  @@unique([brandId, platform, platformAccountId], name: "brand_platform_account_unique")
+  @@index([brandId])
+  @@index([platform, platformAccountId], name: "platform_account_idx")
+  @@map("social_accounts")
+}
+
+/// ============================================================================
+/// CONTENT & PUBLICATION MODELS
+/// ============================================================================
+
+model Content {
+  id          String  @id @default(cuid())
+  brandId     String
+  workspaceId String? // Denormalized for easier querying
+
+  // Status & scheduling
+  status      ContentStatus @default(DRAFT)
+  scheduledAt DateTime? // Single scheduled time for all publications
+
+  // Form factor / content type
+  formFactor ContentFormFactor
+
+  // Text content
+  title            String? // Content title (optional)
+  baseCaption      String? // Base caption (optional)
+  platformCaptions Json? // Platform-specific captions: { "INSTAGRAM": "...", "LINKEDIN": "..." }
+
+  // Tags / campaigns
+  tags String[] // JSON array of tag strings
+
+  // Soft delete
+  deletedAt DateTime?
+
+  // Tracking
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  brand           Brand                   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  workspace       Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  contentAccounts ContentAccount[]
+  publications    Publication[]
+  contentMedia    ContentMedia[]
+  accountOptions  ContentAccountOptions[]
+
+  @@index([brandId])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([deletedAt])
+  @@map("contents")
+}
+
+model ContentAccount {
+  id              String @id @default(cuid())
+  contentId       String
+  socialAccountId String
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  content       Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, socialAccountId])
+  @@index([contentId])
+  @@index([socialAccountId])
+  @@index([deletedAt])
+  @@map("content_accounts")
+}
+
+model ContentMedia {
+  id        String @id @default(cuid())
+  contentId String
+  mediaId   String
+  sortOrder Int    @default(0) // Order of media in the content
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, mediaId])
+  @@index([contentId])
+  @@index([mediaId])
+  @@map("content_media")
+}
+
+model Publication {
+  id              String @id @default(cuid())
+  contentId       String
+  socialAccountId String
+
+  // Denormalized platform for easier querying
+  platform SocialPlatform
+
+  // Status
+  status PublicationStatus @default(PENDING)
+
+  // Timing
+  scheduledAt DateTime // Always matches Content.scheduledAt
+  publishedAt DateTime? // Actual publish time from platform
+
+  // Platform result
+  platformPostId String? // Post ID returned by platform API
+  errorCode      String?
+  errorMessage   String?
+
+  // Snapshot of payload used for publishing
+  payloadSnapshot Json?
+
+  // Soft delete
+  deletedAt DateTime?
+
+  // Tracking
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  content       Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, socialAccountId])
+  @@index([contentId])
+  @@index([socialAccountId])
+  @@index([platform])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([deletedAt])
+  @@map("publications")
+}
+
+model ContentAccountOptions {
+  id              String @id @default(cuid())
+  contentId       String
+  socialAccountId String
+
+  // Caption override
+  captionOverride String?
+
+  // Vertical video cover options
+  coverMode         VerticalVideoCoverMode?
+  coverFrameTimeSec Float? // Time in seconds for frame selection
+  coverMediaId      String? // Custom cover media ID
+
+  // YouTube / LONG_VIDEO options
+  titleOverride       String?
+  descriptionOverride String?
+  thumbnailMode       String? // Future: enum for thumbnail selection mode
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  content       Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  coverMedia    Media?        @relation("ContentAccountCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, socialAccountId])
+  @@index([contentId])
+  @@index([socialAccountId])
+  @@index([deletedAt])
+  @@map("content_account_options")
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name        String   // Ekranda görünen isim. Örn: "Black Friday 2025"
+  slug        String   // Normalize edilmiş, unique key: "black-friday-2025"
+  color       String?  // (opsiyonel) İleride UI'da renk göstermek için
+  description String?  // (opsiyonel) Etiketle ilgili açıklama
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
 
-  @@index([brandId])
-  @@index([platform, platformAccountId], name: "platform_account_idx")
-  @@unique([brandId, platform, platformAccountId], name: "brand_platform_account_unique")
-  @@map("social_accounts")
+  relations   TagRelation[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([deletedAt])
+  @@map("tags")
+}
+
+model TagRelation {
+  id         String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  tagId      String
+  tag        Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  entityType TagEntityType
+  entityId   String        // contentId, taskId vs.
+
+  createdAt  DateTime      @default(now())
+  deletedAt  DateTime?
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([tagId, entityType])
+  @@index([workspaceId, tagId])
+  @@index([deletedAt])
+  @@map("tag_relations")
 }

@@ -1667,6 +1667,122 @@ export const apiClient = {
     
     return fetchApi(`/workspaces/${workspaceId}/brands/${brandId}/social-accounts/pinterest/authorize${query}`);
   },
+
+  // ============================================================================
+  // Tag API
+  // ============================================================================
+
+  /**
+   * Search tags for autocomplete
+   */
+  async searchTags(
+    workspaceId: string,
+    options?: {
+      query?: string;
+      limit?: number;
+    }
+  ): Promise<{
+    success: true;
+    items: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      color: string | null;
+    }>;
+  }> {
+    const params = new URLSearchParams();
+    if (options?.query) params.append('query', options.query);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    
+    return fetchApi(`/workspaces/${workspaceId}/tags/search${query}`);
+  },
+
+  // ============================================================================
+  // Content API
+  // ============================================================================
+
+  /**
+   * Create content
+   */
+  async createContent(
+    workspaceId: string,
+    brandSlug: string,
+    data: {
+      formFactor: 'FEED_POST' | 'STORY' | 'VERTICAL_VIDEO' | 'BLOG_ARTICLE' | 'LONG_VIDEO';
+      title?: string | null;
+      baseCaption?: string | null;
+      platformCaptions?: Record<string, string> | null;
+      accountIds: string[];
+      scheduledAt?: string | null;
+      status?: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED';
+      tags?: string[];
+      mediaIds?: string[];
+    }
+  ): Promise<{
+    success: true;
+    content: any;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandSlug}/contents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update content
+   */
+  async updateContent(
+    workspaceId: string,
+    brandSlug: string,
+    contentId: string,
+    data: {
+      formFactor?: 'FEED_POST' | 'STORY' | 'VERTICAL_VIDEO' | 'BLOG_ARTICLE' | 'LONG_VIDEO';
+      title?: string | null;
+      baseCaption?: string | null;
+      platformCaptions?: Record<string, string> | null;
+      accountIds?: string[];
+      scheduledAt?: string | null;
+      status?: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED';
+      tags?: string[];
+      mediaIds?: string[];
+    }
+  ): Promise<{
+    success: true;
+    content: any;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandSlug}/contents/${contentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Get content
+   */
+  async getContent(
+    workspaceId: string,
+    brandSlug: string,
+    contentId: string
+  ): Promise<{
+    success: true;
+    content: any;
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandSlug}/contents/${contentId}`);
+  },
+
+  /**
+   * List contents
+   */
+  async listContents(
+    workspaceId: string,
+    brandSlug: string
+  ): Promise<{
+    success: true;
+    contents: any[];
+  }> {
+    return fetchApi(`/workspaces/${workspaceId}/brands/${brandSlug}/contents`);
+  },
 };
 
 // ============================================================================

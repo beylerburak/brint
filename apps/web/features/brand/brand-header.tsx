@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { key: 'calendar', href: 'calendar' },
   { key: 'analytics', href: 'analytics' },
   { key: 'socialAccounts', href: 'social-accounts' },
-  { key: 'contacts', href: 'contacts' },
+  { key: 'publish', href: 'publish' },
 ] as const
 
 export function BrandHeader() {

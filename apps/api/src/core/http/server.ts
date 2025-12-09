@@ -24,6 +24,8 @@ import { registerXRoutes } from '../../modules/social-account/x/x.routes.js';
 import { registerTikTokRoutes } from '../../modules/social-account/tiktok/tiktok.routes.js';
 import { registerYouTubeRoutes } from '../../modules/social-account/youtube/youtube.routes.js';
 import { registerPinterestRoutes } from '../../modules/social-account/pinterest/pinterest.routes.js';
+import { registerTagRoutes } from '../../modules/tag/tag.routes.js';
+import { registerContentRoutes } from '../../modules/content/content.routes.js';
 
 /**
  * Creates and configures a Fastify server instance
@@ -93,6 +95,8 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerTikTokRoutes(app);
   await registerYouTubeRoutes(app);
   await registerPinterestRoutes(app);
+  await registerTagRoutes(app);
+  await registerContentRoutes(app);
 
   return app;
 }

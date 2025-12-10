@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { ButtonGroup } from "@/components/ui/button-group"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { IconX, IconDots, IconPhoto, IconVideo, IconFileUpload, IconCalendar, IconHash, IconMoodSmile, IconSparkles, IconChevronDown, IconGripVertical, IconSend, IconStar, IconCheck, IconClock, IconPin, IconLock } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { PLATFORM_RULES, type ContentFormFactor, type SocialPlatform, getCaptionLimitFor } from "@brint/shared-config/platform-rules"
@@ -55,6 +56,7 @@ export interface ContentCreationModalProps {
   brandSlug?: string
   brandName?: string
   brandLogoUrl?: string
+  contentId?: string | null // If provided, modal opens in edit mode
 }
 
 export function ContentCreationModal({
@@ -63,12 +65,14 @@ export function ContentCreationModal({
   brandSlug,
   brandName,
   brandLogoUrl,
+  contentId,
 }: ContentCreationModalProps) {
   const t = useTranslations("contentCreation")
   const { currentWorkspace } = useWorkspace()
   
   // Form state
   const [formFactor, setFormFactor] = useState<ContentFormFactor | null>(null)
+  const [isLoadingContent, setIsLoadingContent] = useState(false)
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
   const [title, setTitle] = useState("")
   const [caption, setCaption] = useState("")
@@ -76,6 +80,17 @@ export function ContentCreationModal({
   const [scheduledAt, setScheduledAt] = useState<string>("")
   const [isDraft, setIsDraft] = useState(true)
   const [createAnother, setCreateAnother] = useState(false)
+
+  // Track changes for optimization
+  const [hasChanges, setHasChanges] = useState(false)
+  const [initialState, setInitialState] = useState<{
+    formFactor: ContentFormFactor | null
+    selectedAccountIds: string[]
+    title: string
+    caption: string
+    tags: string[]
+    mediaIds: string[]
+  } | null>(null)
   
   // Publish mode: 'now' | 'setDateTime'
   const [publishMode, setPublishMode] = useState<'now' | 'setDateTime'>('now')
@@ -83,13 +98,18 @@ export function ContentCreationModal({
   const [showDateTimePicker, setShowDateTimePicker] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedTime, setSelectedTime] = useState<string>("")
+
+  // Loading states
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   
   // Media state - stored as blobs until submit
   const [selectedMedia, setSelectedMedia] = useState<Array<{
     id: string
-    file: File
-    preview: string // blob URL
+    file?: File // Optional for existing media
+    preview: string // blob URL or S3 URL
     type: 'image' | 'video' | 'document'
+    mediaId?: string // For existing media from API
   }>>([])
   
   // Tag autocomplete state
@@ -114,6 +134,137 @@ export function ContentCreationModal({
   }>>([])
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
   
+  // Load content for edit mode
+  useEffect(() => {
+    const loadContent = async () => {
+      if (!currentWorkspace || !brandSlug || !open || !contentId) {
+        // Reset form when not in edit mode
+        if (!contentId && open) {
+          setFormFactor(null)
+          setSelectedAccountIds([])
+          setTitle("")
+          setCaption("")
+          setTags([])
+          setSelectedMedia([])
+          setScheduledAt("")
+          setPublishMode('now')
+          setSelectedDate(undefined)
+          setSelectedTime("")
+          // Reset change tracking
+          setHasChanges(false)
+          setInitialState({
+            formFactor: null,
+            selectedAccountIds: [],
+            title: "",
+            caption: "",
+            tags: [],
+            mediaIds: [],
+          })
+        }
+        return
+      }
+      
+      setIsLoadingContent(true)
+      try {
+        const response = await apiClient.getContent(currentWorkspace.id, brandSlug, contentId)
+        const content = response.content
+        
+        // Populate form with content data
+        setFormFactor(content.formFactor as ContentFormFactor)
+        setTitle(content.title || "")
+        setCaption(content.baseCaption || "")
+        setTags(content.tags?.map((t: any) => t.name) || [])
+        
+        // Set selected accounts
+        if (content.contentAccounts) {
+          setSelectedAccountIds(content.contentAccounts.map((ca: any) => ca.socialAccountId))
+        }
+        
+        // Set scheduled date/time if exists
+        if (content.scheduledAt) {
+          const scheduledDate = new Date(content.scheduledAt)
+          setSelectedDate(scheduledDate)
+          setSelectedTime(`${String(scheduledDate.getHours()).padStart(2, '0')}:${String(scheduledDate.getMinutes()).padStart(2, '0')}`)
+          setPublishMode('setDateTime')
+        } else {
+          setPublishMode('now')
+        }
+        
+        // Load media if exists
+        if (content.contentMedia && content.contentMedia.length > 0) {
+          const mediaItems: Array<{
+            id: string
+            preview: string
+            type: 'image' | 'video' | 'document'
+            mediaId?: string
+          } | null> = content.contentMedia.map((cm: any) => {
+            const media = cm.media
+            if (!media) return null
+            
+            // Determine media type
+            let type: 'image' | 'video' | 'document' = 'image'
+            if (media.mimeType?.startsWith('video/')) {
+              type = 'video'
+            } else if (media.mimeType?.includes('pdf') || media.mimeType?.includes('document')) {
+              type = 'document'
+            }
+            
+            // Use previewUrl from API (already generated on backend)
+            const previewUrl = media.previewUrl || ''
+            
+            return {
+              id: `existing-${media.id}`,
+              preview: previewUrl,
+              type,
+              mediaId: media.id, // Store original media ID for update
+            }
+          })
+          
+          // Filter out null values and set media
+          const validMediaItems = mediaItems.filter((item: typeof mediaItems[0]): item is NonNullable<typeof item> => item !== null)
+          setSelectedMedia(validMediaItems)
+        } else {
+          setSelectedMedia([])
+        }
+
+        // Set initial state for change tracking
+        setInitialState({
+          formFactor: content.formFactor as ContentFormFactor,
+          selectedAccountIds: content.contentAccounts?.map((ca: any) => ca.socialAccountId) || [],
+          title: content.title || "",
+          caption: content.baseCaption || "",
+          tags: content.tags?.map((t: any) => t.name) || [],
+          mediaIds: content.contentMedia?.map((cm: any) => cm.media.id) || [],
+        })
+        setHasChanges(false)
+      } catch (error) {
+        console.error('Failed to load content:', error)
+        toast.error('Failed to load content')
+      } finally {
+        setIsLoadingContent(false)
+      }
+    }
+    
+    loadContent()
+  }, [currentWorkspace, brandSlug, open, contentId])
+
+  // Track changes for optimization
+  useEffect(() => {
+    if (!initialState) return
+
+    const currentMediaIds = selectedMedia.map(m => m.mediaId).filter(Boolean)
+
+    const hasAnyChange =
+      formFactor !== initialState.formFactor ||
+      JSON.stringify(selectedAccountIds.sort()) !== JSON.stringify(initialState.selectedAccountIds.sort()) ||
+      title !== initialState.title ||
+      caption !== initialState.caption ||
+      JSON.stringify(tags.sort()) !== JSON.stringify(initialState.tags.sort()) ||
+      JSON.stringify(currentMediaIds.sort()) !== JSON.stringify(initialState.mediaIds.sort())
+
+    setHasChanges(hasAnyChange)
+  }, [formFactor, selectedAccountIds, title, caption, tags, selectedMedia, initialState])
+
   // Load social accounts
   useEffect(() => {
     const loadAccounts = async () => {
@@ -203,6 +354,9 @@ export function ContentCreationModal({
         URL.revokeObjectURL(media.preview)
       })
       setSelectedMedia([])
+      // Reset change tracking
+      setHasChanges(false)
+      setInitialState(null)
     }
   }, [open])
   
@@ -379,6 +533,29 @@ export function ContentCreationModal({
   // Check if base caption exceeds limit
   const isBaseCaptionExceeded = globalCaptionLimit !== null && caption.length > globalCaptionLimit
 
+  // Validation: Feed post requirements
+  const isFeedPost = formFactor === 'FEED_POST'
+  const hasSelectedAccounts = selectedAccountIds.length > 0
+  const hasMedia = selectedMedia.length > 0
+  const hasCaption = caption.trim().length > 0
+  
+  // Check if Instagram is selected
+  const hasInstagram = selectedPlatforms.includes('INSTAGRAM')
+  // Check if TikTok is selected
+  const hasTikTok = selectedPlatforms.includes('TIKTOK')
+  
+  // Feed post validation rules:
+  // 1. Caption is required for feed posts (at minimum)
+  // 2. Media is required if Instagram is selected
+  // 3. Media is required if TikTok is selected (for feed posts)
+  const isCaptionRequired = isFeedPost && hasSelectedAccounts
+  const isMediaRequiredForInstagram = isFeedPost && hasInstagram
+  const isMediaRequiredForTikTok = isFeedPost && hasTikTok
+  const isMediaRequired = isMediaRequiredForInstagram || isMediaRequiredForTikTok
+  
+  const isCaptionMissing = isCaptionRequired && !hasCaption
+  const isMediaMissing = isMediaRequired && !hasMedia
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -390,7 +567,9 @@ export function ContentCreationModal({
         {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-4 pt-3 sm:pt-4 pb-2 sm:pb-3 flex-shrink-0 border-b">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            <h2 className="text-base sm:text-lg font-semibold truncate">{t("title")}</h2>
+            <h2 className="text-base sm:text-lg font-semibold truncate">
+              {contentId ? t("editTitle") : t("title")}
+            </h2>
             {brandSlug && (
               <>
                 <div className="h-4 sm:h-5 w-px bg-border flex-shrink-0"></div>
@@ -910,7 +1089,122 @@ export function ContentCreationModal({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsDraft(true)}
+              onClick={async () => {
+                if (!currentWorkspace || !brandSlug || !formFactor || selectedAccountIds.length === 0) {
+                  toast.error(t("saveDraftError"), {
+                    description: !formFactor
+                      ? t("publishButtonDisabledNoContentType")
+                      : selectedAccountIds.length === 0
+                      ? t("publishButtonDisabledNoAccounts")
+                      : t("saveDraftErrorDescription")
+                  })
+                  return
+                }
+
+                // If no changes, skip API call and show success immediately
+                if (!hasChanges) {
+                  toast.success(t("saveDraftSuccess"))
+                  onOpenChange(false)
+                  return
+                }
+
+                setIsSavingDraft(true)
+                try {
+                  // Step 1: Upload media files to S3 (only new files, keep existing media)
+                  const uploadedMediaIds: string[] = []
+
+                  // Add existing media IDs (from edit mode)
+                  for (const media of selectedMedia) {
+                    if (media.mediaId) {
+                      // Existing media - keep the ID
+                      uploadedMediaIds.push(media.mediaId)
+                    } else if (media.file) {
+                      // New media - upload to S3
+                      try {
+                        const uploadResult = await apiClient.uploadMedia(
+                          currentWorkspace.id,
+                          media.file
+                        )
+
+                        if (uploadResult.success && uploadResult.media?.id) {
+                          uploadedMediaIds.push(uploadResult.media.id)
+                        }
+                      } catch (error) {
+                        console.error(`Failed to upload media ${media.file?.name || media.mediaId || 'unknown'}:`, error)
+                      }
+                    }
+                  }
+
+                  // Step 2: Create or update content as draft
+                  if (contentId) {
+                    await apiClient.updateContent(
+                      currentWorkspace.id,
+                      brandSlug,
+                      contentId,
+                      {
+                        formFactor,
+                        title: title || null,
+                        baseCaption: caption || null,
+                        accountIds: selectedAccountIds,
+                        scheduledAt: null, // Drafts don't have scheduled time
+                        status: 'DRAFT',
+                        tags: tags.length > 0 ? tags : undefined,
+                        mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+                      }
+                    )
+                  } else {
+                    await apiClient.createContent(
+                      currentWorkspace.id,
+                      brandSlug,
+                      {
+                        formFactor,
+                        title: title || null,
+                        baseCaption: caption || null,
+                        accountIds: selectedAccountIds,
+                        scheduledAt: null, // Drafts don't have scheduled time
+                        status: 'DRAFT',
+                        tags: tags.length > 0 ? tags : undefined,
+                        mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+                      }
+                    )
+                  }
+
+                  // Step 3: Clean up
+                  selectedMedia.forEach(media => {
+                    URL.revokeObjectURL(media.preview)
+                  })
+
+                  // Step 4: Show success message and handle create another or close
+                  toast.success(t("saveDraftSuccess"))
+
+                  if (contentId) {
+                    // After update, close modal
+                    onOpenChange(false)
+                  } else if (createAnother) {
+                    // Reset form but keep modal open
+                    setFormFactor(null)
+                    setSelectedAccountIds([])
+                    setTitle("")
+                    setCaption("")
+                    setTags([])
+                    setSelectedMedia([])
+                    setScheduledAt("")
+                    setPublishMode('now')
+                    setSelectedDate(undefined)
+                    setSelectedTime("")
+                  } else {
+                    onOpenChange(false)
+                  }
+                } catch (error) {
+                  console.error('Failed to save draft:', error)
+                  toast.error(t("saveDraftError"), {
+                    description: t("saveDraftErrorDescription")
+                  })
+                } finally {
+                  setIsSavingDraft(false)
+                }
+              }}
+              disabled={!formFactor || selectedAccountIds.length === 0 || isSavingDraft}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               {t("saveDrafts")}
@@ -1102,101 +1396,202 @@ export function ContentCreationModal({
             </Popover>
 
             {/* Schedule/Publish Button */}
-            <Button
-              variant="outline"
-              className="rounded-l-none"
-              onClick={async () => {
-                if (!currentWorkspace || !brandSlug || !formFactor || selectedAccountIds.length === 0) {
-                  return
-                }
-
-                // Hard validation: prevent submission if caption exceeds limits
-                if (isBaseCaptionExceeded) {
-                  return
-                }
-                
-                try {
-                  // Determine scheduledAt based on publish mode
-                  let finalScheduledAt: string | null = null
-                  let finalStatus: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT'
-                  
-                  if (publishMode === 'now') {
-                    finalStatus = 'PUBLISHED'
-                    finalScheduledAt = new Date().toISOString()
-                  } else if (publishMode === 'setDateTime' && selectedDate && selectedTime) {
-                    const dateTime = new Date(selectedDate)
-                    const [hours, minutes] = selectedTime.split(':')
-                    dateTime.setHours(parseInt(hours), parseInt(minutes))
-                    finalScheduledAt = dateTime.toISOString()
-                    finalStatus = 'SCHEDULED'
+            {(() => {
+              const isDisabled = !formFactor || selectedAccountIds.length === 0 || isBaseCaptionExceeded || isCaptionMissing || isMediaMissing
+              let disabledMessage = ""
+              
+              if (isDisabled) {
+                if (!formFactor) {
+                  disabledMessage = t("publishButtonDisabledNoContentType")
+                } else if (selectedAccountIds.length === 0) {
+                  disabledMessage = t("publishButtonDisabledNoAccounts")
+                } else if (isBaseCaptionExceeded) {
+                  disabledMessage = t("publishButtonDisabledCaptionTooLong")
+                } else if (isCaptionMissing) {
+                  disabledMessage = t("publishButtonDisabledNoCaption")
+                } else if (isMediaMissing) {
+                  if (isMediaRequiredForInstagram && isMediaRequiredForTikTok) {
+                    disabledMessage = t("publishButtonDisabledNoMediaInstagramTikTok")
+                  } else if (isMediaRequiredForInstagram) {
+                    disabledMessage = t("publishButtonDisabledNoMediaInstagram")
+                  } else if (isMediaRequiredForTikTok) {
+                    disabledMessage = t("publishButtonDisabledNoMediaTikTok")
                   }
-                  
-                  // Step 1: Upload media files to S3
-                  const uploadedMediaIds: string[] = []
-                  
-                  for (const media of selectedMedia) {
+                }
+              }
+              
+              const button = (
+                <Button
+                  variant="outline"
+                  className="rounded-l-none"
+                  onClick={async () => {
+                    if (!currentWorkspace || !brandSlug || !formFactor || selectedAccountIds.length === 0) {
+                      return
+                    }
+
+                    // Hard validation: prevent submission if caption exceeds limits
+                    if (isBaseCaptionExceeded) {
+                      return
+                    }
+
+                    // Hard validation: prevent submission if required fields are missing
+                    if (isCaptionMissing || isMediaMissing) {
+                      return
+                    }
+
+                    setIsPublishing(true)
                     try {
-                      const uploadResult = await apiClient.uploadMedia(
-                        currentWorkspace.id,
-                        media.file
-                      )
-                      
-                      if (uploadResult.success && uploadResult.media?.id) {
-                        uploadedMediaIds.push(uploadResult.media.id)
+                      // Determine scheduledAt based on publish mode
+                      let finalScheduledAt: string | null = null
+                      let finalStatus: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT'
+
+                      if (publishMode === 'now') {
+                        finalStatus = 'PUBLISHED'
+                        finalScheduledAt = new Date().toISOString()
+                      } else if (publishMode === 'setDateTime' && selectedDate && selectedTime) {
+                        const dateTime = new Date(selectedDate)
+                        const [hours, minutes] = selectedTime.split(':')
+                        dateTime.setHours(parseInt(hours), parseInt(minutes))
+                        finalScheduledAt = dateTime.toISOString()
+                        finalStatus = 'SCHEDULED'
+                      }
+
+                      // Step 1: Upload media files to S3 (only new files, keep existing media)
+                      const uploadedMediaIds: string[] = []
+
+                      // Add existing media IDs (from edit mode)
+                      for (const media of selectedMedia) {
+                        if (media.mediaId) {
+                          // Existing media - keep the ID
+                          uploadedMediaIds.push(media.mediaId)
+                        } else if (media.file) {
+                          // New media - upload to S3
+                          try {
+                            const uploadResult = await apiClient.uploadMedia(
+                              currentWorkspace.id,
+                              media.file
+                            )
+
+                            if (uploadResult.success && uploadResult.media?.id) {
+                              uploadedMediaIds.push(uploadResult.media.id)
+                            }
+                          } catch (error) {
+                            console.error(`Failed to upload media ${media.file.name}:`, error)
+                          }
+                        }
+                      }
+
+                      // Step 2: Create or update content
+                      if (contentId) {
+                        // Update existing content
+                        await apiClient.updateContent(
+                          currentWorkspace.id,
+                          brandSlug,
+                          contentId,
+                          {
+                            formFactor,
+                            title: title || null,
+                            baseCaption: caption || null,
+                            accountIds: selectedAccountIds,
+                            scheduledAt: finalScheduledAt,
+                            status: finalStatus,
+                            tags: tags.length > 0 ? tags : undefined,
+                            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+                          }
+                        )
+                        toast.success(t("updateSuccess") || "Content updated successfully")
+                      } else {
+                        // Create new content
+                        await apiClient.createContent(
+                          currentWorkspace.id,
+                          brandSlug,
+                          {
+                            formFactor,
+                            title: title || null,
+                            baseCaption: caption || null,
+                            accountIds: selectedAccountIds,
+                            scheduledAt: finalScheduledAt,
+                            status: finalStatus,
+                            tags: tags.length > 0 ? tags : undefined,
+                            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+                          }
+                        )
+                        toast.success(t("createSuccess") || "Content created successfully")
+                      }
+
+                      // Step 3: Clean up
+                      selectedMedia.forEach(media => {
+                        URL.revokeObjectURL(media.preview)
+                      })
+
+                      // Step 4: Handle create another or close
+                      if (contentId) {
+                        // After update, close modal
+                        onOpenChange(false)
+                      } else if (createAnother) {
+                        // Reset form but keep modal open
+                        setFormFactor(null)
+                        setSelectedAccountIds([])
+                        setTitle("")
+                        setCaption("")
+                        setTags([])
+                        setSelectedMedia([])
+                        setScheduledAt("")
+                        setPublishMode('now')
+                        setSelectedDate(undefined)
+                        setSelectedTime("")
+                      } else {
+                        onOpenChange(false)
                       }
                     } catch (error) {
-                      console.error(`Failed to upload media ${media.file.name}:`, error)
+                      console.error('Failed to save content:', error)
+                    } finally {
+                      setIsPublishing(false)
                     }
-                  }
-                  
-                  // Step 2: Create content
-                  await apiClient.createContent(
-                    currentWorkspace.id,
-                    brandSlug,
-                    {
-                      formFactor,
-                      title: title || null,
-                      baseCaption: caption || null,
-                      accountIds: selectedAccountIds,
-                      scheduledAt: finalScheduledAt,
-                      status: finalStatus,
-                      tags: tags.length > 0 ? tags : undefined,
-                      mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
-                    }
-                  )
-                  
-                  // Step 3: Clean up
-                  selectedMedia.forEach(media => {
-                    URL.revokeObjectURL(media.preview)
-                  })
-                  
-                  // Step 4: Handle create another or close
-                  if (createAnother) {
-                    // Reset form but keep modal open
-                    setFormFactor(null)
-                    setSelectedAccountIds([])
-                    setTitle("")
-                    setCaption("")
-                    setTags([])
-                    setSelectedMedia([])
-                    setScheduledAt("")
-                    setPublishMode('now')
-                    setSelectedDate(undefined)
-                    setSelectedTime("")
-                  } else {
-                    onOpenChange(false)
-                  }
-                } catch (error) {
-                  console.error('Failed to save content:', error)
-                }
-              }}
-              disabled={!formFactor || selectedAccountIds.length === 0 || isBaseCaptionExceeded}
-            >
-              {publishMode === 'now' ? t("publishNowButton") : t("schedulePosts")}
-              </Button>
+                  }}
+                  disabled={isDisabled}
+                >
+                  {publishMode === 'now' ? t("publishNowButton") : t("schedulePosts")}
+                </Button>
+              )
+              
+              if (isDisabled && disabledMessage) {
+                return (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block [&>button]:pointer-events-auto">
+                        {button}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {disabledMessage}
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+              
+              return button
+            })()}
             </ButtonGroup>
           </div>
         </div>
+
+        {/* Loading Overlay */}
+        {(isSavingDraft || isPublishing) && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+            <div className="flex flex-col items-center gap-4 p-6 bg-background border border-border rounded-lg shadow-lg">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              <div className="text-center">
+                <p className="text-sm font-medium">
+                  {isSavingDraft ? t("savingDraft") : t("publishingContent")}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("uploadingMedia")}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -1206,9 +1601,10 @@ export function ContentCreationModal({
 interface SortableMediaItemProps {
   media: {
     id: string
-    file: File
+    file?: File
     preview: string
     type: 'image' | 'video' | 'document'
+    mediaId?: string
   }
   onRemove: (id: string) => void
 }
@@ -1239,7 +1635,7 @@ function SortableMediaItem({ media, onRemove }: SortableMediaItemProps) {
       {media.type === 'image' ? (
         <img
           src={media.preview}
-          alt={media.file.name}
+          alt={media.file?.name || media.mediaId || 'Media'}
           className="w-full h-full object-cover"
         />
       ) : media.type === 'video' ? (

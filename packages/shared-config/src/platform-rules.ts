@@ -181,22 +181,28 @@ export const PLATFORM_RULES: Record<SocialPlatform, PlatformRule> = {
 
   TIKTOK: {
     supports: {
-      FEED_POST: false,
+      FEED_POST: true, // TikTok supports photo posts and carousel
       STORY: false,
       VERTICAL_VIDEO: true,
       BLOG_ARTICLE: false,
       LONG_VIDEO: false,
     },
     media: {
-      maxMediaCount: 1, // TikTok only supports single video
-      allowMultipleMedia: false,
+      maxMediaCount: 10, // TikTok supports carousel posts
+      allowMultipleMedia: true, // TikTok supports carousel
       allowVideo: true,
-      allowPhoto: false, // TikTok doesn't support photo posts
+      allowPhoto: true, // TikTok supports photo posts
       allowMixedPhotoVideo: false,
     },
     captionLimits: {
       DEFAULT: 2200,
+      FEED_POST: 2200,
       VERTICAL_VIDEO: 2200,
+    },
+    feedPost: {
+      maxCaptionLength: 2200,
+      supportsCarousel: true,
+      maxCarouselItems: 10,
     },
     verticalVideo: {
       requiresVerticalAspect: true,

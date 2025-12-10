@@ -120,10 +120,31 @@
   "publish": {
     "title": "Yayınla",
     "newContent": "Yeni İçerik",
+    "description": "Sosyal medya platformları için içerik oluşturun ve yönetin.",
+    "status": {
+      "draft": "Taslak",
+      "scheduled": "Planlandı",
+      "published": "Yayınlandı",
+      "partiallyPublished": "Kısmen Yayınlandı",
+      "failed": "Başarısız",
+      "archived": "Arşivlendi"
+    },
+    "formFactor": {
+      "feedPost": "Feed Gönderisi",
+      "story": "Hikaye",
+      "verticalVideo": "Dikey Video",
+      "blogArticle": "Blog Yazısı",
+      "longVideo": "Uzun Video"
+    },
+    "title": "Yayınla",
+    "newContent": "Yeni İçerik",
     "description": "Sosyal medya hesaplarınız için içerik oluşturun ve planlayın"
   },
   "contentCreation": {
     "title": "İçerik Oluştur",
+    "editTitle": "İçeriği Düzenle",
+    "createSuccess": "İçerik başarıyla oluşturuldu",
+    "updateSuccess": "İçerik başarıyla güncellendi",
     "contentType": "İçerik Tipi",
     "feedPost": "Feed Post",
     "story": "Story",
@@ -163,7 +184,20 @@
     "otherOptions": "Diğer Seçenekler",
     "done": "Tamam",
     "publishNowButton": "Şimdi Yayınla",
-    "schedulePosts": "Gönderileri Planla"
+    "schedulePosts": "Gönderileri Planla",
+    "publishButtonDisabledNoContentType": "Lütfen bir içerik tipi seçin",
+    "publishButtonDisabledNoAccounts": "Lütfen en az bir hesap seçin",
+    "publishButtonDisabledCaptionTooLong": "Başlık seçili platformlar için karakter limitini aşıyor",
+    "publishButtonDisabledNoCaption": "Feed gönderileri için başlık zorunludur",
+    "publishButtonDisabledNoMediaInstagram": "Instagram feed gönderileri için medya zorunludur",
+    "publishButtonDisabledNoMediaTikTok": "TikTok feed gönderileri için medya zorunludur",
+    "publishButtonDisabledNoMediaInstagramTikTok": "Instagram ve TikTok feed gönderileri için medya zorunludur",
+    "saveDraftSuccess": "Taslak başarıyla kaydedildi",
+    "saveDraftError": "Taslak kaydedilemedi",
+    "saveDraftErrorDescription": "Taslak kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.",
+    "savingDraft": "Taslak kaydediliyor...",
+    "publishingContent": "İçerik yayınlanıyor...",
+    "uploadingMedia": "Medya dosyaları yükleniyor..."
   },
   "tasks": {
     "title": "Görevler",

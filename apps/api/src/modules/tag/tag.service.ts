@@ -171,9 +171,7 @@ export async function getTagsForContent(
           name: true,
           slug: true,
           color: true,
-        },
-        where: {
-          deletedAt: null,
+          deletedAt: true,
         },
       },
     },
@@ -181,7 +179,13 @@ export async function getTagsForContent(
 
   return relations
     .map(r => r.tag)
-    .filter((tag): tag is NonNullable<typeof tag> => tag !== null);
+    .filter((tag): tag is NonNullable<typeof tag> => tag !== null && tag.deletedAt === null)
+    .map(tag => ({
+      id: tag.id,
+      name: tag.name,
+      slug: tag.slug,
+      color: tag.color,
+    }));
 }
 
 /**
@@ -213,9 +217,7 @@ export async function getTagsForContents(
           name: true,
           slug: true,
           color: true,
-        },
-        where: {
-          deletedAt: null,
+          deletedAt: true,
         },
       },
     },
@@ -224,9 +226,14 @@ export async function getTagsForContents(
   const result = new Map<string, Array<{ id: string; name: string; slug: string; color: string | null }>>();
 
   for (const relation of relations) {
-    if (relation.tag) {
+    if (relation.tag && relation.tag.deletedAt === null) {
       const existing = result.get(relation.entityId) || [];
-      existing.push(relation.tag);
+      existing.push({
+        id: relation.tag.id,
+        name: relation.tag.name,
+        slug: relation.tag.slug,
+        color: relation.tag.color,
+      });
       result.set(relation.entityId, existing);
     }
   }

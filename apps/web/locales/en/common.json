@@ -120,10 +120,31 @@
   "publish": {
     "title": "Publish",
     "newContent": "New Content",
+    "description": "Create and manage your content for social media platforms.",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "published": "Published",
+      "partiallyPublished": "Partially Published",
+      "failed": "Failed",
+      "archived": "Archived"
+    },
+    "formFactor": {
+      "feedPost": "Feed Post",
+      "story": "Story",
+      "verticalVideo": "Vertical Video",
+      "blogArticle": "Blog Article",
+      "longVideo": "Long Video"
+    },
+    "title": "Publish",
+    "newContent": "New Content",
     "description": "Create and schedule content for your social media accounts"
   },
   "contentCreation": {
     "title": "Create Content",
+    "editTitle": "Edit Content",
+    "createSuccess": "Content created successfully",
+    "updateSuccess": "Content updated successfully",
     "contentType": "Content Type",
     "feedPost": "Feed Post",
     "story": "Story",
@@ -136,7 +157,7 @@
     "contentTitle": "Content Title",
     "contentTitlePlaceholder": "Enter content title (optional)",
     "captionPlaceholder": "What would you like to share?",
-    "dragDropOrSelect": "Drag & drop or",
+    "dragDropOrSelect": "Drag & drop or ",
     "selectFiles": "select files",
     "dropFilesHere": "Drop files here...",
     "maxFilesReached": "Maximum 10 files reached",
@@ -163,7 +184,20 @@
     "otherOptions": "Other Options",
     "done": "Done",
     "publishNowButton": "Publish Now",
-    "schedulePosts": "Schedule Posts"
+    "schedulePosts": "Schedule Posts",
+    "publishButtonDisabledNoContentType": "Please select a content type",
+    "publishButtonDisabledNoAccounts": "Please select at least one account",
+    "publishButtonDisabledCaptionTooLong": "Caption exceeds the character limit for selected platforms",
+    "publishButtonDisabledNoCaption": "Caption is required for feed posts",
+    "publishButtonDisabledNoMediaInstagram": "Media is required for Instagram feed posts",
+    "publishButtonDisabledNoMediaTikTok": "Media is required for TikTok feed posts",
+    "publishButtonDisabledNoMediaInstagramTikTok": "Media is required for Instagram and TikTok feed posts",
+    "saveDraftSuccess": "Draft saved successfully",
+    "saveDraftError": "Failed to save draft",
+    "saveDraftErrorDescription": "An error occurred while saving the draft. Please try again.",
+    "savingDraft": "Saving draft...",
+    "publishingContent": "Publishing content...",
+    "uploadingMedia": "Uploading media files..."
   },
   "tasks": {
     "title": "Tasks",

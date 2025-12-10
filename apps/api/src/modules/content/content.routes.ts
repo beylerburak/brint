@@ -286,25 +286,57 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
 
       // Update content accounts if provided
       if (body.accountIds !== undefined) {
-        // Soft delete existing
-        await prisma.contentAccount.updateMany({
+        // Get current active account IDs
+        const currentAccounts = await prisma.contentAccount.findMany({
           where: {
             contentId,
             deletedAt: null,
           },
-          data: {
-            deletedAt: new Date(),
+          select: {
+            socialAccountId: true,
           },
         });
 
-        // Create new ones
-        if (body.accountIds.length > 0) {
-          await prisma.contentAccount.createMany({
-            data: body.accountIds.map(accountId => ({
+        const currentAccountIds = currentAccounts.map((ca: { socialAccountId: string }) => ca.socialAccountId);
+        const newAccountIds = body.accountIds;
+
+        // Check if accounts actually changed
+        const accountsChanged = currentAccountIds.length !== newAccountIds.length ||
+          !currentAccountIds.every((id: string) => newAccountIds.includes(id)) ||
+          !newAccountIds.every((id: string) => currentAccountIds.includes(id));
+
+        if (accountsChanged) {
+          // Soft delete existing
+          await prisma.contentAccount.updateMany({
+            where: {
               contentId,
-              socialAccountId: accountId,
-            })),
+              deletedAt: null,
+            },
+            data: {
+              deletedAt: new Date(),
+            },
           });
+
+          // Create new ones using individual creates to handle potential conflicts
+          if (newAccountIds.length > 0) {
+            for (const accountId of newAccountIds) {
+              await prisma.contentAccount.upsert({
+                where: {
+                  contentId_socialAccountId: {
+                    contentId,
+                    socialAccountId: accountId,
+                  },
+                },
+                update: {
+                  deletedAt: null, // Restore if it was soft deleted
+                },
+                create: {
+                  contentId,
+                  socialAccountId: accountId,
+                },
+              });
+            }
+          }
         }
       }
 
@@ -389,10 +421,10 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       });
 
       // Fetch tags for all contents
-      const contentIds = contents.map(c => c.id);
+      const contentIds = contents.map((c: any) => c.id);
       const tagsMap = await getTagsForContents(workspaceId, contentIds);
 
-      const contentsWithTags = contents.map(content => ({
+      const contentsWithTags = contents.map((content: any) => ({
         ...content,
         tags: (tagsMap.get(content.id) || []).map(t => ({
           id: t.id,
@@ -464,6 +496,11 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
               socialAccount: true,
             },
           },
+          contentMedia: {
+            include: {
+              media: true,
+            },
+          },
         },
       });
 
@@ -480,17 +517,61 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       // Fetch tags
       const tags = await getTagsForContent(workspaceId, content.id);
 
+      // Generate media URLs
+      const { getMediaVariantUrlAsync } = await import('../../core/storage/s3-url.js');
+      const contentWithMediaUrls = {
+        ...content,
+        contentMedia: await Promise.all(
+          (content.contentMedia || []).map(async (cm: any) => {
+            const media = cm.media;
+            if (!media) return cm;
+            
+            // Generate preview URL (use small variant if available, otherwise original)
+            let previewUrl: string | null = null;
+            if (media.variants && typeof media.variants === 'object') {
+              previewUrl = await getMediaVariantUrlAsync(
+                media.bucket,
+                media.variants,
+                'small',
+                media.isPublic
+              ) || await getMediaVariantUrlAsync(
+                media.bucket,
+                media.variants,
+                'thumbnail',
+                media.isPublic
+              );
+            }
+            
+            // Fallback to original if no variant available
+            if (!previewUrl && media.isPublic) {
+              const { getS3PublicUrl } = await import('../../core/storage/s3-url.js');
+              previewUrl = getS3PublicUrl(media.bucket, media.baseKey);
+            } else if (!previewUrl) {
+              // For private media, generate presigned URL
+              const { generatePresignedUrl } = await import('../../core/storage/s3-client.js');
+              previewUrl = await generatePresignedUrl(media.bucket, media.baseKey, 3600);
+            }
+            
+            return {
+              ...cm,
+              media: {
+                ...media,
+                previewUrl,
+              },
+            };
+          })
+        ),
+        tags: tags.map(t => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          color: t.color,
+        })),
+      };
+
       return reply.status(200).send({
         success: true,
-        content: {
-          ...content,
-          tags: tags.map(t => ({
-            id: t.id,
-            name: t.name,
-            slug: t.slug,
-            color: t.color,
-          })),
-        },
+        content: contentWithMediaUrls,
       });
     } catch (error: any) {
       request.log.error(error, 'Error getting content');

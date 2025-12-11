@@ -48,7 +48,11 @@ export function GoogleDrivePickerDialog({
   
   const getThumbnailUrl = (fileId: string): string | undefined => {
     if (!currentWorkspace) return undefined;
-    return apiClient.getGoogleDriveThumbnailUrl(currentWorkspace.id, fileId);
+    // API client automatically adds X-Workspace-Id header via fetchApi
+    // But if API requires query param, add it as fallback
+    const baseUrl = apiClient.getGoogleDriveThumbnailUrl(currentWorkspace.id, fileId);
+    // Add workspaceId as query param if not already present (some APIs require both header and query)
+    return baseUrl.includes('?') ? baseUrl : `${baseUrl}?workspaceId=${currentWorkspace.id}`;
   };
   const [files, setFiles] = useState<GoogleDriveFile[]>([]);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
@@ -57,20 +61,18 @@ export function GoogleDrivePickerDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(false);
+  const [showAllFiles, setShowAllFiles] = useState(false); // Track if user clicked "Show All"
 
   const loadFiles = async (reset = false) => {
     if (!currentWorkspace) return;
     
     setIsLoading(true);
     try {
-      // Simple approach: 
-      // - If searching, search entire Drive (My Drive + Shared Drives)
-      // - If not searching, show recently modified files from all drives
+      // Load max 10 files initially, then paginate with "Load More"
       const res = await apiClient.listGoogleDriveFiles(currentWorkspace.id, {
         query: searchQuery || undefined,
-        pageSize: 100,
+        pageSize: reset ? 10 : 100, // Initial load: 10, pagination: 100
         pageToken: reset ? undefined : nextPageToken,
-        // No folderId or driveId - show all recent files or search results
         folderId: undefined,
         driveId: undefined,
       });
@@ -115,6 +117,7 @@ export function GoogleDrivePickerDialog({
       setSearchQuery('');
       setNextPageToken(undefined);
       setHasMore(false);
+      setShowAllFiles(false);
       // Don't call loadFiles here - it will be called by the search useEffect
     } else {
       // Reset state when modal closes
@@ -123,6 +126,7 @@ export function GoogleDrivePickerDialog({
       setSearchQuery('');
       setNextPageToken(undefined);
       setHasMore(false);
+      setShowAllFiles(false);
     }
   }, [open, currentWorkspace]);
 
@@ -287,7 +291,8 @@ export function GoogleDrivePickerDialog({
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {files.map((file) => {
+                  {/* Show max 10 files initially, then all when "Show All" is clicked */}
+                  {(showAllFiles || files.length <= 10 ? files : files.slice(0, 10)).map((file) => {
                     const isSelected = selectedFileIds.has(file.id);
                     const isImage = isImageType(file.mimeType);
                     const isVideo = isVideoType(file.mimeType);
@@ -316,13 +321,21 @@ export function GoogleDrivePickerDialog({
                   })}
                 </div>
                 
-                {/* Load more button */}
-                {hasMore && (
+                {/* Load more button - show if there are more files to load OR if we have more than 10 files */}
+                {(hasMore || (files.length > 10 && !showAllFiles)) && (
                   <div className="flex justify-center mt-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => loadFiles(false)}
+                      onClick={() => {
+                        if (files.length > 10 && !hasMore && !showAllFiles) {
+                          // Show all files (already loaded, just expand view)
+                          setShowAllFiles(true);
+                        } else if (hasMore) {
+                          // Load next page
+                          loadFiles(false);
+                        }
+                      }}
                       disabled={isLoading}
                     >
                       {isLoading ? (
@@ -330,6 +343,8 @@ export function GoogleDrivePickerDialog({
                           <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
                           Loading...
                         </>
+                      ) : files.length > 10 && !hasMore && !showAllFiles ? (
+                        `Show All (${files.length})`
                       ) : (
                         'Load More'
                       )}
@@ -390,6 +405,7 @@ function FileThumbnail({
   getFileIcon: (mimeType: string) => React.ReactNode;
   getThumbnailUrl: (fileId: string) => string | undefined;
 }) {
+  const { currentWorkspace } = useWorkspace();
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
   const [thumbnailBlobUrl, setThumbnailBlobUrl] = useState<string | null>(null);
@@ -399,14 +415,22 @@ function FileThumbnail({
 
   // Load thumbnail as blob to ensure credentials are sent
   useEffect(() => {
-    if (!thumbnailUrl || thumbnailBlobUrl) return;
+    if (!thumbnailUrl || thumbnailBlobUrl || !currentWorkspace) return;
 
     let cancelled = false;
 
     const loadThumbnail = async () => {
       try {
-        const response = await fetch(thumbnailUrl, {
+        // Ensure workspaceId is in URL as query param for API compatibility
+        const urlWithWorkspace = thumbnailUrl.includes('workspaceId=') 
+          ? thumbnailUrl 
+          : `${thumbnailUrl}${thumbnailUrl.includes('?') ? '&' : '?'}workspaceId=${currentWorkspace.id}`;
+        
+        const response = await fetch(urlWithWorkspace, {
           credentials: 'include', // Include cookies for authentication
+          headers: {
+            'X-Workspace-Id': currentWorkspace.id,
+          },
         });
 
         if (!response.ok) {
@@ -435,7 +459,7 @@ function FileThumbnail({
         URL.revokeObjectURL(thumbnailBlobUrl);
       }
     };
-  }, [thumbnailUrl, thumbnailBlobUrl]);
+  }, [thumbnailUrl, thumbnailBlobUrl, currentWorkspace]);
 
   return (
     <div

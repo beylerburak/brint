@@ -1739,6 +1739,8 @@ export const apiClient = {
       status?: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED';
       tags?: string[];
       mediaIds?: string[];
+      mediaLookupId?: string | null;
+      useMediaLookupOnPublish?: boolean;
     }
   ): Promise<{
     success: true;
@@ -1767,6 +1769,7 @@ export const apiClient = {
       status?: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED';
       tags?: string[];
       mediaIds?: string[];
+      useMediaLookupOnPublish?: boolean;
     }
   ): Promise<{
     success: true;

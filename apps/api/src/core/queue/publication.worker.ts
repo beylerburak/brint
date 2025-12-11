@@ -132,6 +132,27 @@ createWorker(
   }
 
   try {
+    // Media should already be resolved at content level before publication creation
+    // If content has useMediaLookupOnPublish enabled but no media, this is an error condition
+    // that should have been caught upstream. However, we still validate here as a safety check.
+    if (publication.content.useMediaLookupOnPublish && 
+        publication.content.mediaLookupId && 
+        (!publication.content.contentMedia || publication.content.contentMedia.length === 0)) {
+      logger.error(
+        { 
+          publicationId: publication.id,
+          contentId: publication.contentId,
+          mediaLookupId: publication.content.mediaLookupId
+        },
+        "[PUBLICATION_WORKER] Content has useMediaLookupOnPublish enabled but no media found. This should have been resolved upstream."
+      );
+      
+      // Fail the publication - media should have been resolved before publication creation
+      throw new Error(
+        `Content has media lookup enabled but no media was found. Media lookup ID: ${publication.content.mediaLookupId || 'unknown'}. Media should have been resolved before publication creation.`
+      );
+    }
+
     // Ensure access token is valid and refresh if needed (for Facebook)
     if (publication.platform === "FACEBOOK") {
       try {
@@ -239,33 +260,35 @@ createWorker(
         await deleteCachePattern(`contents:workspace:${content.workspaceId}:brand:${brand.slug}`);
         
         // Broadcast publication success and content status update
-        broadcastPublicationEvent(
-          content.workspaceId,
-          {
-            type: 'publication.status.changed',
-            data: {
-              id: publication.id,
-              contentId: publication.contentId,
-              status: PublicationStatus.SUCCESS,
-              platform: publication.platform,
-              platformPostId: result.platformPostId,
+        if (content.workspaceId && content.brandId) {
+          broadcastPublicationEvent(
+            content.workspaceId,
+            {
+              type: 'publication.status.changed',
+              data: {
+                id: publication.id,
+                contentId: publication.contentId,
+                status: PublicationStatus.SUCCESS,
+                platform: publication.platform,
+                platformPostId: result.platformPostId,
+              },
             },
-          },
-          content.brandId
-        );
+            content.brandId
+          );
 
-        broadcastPublicationEvent(
-          content.workspaceId,
-          {
-            type: 'content.status.changed',
-            data: {
-              id: content.id,
-              status: content.status,
-              publications: content.publications,
+          broadcastPublicationEvent(
+            content.workspaceId,
+            {
+              type: 'content.status.changed',
+              data: {
+                id: content.id,
+                status: content.status,
+                publications: content.publications,
+              },
             },
-          },
-          content.brandId
-        );
+            content.brandId
+          );
+        }
       }
     }
 

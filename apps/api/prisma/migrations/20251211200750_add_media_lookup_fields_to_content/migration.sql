@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "mediaLookupId" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "useMediaLookupOnPublish" BOOLEAN NOT NULL DEFAULT false;

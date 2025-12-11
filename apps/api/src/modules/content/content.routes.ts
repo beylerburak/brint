@@ -14,6 +14,8 @@ import { getCache, setCache, deleteCachePattern } from '../../lib/redis.js';
 import { broadcastPublicationEvent } from '../publication/publication-websocket.routes.js';
 import { deleteMedia } from '../media/media-delete.service.js';
 import { logger } from '../../lib/logger.js';
+import { generateMediaLookupId, getBrandHandleForMediaLookup } from './media-lookup.util.js';
+import { ContentMediaLookupService } from './services/content-media-lookup.service.js';
 
 export async function registerContentRoutes(app: FastifyInstance): Promise<void> {
   const publicationService = new PublicationService();
@@ -55,6 +57,15 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
             items: { type: 'string' },
             description: 'Array of media IDs to attach to content',
           },
+          mediaLookupId: {
+            type: ['string', 'null'],
+            description: 'Media lookup ID for Drive search (auto-generated if not provided)',
+          },
+          useMediaLookupOnPublish: {
+            type: 'boolean',
+            description: 'If true, lookup media from Drive on publish using mediaLookupId',
+            default: false,
+          },
         },
         required: ['formFactor', 'accountIds'],
       },
@@ -80,6 +91,8 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       status?: string;
       tags?: string[];
       mediaIds?: string[];
+      mediaLookupId?: string | null;
+      useMediaLookupOnPublish?: boolean;
     };
 
     try {
@@ -108,6 +121,18 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
         ? (body.status as any)
         : (isScheduledForFuture ? ContentStatus.SCHEDULED : ContentStatus.DRAFT);
 
+      // Generate media lookup ID if not provided
+      let mediaLookupId = body.mediaLookupId || null;
+      if (!mediaLookupId) {
+        const dateForLookup = scheduledAtDate || new Date();
+        const brandHandle = await getBrandHandleForMediaLookup(brand.id, prisma);
+        mediaLookupId = generateMediaLookupId({
+          date: dateForLookup,
+          brandHandle,
+          title: body.title || 'Untitled',
+        });
+      }
+
       // Create content
       const content = await prisma.content.create({
         data: {
@@ -119,6 +144,8 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
           platformCaptions: body.platformCaptions || undefined,
           scheduledAt: scheduledAtDate,
           status: initialStatus,
+          mediaLookupId,
+          useMediaLookupOnPublish: body.useMediaLookupOnPublish ?? false,
           // Create content accounts
           contentAccounts: {
             create: body.accountIds.map(accountId => ({
@@ -150,6 +177,44 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       if (body.tags && body.tags.length > 0) {
         const tagEntities = await upsertTagsForWorkspace(workspaceId, body.tags);
         await setTagsForContent(workspaceId, content.id, tagEntities);
+      }
+
+      // Resolve media from Google Drive if needed (before creating publications)
+      if (content.scheduledAt) {
+        const mediaLookupService = new ContentMediaLookupService();
+        try {
+          await mediaLookupService.resolveMediaForContentIfNeeded(content.id);
+          
+          // Reload content to get imported media
+          const contentWithMedia = await prisma.content.findUnique({
+            where: { id: content.id },
+            include: {
+              contentMedia: {
+                include: { media: true },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          });
+          if (contentWithMedia) {
+            (content as any).contentMedia = contentWithMedia.contentMedia;
+          }
+        } catch (mediaLookupError: any) {
+          logger.error(
+            { 
+              contentId: content.id,
+              error: mediaLookupError.message 
+            },
+            "Failed to resolve media from Google Drive"
+          );
+          // Don't create publications if media lookup failed
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'MEDIA_LOOKUP_FAILED',
+              message: mediaLookupError.message || 'Failed to find or import media from Google Drive',
+            },
+          });
+        }
       }
 
       // Sync publications if content has scheduledAt (creates publication records)
@@ -197,6 +262,9 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
             slug: t.slug,
             color: t.color,
           })),
+          // Include media lookup fields in response
+          mediaLookupId: content.mediaLookupId || null,
+          useMediaLookupOnPublish: content.useMediaLookupOnPublish ?? false,
         },
       });
     } catch (error: any) {
@@ -245,6 +313,14 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
             items: { type: 'string' },
             description: 'Array of media IDs to attach to content',
           },
+          mediaLookupId: {
+            type: ['string', 'null'],
+            description: 'Media lookup ID for Drive search (not updated if not provided)',
+          },
+          useMediaLookupOnPublish: {
+            type: 'boolean',
+            description: 'If true, lookup media from Drive on publish using mediaLookupId',
+          },
         },
       },
       response: {
@@ -267,6 +343,7 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       formFactor?: string;
       title?: string | null;
       baseCaption?: string | null;
+      useMediaLookupOnPublish?: boolean;
       platformCaptions?: Record<string, string> | null;
       accountIds?: string[];
       scheduledAt?: string | null;
@@ -322,6 +399,7 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
       if (body.platformCaptions !== undefined) updateData.platformCaptions = body.platformCaptions;
       if (body.scheduledAt !== undefined) updateData.scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
       if (body.status !== undefined) updateData.status = body.status;
+      if (body.useMediaLookupOnPublish !== undefined) updateData.useMediaLookupOnPublish = body.useMediaLookupOnPublish;
 
       const content = await prisma.content.update({
         where: { id: contentId },
@@ -445,12 +523,50 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
         await setTagsForContent(workspaceId, content.id, tagEntities);
       }
 
-      // Sync publications if content status changed to scheduled/published or scheduledAt was set
+      // Resolve media from Google Drive if needed (before creating publications)
       const wasScheduled = existingContent.scheduledAt;
       const isNowScheduled = content.scheduledAt;
       const statusChangedToScheduled = body.status === 'SCHEDULED' || body.status === 'PUBLISHED';
       const scheduledAtChanged = wasScheduled?.getTime() !== isNowScheduled?.getTime();
 
+      if ((statusChangedToScheduled || (!wasScheduled && isNowScheduled) || scheduledAtChanged) && content.scheduledAt) {
+        const mediaLookupService = new ContentMediaLookupService();
+        try {
+          await mediaLookupService.resolveMediaForContentIfNeeded(contentId);
+          
+          // Reload content to get imported media
+          const contentWithMedia = await prisma.content.findUnique({
+            where: { id: contentId },
+            include: {
+              contentMedia: {
+                include: { media: true },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          });
+          if (contentWithMedia) {
+            (content as any).contentMedia = contentWithMedia.contentMedia;
+          }
+        } catch (mediaLookupError: any) {
+          logger.error(
+            { 
+              contentId: contentId,
+              error: mediaLookupError.message 
+            },
+            "Failed to resolve media from Google Drive"
+          );
+          // Don't create publications if media lookup failed
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'MEDIA_LOOKUP_FAILED',
+              message: mediaLookupError.message || 'Failed to find or import media from Google Drive',
+            },
+          });
+        }
+      }
+
+      // Sync publications if content status changed to scheduled/published or scheduledAt was set
       if ((statusChangedToScheduled || (!wasScheduled && isNowScheduled) || scheduledAtChanged) && content.scheduledAt) {
         await publicationService.syncPublicationsForContent(content.id);
         
@@ -571,6 +687,9 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
             slug: t.slug,
             color: t.color,
           })),
+          // Include media lookup fields in response
+          mediaLookupId: (contentWithMedia as any).mediaLookupId || null,
+          useMediaLookupOnPublish: (contentWithMedia as any).useMediaLookupOnPublish ?? false,
         },
       });
     } catch (error: any) {
@@ -852,7 +971,12 @@ export async function registerContentRoutes(app: FastifyInstance): Promise<void>
 
       return reply.status(200).send({
         success: true,
-        content: contentWithMediaUrls,
+        content: {
+          ...contentWithMediaUrls,
+          // Include media lookup fields in response
+          mediaLookupId: content.mediaLookupId || null,
+          useMediaLookupOnPublish: content.useMediaLookupOnPublish ?? false,
+        },
       });
     } catch (error: any) {
       request.log.error(error, 'Error getting content');

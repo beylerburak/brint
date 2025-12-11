@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { apiClient } from "@/lib/api-client"
@@ -20,7 +20,7 @@ import {
   getCaptionLimitFor, 
   requiresMedia 
 } from "@brint/shared-config/platform-rules"
-import { GoogleDrivePickerDialog } from "./google-drive-picker-dialog"
+import { GoogleDrivePickerDialog } from "../google-drive-picker-dialog"
 import {
   DndContext,
   closestCenter,
@@ -35,23 +35,23 @@ import {
 } from "@dnd-kit/sortable"
 
 // Hooks
-import { useContentFormState } from "./content-creation/hooks/use-content-form-state"
-import { useMediaManager } from "./content-creation/hooks/use-media-manager"
-import { usePublishOptions } from "./content-creation/hooks/use-publish-options"
-import { useTagSuggestions } from "./content-creation/hooks/use-tag-suggestions"
+import { useContentFormState } from "./hooks/use-content-form-state"
+import { useMediaManager } from "./hooks/use-media-manager"
+import { usePublishOptions } from "./hooks/use-publish-options"
+import { useTagSuggestions } from "./hooks/use-tag-suggestions"
 
 // Components
-import { ContentModalHeader } from "./content-creation/components/content-modal-header"
-import { ContentFormFactorSelector } from "./content-creation/components/content-form-factor-selector"
-import { ContentAccountSelector } from "./content-creation/components/content-account-selector"
-import { ContentCaptionAndMedia } from "./content-creation/components/content-caption-and-media"
-import { ContentTagsField } from "./content-creation/components/content-tags-field"
-import { ContentPreviewPanel } from "./content-creation/components/content-preview-panel"
-import { ContentFooterActions } from "./content-creation/components/content-footer-actions"
-import { ContentDeleteDialog } from "./content-creation/components/content-delete-dialog"
+import { ContentModalHeader } from "./components/content-modal-header"
+import { ContentFormFactorSelector } from "./components/content-form-factor-selector"
+import { ContentAccountSelector } from "./components/content-account-selector"
+import { ContentCaptionAndMedia } from "./components/content-caption-and-media"
+import { ContentTagsField } from "./components/content-tags-field"
+import { ContentPreviewPanel } from "./components/content-preview-panel"
+import { ContentFooterActions } from "./components/content-footer-actions"
+import { ContentDeleteDialog } from "./components/content-delete-dialog"
 
 // Types
-import type { ContentMediaItem, SocialAccount, ContentStatusType } from "./content-creation/content-creation.types"
+import type { ContentMediaItem, SocialAccount, ContentStatusType } from "./content-creation.types"
 
 export interface ContentCreationModalProps {
   open: boolean
@@ -89,9 +89,6 @@ export function ContentCreationModal({
   
   // Social accounts
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
-  
-  // Store random number for media lookup ID (generated once per modal open)
-  const mediaLookupRandomRef = useRef<number | null>(null)
 
   // Load content callback for useContentFormState
   const loadContent = useCallback(async (contentId: string) => {
@@ -132,8 +129,6 @@ export function ContentCreationModal({
       accountIds: content.contentAccounts?.map((ca: any) => ca.socialAccountId) || [],
       scheduledAt: content.scheduledAt,
       media,
-      mediaLookupId: content.mediaLookupId || null,
-      useMediaLookupOnPublish: content.useMediaLookupOnPublish ?? false,
     }
   }, [currentWorkspace, brandSlug])
 
@@ -236,41 +231,6 @@ export function ContentCreationModal({
     loadAccounts()
   }, [currentWorkspace, brandSlug, open])
 
-  // Generate or update media lookup ID for new content
-  // This ID is generated when modal opens, so user can use it to name their files in Drive
-  useEffect(() => {
-    if (open && !contentId && brandSlug && currentWorkspace) {
-      // Generate random number once when modal opens (for new content)
-      if (mediaLookupRandomRef.current === null) {
-        mediaLookupRandomRef.current = Math.floor(10000 + Math.random() * 90000) // 10000–99999
-      }
-
-      const generateMediaLookupId = (date: Date, brandHandle: string, title: string, random: number): string => {
-        const yyyy = date.getFullYear()
-        const mm = String(date.getMonth() + 1).padStart(2, "0")
-        const dd = String(date.getDate()).padStart(2, "0")
-        const safeTitle = (title || "Untitled").trim()
-        return `${yyyy}-${mm}-${dd} ${brandHandle} ${safeTitle} #${random}`
-      }
-
-      // Use scheduled date if set, otherwise current date
-      const dateForLookup = formState.selectedDate || new Date()
-      const brandHandle = `@${brandSlug}`
-      const title = formState.title || "Untitled"
-      const lookupId = generateMediaLookupId(dateForLookup, brandHandle, title, mediaLookupRandomRef.current)
-      
-      // Update ID when title or date changes (random number stays the same)
-      formState.setMediaLookupId(lookupId)
-    }
-  }, [open, contentId, brandSlug, currentWorkspace, formState.setMediaLookupId, formState.selectedDate, formState.title])
-
-  // Reset random ref when modal closes
-  useEffect(() => {
-    if (!open) {
-      mediaLookupRandomRef.current = null
-    }
-  }, [open])
-
   // Reset form when modal closes
   useEffect(() => {
     if (!open) {
@@ -279,23 +239,18 @@ export function ContentCreationModal({
       setShowDeleteDialog(false)
       setIsGoogleDrivePickerOpen(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]) // Only depend on 'open' to avoid infinite loops
+  }, [open, formState, mediaManager])
 
   // Track changes
   useEffect(() => {
-    if (formState.initialState) {
-      formState.trackChanges(
-        mediaManager.selectedMedia,
-        formState.formFactor,
-        formState.selectedAccountIds,
-        formState.title,
-        formState.caption,
-        formState.tags
-      )
-    }
-    // trackChanges is stable (only changes when initialState changes, which is expected)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    formState.trackChanges(
+      mediaManager.selectedMedia,
+      formState.formFactor,
+      formState.selectedAccountIds,
+      formState.title,
+      formState.caption,
+      formState.tags
+    )
   }, [
     mediaManager.selectedMedia,
     formState.formFactor,
@@ -303,7 +258,7 @@ export function ContentCreationModal({
     formState.title,
     formState.caption,
     formState.tags,
-    formState.initialState,
+    formState.trackChanges,
   ])
 
   // Handle form factor change - remove incompatible accounts and media
@@ -318,8 +273,6 @@ export function ContentCreationModal({
         return isFormFactorSupported(account.platform, factor)
       })
     )
-    
-    // Media cleanup is handled in useMediaManager hook via useEffect
   }, [formState, socialAccounts])
 
   // Check account compatibility
@@ -352,26 +305,18 @@ export function ContentCreationModal({
     return !isFormFactorSupported(account.platform, formState.formFactor)
   }, [formState.formFactor, socialAccounts, isFormFactorSupported])
 
-  // Select all compatible accounts (toggle behavior)
+  // Select all compatible accounts
   const handleSelectAll = useCallback(() => {
-    // Get compatible accounts
-    const compatibleAccounts = formState.formFactor
-      ? socialAccounts.filter(account => isFormFactorSupported(account.platform, formState.formFactor!))
-      : socialAccounts
-    
-    const compatibleAccountIds = compatibleAccounts.map(account => account.id)
-    
-    // Check if all compatible accounts are already selected
-    const allCompatibleSelected = compatibleAccountIds.length > 0 && 
-      compatibleAccountIds.every(id => formState.selectedAccountIds.includes(id))
-    
-    if (allCompatibleSelected) {
-      // Clear all selections
-      formState.setSelectedAccountIds([])
-    } else {
-      // Select all compatible accounts
-      formState.setSelectedAccountIds(compatibleAccountIds)
+    if (!formState.formFactor) {
+      formState.setSelectedAccountIds(socialAccounts.map(acc => acc.id))
+      return
     }
+    
+    const compatibleAccountIds = socialAccounts
+      .filter(account => isFormFactorSupported(account.platform, formState.formFactor!))
+      .map(account => account.id)
+    
+    formState.setSelectedAccountIds(compatibleAccountIds)
   }, [formState, socialAccounts, isFormFactorSupported])
 
   // Calculate derived values
@@ -421,12 +366,8 @@ export function ContentCreationModal({
   }, [isCaptionRequired, hasCaption])
 
   const isMediaMissing = useMemo(() => {
-    // Media is missing only if:
-    // 1. Media is required for selected platforms
-    // 2. No local media is selected
-    // 3. Media lookup toggle is OFF
-    return isMediaRequired && !hasMedia && !formState.useMediaLookupOnPublish
-  }, [isMediaRequired, hasMedia, formState.useMediaLookupOnPublish])
+    return isMediaRequired && !hasMedia
+  }, [isMediaRequired, hasMedia])
 
   // Platform-specific media requirements
   const hasInstagram = useMemo(() => selectedPlatforms.includes('INSTAGRAM'), [selectedPlatforms])
@@ -456,68 +397,33 @@ export function ContentCreationModal({
       return t("publishButtonDisabledNoCaption")
     }
     if (isMediaMissing) {
-      // If media lookup is enabled, don't show media missing error
-      if (formState.useMediaLookupOnPublish) {
-        return ""
-      }
+      const platformsRequiringMedia: string[] = []
+      if (isMediaRequiredForInstagram) platformsRequiringMedia.push("Instagram")
+      if (isMediaRequiredForTikTok) platformsRequiringMedia.push("TikTok")
+      if (isMediaRequiredForFacebook) platformsRequiringMedia.push("Facebook")
       
-      const platformsRequiringMedia: Array<{ name: string; platform: SocialPlatform }> = []
-      
-      // Collect platforms requiring media with their platform type
       selectedPlatforms.forEach((platform) => {
-        if (formState.formFactor && requiresMedia(platform as SocialPlatform, formState.formFactor)) {
-          const platformName = platform === 'INSTAGRAM' ? 'Instagram' 
-            : platform === 'TIKTOK' ? 'TikTok'
-            : platform === 'FACEBOOK' ? 'Facebook'
-            : platform === 'X' ? 'X'
-            : platform === 'LINKEDIN' ? 'LinkedIn'
-            : platform
-          platformsRequiringMedia.push({ name: platformName, platform: platform as SocialPlatform })
+        if (platform !== 'INSTAGRAM' && platform !== 'TIKTOK' && platform !== 'FACEBOOK') {
+          if (formState.formFactor && requiresMedia(platform as SocialPlatform, formState.formFactor)) {
+            platformsRequiringMedia.push(platform)
+          }
         }
       })
 
-      if (platformsRequiringMedia.length === 0) {
-        return t("publishButtonDisabledNoMediaOrToggle") || "Media is required. Upload media or enable 'Medya yüklemeden paylaş' option."
-      }
-
-      // Form factor-specific messages
-      const formFactorKey = formState.formFactor === 'VERTICAL_VIDEO' ? 'Vertical' 
-        : formState.formFactor === 'STORY' ? 'Story'
-        : formState.formFactor === 'FEED_POST' ? 'Feed'
-        : 'Generic'
-
-      if (platformsRequiringMedia.length === 1) {
-        const { name, platform } = platformsRequiringMedia[0]
-        
-        // Use existing translation keys - they work for all form factors
-        // The existing keys say "feed posts" but they're generic enough
-        if (platform === 'INSTAGRAM') {
-          return t("publishButtonDisabledNoMediaInstagram")
-        } else if (platform === 'TIKTOK') {
-          return t("publishButtonDisabledNoMediaTikTok")
-        }
-        
-        // Fallback to generic message for other platforms
-        const contentType = formState.formFactor === 'VERTICAL_VIDEO' ? 'videos' 
-          : formState.formFactor === 'STORY' ? 'stories'
-          : 'posts'
-        return `Media is required for ${name} ${contentType}`
-      } else {
-        // Multiple platforms
-        const platformNames = platformsRequiringMedia.map(p => p.name)
-        
-        if (platformsRequiringMedia.some(p => p.platform === 'INSTAGRAM') && 
-            platformsRequiringMedia.some(p => p.platform === 'TIKTOK')) {
-          // Use existing key for Instagram + TikTok
+      if (platformsRequiringMedia.length > 1) {
+        if (platformsRequiringMedia.includes("Instagram") && platformsRequiringMedia.includes("TikTok")) {
           return t("publishButtonDisabledNoMediaInstagramTikTok")
         }
-        
-        // Generic multi-platform message
-        const contentType = formState.formFactor === 'VERTICAL_VIDEO' ? 'videos' 
-          : formState.formFactor === 'STORY' ? 'stories'
-          : 'posts'
-        return t("publishButtonDisabledNoMediaOrToggle") || `Media is required for ${platformNames.join(" and ")} ${contentType}. Upload media or enable 'Medya yüklemeden paylaş' option.`
+        return `Media is required for ${platformsRequiringMedia.join(" and ")}`
+      } else if (platformsRequiringMedia.length === 1) {
+        if (platformsRequiringMedia[0] === "Instagram") {
+          return t("publishButtonDisabledNoMediaInstagram")
+        } else if (platformsRequiringMedia[0] === "TikTok") {
+          return t("publishButtonDisabledNoMediaTikTok")
+        }
+        return `Media is required for ${platformsRequiringMedia[0]}`
       }
+      return "Media is required"
     }
     return ""
   }, [
@@ -526,7 +432,9 @@ export function ContentCreationModal({
     isBaseCaptionExceeded,
     isCaptionMissing,
     isMediaMissing,
-    formState.useMediaLookupOnPublish,
+    isMediaRequiredForInstagram,
+    isMediaRequiredForTikTok,
+    isMediaRequiredForFacebook,
     selectedPlatforms,
     t,
   ])
@@ -579,39 +487,36 @@ export function ContentCreationModal({
       }
 
       if (contentId) {
-                        await apiClient.updateContent(
-                          currentWorkspace.id,
-                          brandSlug,
-                          contentId,
-                          {
-                            formFactor: formState.formFactor,
-                            title: formState.title || null,
-                            baseCaption: formState.caption || null,
-                            accountIds: formState.selectedAccountIds,
-                            scheduledAt: null,
-                            status: 'DRAFT',
-                            tags: formState.tags.length > 0 ? formState.tags : undefined,
-                            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
-                            useMediaLookupOnPublish: formState.useMediaLookupOnPublish,
-                          }
-                        )
+        await apiClient.updateContent(
+          currentWorkspace.id,
+          brandSlug,
+          contentId,
+          {
+            formFactor: formState.formFactor,
+            title: formState.title || null,
+            baseCaption: formState.caption || null,
+            accountIds: formState.selectedAccountIds,
+            scheduledAt: null,
+            status: 'DRAFT',
+            tags: formState.tags.length > 0 ? formState.tags : undefined,
+            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+          }
+        )
       } else {
-                    await apiClient.createContent(
-                      currentWorkspace.id,
-                      brandSlug,
-                      {
-                        formFactor: formState.formFactor,
-                        title: formState.title || null,
-                        baseCaption: formState.caption || null,
-                        accountIds: formState.selectedAccountIds,
-                        scheduledAt: null,
-                        status: 'DRAFT',
-                        tags: formState.tags.length > 0 ? formState.tags : undefined,
-                        mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
-                        mediaLookupId: formState.mediaLookupId || null,
-                        useMediaLookupOnPublish: formState.useMediaLookupOnPublish,
-                      }
-                    )
+        await apiClient.createContent(
+          currentWorkspace.id,
+          brandSlug,
+          {
+            formFactor: formState.formFactor,
+            title: formState.title || null,
+            baseCaption: formState.caption || null,
+            accountIds: formState.selectedAccountIds,
+            scheduledAt: null,
+            status: 'DRAFT',
+            tags: formState.tags.length > 0 ? formState.tags : undefined,
+            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+          }
+        )
       }
 
       mediaManager.selectedMedia.forEach(media => {
@@ -683,40 +588,37 @@ export function ContentCreationModal({
       }
 
       if (contentId) {
-                        await apiClient.updateContent(
-                          currentWorkspace.id,
-                          brandSlug,
-                          contentId,
-                          {
-                            formFactor: formState.formFactor,
-                            title: formState.title || null,
-                            baseCaption: formState.caption || null,
-                            accountIds: formState.selectedAccountIds,
-                            scheduledAt: finalScheduledAt,
-                            status: finalStatus,
-                            tags: formState.tags.length > 0 ? formState.tags : undefined,
-                            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
-                            useMediaLookupOnPublish: formState.useMediaLookupOnPublish,
-                          }
-                        )
+        await apiClient.updateContent(
+          currentWorkspace.id,
+          brandSlug,
+          contentId,
+          {
+            formFactor: formState.formFactor,
+            title: formState.title || null,
+            baseCaption: formState.caption || null,
+            accountIds: formState.selectedAccountIds,
+            scheduledAt: finalScheduledAt,
+            status: finalStatus,
+            tags: formState.tags.length > 0 ? formState.tags : undefined,
+            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+          }
+        )
         toast.success(t("updateSuccess") || "Content updated successfully")
       } else {
-                        await apiClient.createContent(
-                          currentWorkspace.id,
-                          brandSlug,
-                          {
-                            formFactor: formState.formFactor,
-                            title: formState.title || null,
-                            baseCaption: formState.caption || null,
-                            accountIds: formState.selectedAccountIds,
-                            scheduledAt: finalScheduledAt,
-                            status: finalStatus,
-                            tags: formState.tags.length > 0 ? formState.tags : undefined,
-                            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
-                            mediaLookupId: formState.mediaLookupId || null,
-                            useMediaLookupOnPublish: formState.useMediaLookupOnPublish,
-                          }
-                        )
+        await apiClient.createContent(
+          currentWorkspace.id,
+          brandSlug,
+          {
+            formFactor: formState.formFactor,
+            title: formState.title || null,
+            baseCaption: formState.caption || null,
+            accountIds: formState.selectedAccountIds,
+            scheduledAt: finalScheduledAt,
+            status: finalStatus,
+            tags: formState.tags.length > 0 ? formState.tags : undefined,
+            mediaIds: uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined,
+          }
+        )
         toast.success(t("createSuccess") || "Content created successfully")
       }
 
@@ -862,9 +764,6 @@ export function ContentCreationModal({
                 isGoogleDriveAvailable={isGoogleDriveAvailable}
                 isCheckingGoogleDrive={isCheckingGoogleDrive}
                 onOpenDrivePicker={() => setIsGoogleDrivePickerOpen(true)}
-                useMediaLookupOnPublish={formState.useMediaLookupOnPublish}
-                onUseMediaLookupChange={formState.setUseMediaLookupOnPublish}
-                mediaLookupId={formState.mediaLookupId}
               />
 
               <div className="space-y-2">

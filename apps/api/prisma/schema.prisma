@@ -844,6 +844,10 @@ model Content {
   // Tags / campaigns
   tags String[] // JSON array of tag strings
 
+  // Media lookup
+  mediaLookupId           String?  @db.VarChar(255) // Generated ID for Drive media lookup
+  useMediaLookupOnPublish Boolean   @default(false) // If true, lookup media from Drive on publish
+
   // Soft delete
   deletedAt DateTime?
 

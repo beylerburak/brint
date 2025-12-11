@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams, usePathname } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { IconSettings, IconUserCircle, IconBuilding } from "@tabler/icons-react"
+import { IconSettings, IconUserCircle, IconBuilding, IconPlug } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
 
 const settingsNavItems = [
@@ -21,6 +21,11 @@ const settingsNavItems = [
     titleKey: "workspace",
     href: "/settings/workspace",
     icon: IconBuilding,
+  },
+  {
+    titleKey: "integrations",
+    href: "/settings/integrations",
+    icon: IconPlug,
   },
 ]
 

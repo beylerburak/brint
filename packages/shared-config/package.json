@@ -25,6 +25,11 @@
             "types": "./dist/platform-rules.d.ts",
             "import": "./dist/platform-rules.mjs",
             "require": "./dist/platform-rules.js"
+        },
+        "./queue-rules": {
+            "types": "./dist/queue-rules.d.ts",
+            "import": "./dist/queue-rules.mjs",
+            "require": "./dist/queue-rules.js"
         }
     },
     "files": [
@@ -32,8 +37,8 @@
         "src"
     ],
     "scripts": {
-        "build": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts --format cjs,esm --dts",
-        "dev": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts --format cjs,esm --dts --watch",
+        "build": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts --format cjs,esm --dts",
+        "dev": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts --format cjs,esm --dts --watch",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {

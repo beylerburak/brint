@@ -6,7 +6,7 @@
  */
 
 // Size limits
-export const MAX_FILE_SIZE_MB = 200
+export const MAX_FILE_SIZE_MB = 400
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 export const MAX_AVATAR_SIZE_MB = 3

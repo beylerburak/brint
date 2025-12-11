@@ -1,7 +1,7 @@
 /**
- * Task WebSocket Routes
+ * Publication WebSocket Routes
  * 
- * WebSocket endpoints for real-time task updates
+ * WebSocket endpoints for real-time publication and content updates
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -14,7 +14,7 @@ function getConnectionKey(workspaceId: string, brandId?: string): string {
   return brandId ? `${workspaceId}:${brandId}` : workspaceId;
 }
 
-export function broadcastTaskEvent(
+export function broadcastPublicationEvent(
   workspaceId: string,
   event: { type: string; data: any },
   brandId?: string
@@ -22,9 +22,10 @@ export function broadcastTaskEvent(
   const key = getConnectionKey(workspaceId, brandId);
   const workspaceConnections = connections.get(key);
   
-  console.log(`[WebSocket] Broadcasting event: ${event.type} to ${key}`, {
+  console.log(`[Publication WebSocket] Broadcasting event: ${event.type} to ${key}`, {
     connections: workspaceConnections?.size || 0,
-    taskId: event.data?.id,
+    contentId: event.data?.contentId,
+    publicationId: event.data?.id,
   });
   
   if (workspaceConnections) {
@@ -36,23 +37,22 @@ export function broadcastTaskEvent(
           socket.send(message);
           sentCount++;
         } catch (error) {
-          console.error('[WebSocket] Failed to send message:', error);
+          console.error('[Publication WebSocket] Failed to send message:', error);
         }
       }
     });
-    console.log(`[WebSocket] Sent to ${sentCount}/${workspaceConnections.size} connections`);
+    console.log(`[Publication WebSocket] Sent to ${sentCount}/${workspaceConnections.size} connections`);
   } else {
-    console.log(`[WebSocket] No connections found for key: ${key}`);
+    console.log(`[Publication WebSocket] No connections found for key: ${key}`);
   }
 }
 
-export async function registerTaskWebSocketRoutes(app: FastifyInstance): Promise<void> {
+export async function registerPublicationWebSocketRoutes(app: FastifyInstance): Promise<void> {
   // WebSocket plugin is already registered in server.ts
-  // WebSocket endpoint for task updates
-  // Note: In @fastify/websocket v10.x, the handler receives the WebSocket directly (not connection.socket)
-  app.get('/ws/tasks', { websocket: true }, (socket, request) => {
+  // WebSocket endpoint for publication/content updates
+  app.get('/ws/publications', { websocket: true }, (socket, request) => {
     try {
-      // Get workspaceId from query params (WebSocket doesn't support headers the same way)
+      // Get workspaceId from query params
       const query = request.query as { workspaceId?: string; brandId?: string };
       let workspaceId: string | undefined;
       
@@ -63,7 +63,7 @@ export async function registerTaskWebSocketRoutes(app: FastifyInstance): Promise
       }
       
       if (!workspaceId) {
-        console.error('[WebSocket] No workspaceId provided');
+        console.error('[Publication WebSocket] No workspaceId provided');
         socket.close(1008, 'Missing workspaceId');
         return;
       }
@@ -77,7 +77,7 @@ export async function registerTaskWebSocketRoutes(app: FastifyInstance): Promise
       }
       connections.get(key)!.add(socket);
 
-      console.log(`[WebSocket] Client connected: ${key} (total: ${connections.get(key)!.size})`);
+      console.log(`[Publication WebSocket] Client connected: ${key} (total: ${connections.get(key)!.size})`);
 
       // Handle connection close
       socket.on('close', () => {
@@ -87,13 +87,13 @@ export async function registerTaskWebSocketRoutes(app: FastifyInstance): Promise
           if (connSet.size === 0) {
             connections.delete(key);
           }
-          console.log(`[WebSocket] Client disconnected: ${key} (remaining: ${connSet.size})`);
+          console.log(`[Publication WebSocket] Client disconnected: ${key} (remaining: ${connSet.size})`);
         }
       });
 
       // Handle errors
       socket.on('error', (error) => {
-        console.error(`[WebSocket] Error for ${key}:`, error);
+        console.error(`[Publication WebSocket] Error for ${key}:`, error);
         const connSet = connections.get(key);
         if (connSet) {
           connSet.delete(socket);
@@ -109,7 +109,7 @@ export async function registerTaskWebSocketRoutes(app: FastifyInstance): Promise
         data: { workspaceId, brandId },
       }));
     } catch (error) {
-      console.error('[WebSocket] Connection error:', error);
+      console.error('[Publication WebSocket] Connection error:', error);
       try {
         socket.close(1011, 'Internal server error');
       } catch {}

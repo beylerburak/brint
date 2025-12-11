@@ -2,28 +2,24 @@
 
 import { useEffect, useRef, useCallback } from "react"
 
-export type WebSocketEvent = 
-  | { type: "task.created"; data: any }
-  | { type: "task.updated"; data: any }
-  | { type: "task.deleted"; data: { id: string } }
-  | { type: "task.status.changed"; data: { id: string; statusId: string } }
+export type PublicationWebSocketEvent = 
   | { type: "publication.status.changed"; data: { id: string; contentId: string; status: string; platform: string; platformPostId?: string; errorCode?: string; errorMessage?: string } }
   | { type: "content.status.changed"; data: { id: string; status: string; publications: Array<{ id: string; status: string; platform: string }> } }
   | { type: "connected"; data: { workspaceId: string; brandId?: string } }
 
-export interface UseWebSocketOptions {
+export interface UsePublicationWebSocketOptions {
   workspaceId: string
   brandId?: string
-  onEvent?: (event: WebSocketEvent) => void
+  onEvent?: (event: PublicationWebSocketEvent) => void
   enabled?: boolean
 }
 
-export function useWebSocket({ 
+export function usePublicationWebSocket({ 
   workspaceId, 
   brandId,
   onEvent,
   enabled = true 
-}: UseWebSocketOptions) {
+}: UsePublicationWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
@@ -45,7 +41,7 @@ export function useWebSocket({
       ...(brandId && { brandId }),
     })
     // Note: WebSocket connections automatically include cookies from the same origin
-    const url = `${wsUrl}/ws/tasks?${params.toString()}`
+    const url = `${wsUrl}/ws/publications?${params.toString()}`
 
     try {
       const ws = new WebSocket(url)
@@ -58,7 +54,7 @@ export function useWebSocket({
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          onEvent?.(data as WebSocketEvent)
+          onEvent?.(data as PublicationWebSocketEvent)
         } catch (error) {
           // Silently ignore parse errors
         }

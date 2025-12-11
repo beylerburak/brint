@@ -107,6 +107,9 @@ export async function uploadMedia(input: UploadMediaInput): Promise<UploadMediaR
   );
 
   // Upload to S3
+  // Note: S3 metadata headers must contain only ASCII characters
+  // originalFilename may contain non-ASCII characters (e.g., Turkish chars),
+  // so we don't include it in metadata. It's stored in the database instead.
   await uploadToS3({
     key: baseKey,
     body: input.file.buffer,
@@ -114,7 +117,8 @@ export async function uploadMedia(input: UploadMediaInput): Promise<UploadMediaR
     metadata: {
       workspaceId: input.workspaceId,
       mediaId,
-      originalFilename: input.file.originalname,
+      // originalFilename removed from metadata to avoid "Invalid character in header" error
+      // when filename contains non-ASCII characters (e.g., Turkish: ş, ğ, ü, ö, ç, ı, İ)
     },
   });
 

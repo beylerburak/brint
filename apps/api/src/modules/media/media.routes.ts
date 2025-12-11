@@ -10,6 +10,7 @@ import { uploadMedia } from './media-upload.service.js';
 import { deleteMedia } from './media-delete.service.js';
 import { prisma } from '../../lib/prisma.js';
 import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
+import { APP_CONFIG } from '../../config/app-config.js';
 
 export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
   // POST /workspaces/:workspaceId/media - Upload media
@@ -39,8 +40,31 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      request.log.info({
+        filename: data.filename,
+        mimetype: data.mimetype,
+        encoding: data.encoding,
+        fieldname: data.fieldname,
+      }, 'Received file upload request');
+
       // Convert stream to buffer
-      const buffer = await data.toBuffer();
+      // For large files (> 50MB), this may take time but should work with proper limits
+      let buffer: Buffer;
+      try {
+        buffer = await data.toBuffer();
+        request.log.info({
+          filename: data.filename,
+          sizeBytes: buffer.length,
+          sizeMB: (buffer.length / (1024 * 1024)).toFixed(2),
+        }, 'File converted to buffer successfully');
+      } catch (bufferError: any) {
+        request.log.error({ 
+          error: bufferError,
+          filename: data.filename,
+          errorMessage: bufferError?.message,
+        }, 'Failed to convert file stream to buffer');
+        throw new Error(`Failed to read file: ${bufferError?.message || 'Unknown error'}`);
+      }
 
       // Extract metadata from fields
       const getFieldValue = (fieldName: string): string | undefined => {
@@ -78,13 +102,34 @@ export async function registerMediaRoutes(app: FastifyInstance): Promise<void> {
         success: true,
         media: result,
       });
-    } catch (error) {
-      request.log.error({ error, workspaceId }, 'Media upload failed');
-      return reply.status(500).send({
+    } catch (error: any) {
+      request.log.error({ 
+        error, 
+        workspaceId,
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStack: error?.stack,
+      }, 'Media upload failed');
+      
+      // Provide more detailed error message
+      let errorMessage = 'Failed to upload media';
+      let statusCode = 500;
+      
+      if (error?.code === 'FST_ERR_REQ_FILE_TOO_LARGE' || error?.message?.includes('File too large')) {
+        errorMessage = `File size exceeds the maximum limit of ${APP_CONFIG.media.upload.maxFileSizeMB}MB`;
+        statusCode = 413; // Payload Too Large
+      } else if (error?.code === 'LIMIT_FILE_SIZE') {
+        errorMessage = `File size exceeds the maximum limit of ${APP_CONFIG.media.upload.maxFileSizeMB}MB`;
+        statusCode = 413;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      return reply.status(statusCode).send({
         success: false,
         error: {
-          code: 'UPLOAD_FAILED',
-          message: 'Failed to upload media',
+          code: error?.code || 'UPLOAD_FAILED',
+          message: errorMessage,
         },
       });
     }

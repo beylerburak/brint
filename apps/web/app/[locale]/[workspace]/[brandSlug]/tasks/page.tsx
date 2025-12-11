@@ -825,8 +825,9 @@ export default function BrandTasksPage() {
           onOpenChange={(open) => {
             setIsTaskModalOpen(open)
             if (!open) {
-              // Reset create mode when modal closes
+              // Reset create mode and selected task when modal closes
               setIsCreateMode(false)
+              setSelectedTask(null)
             }
           }}
           workspaceId={currentWorkspace.id}

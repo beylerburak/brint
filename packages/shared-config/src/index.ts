@@ -8,3 +8,4 @@
 export * from './upload'
 export * from './plans'
 export * from './platform-rules'
+export * from './queue-rules'

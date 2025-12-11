@@ -350,10 +350,47 @@ export function useTaskDetail({
         }
     }, [open, task?.id, workspaceId])
 
-    // Update states when task changes - only update changed properties
+    // Reset all states when modal closes or task becomes null (unless in create mode)
     useEffect(() => {
-        if (!task) {
-            prevTaskRef.current = null
+        if (!open || (!task && !isCreateMode)) {
+            // Reset all states when modal closes or task is null (and not creating)
+            if (!open) {
+                // Modal closed - reset everything
+                setEditedTitle("")
+                setEditedDescription("")
+                setCurrentStatus("Not Started")
+                setCurrentPriority("Medium")
+                setCurrentDueDate(null)
+                setCurrentAssigneeId(null)
+                setCurrentAssigneeName(null)
+                setChecklistItems([])
+                setAttachments([])
+                setAttachmentDetails(new Map())
+                setComments([])
+                setActivities([])
+                setIsEditingTitle(false)
+                setIsEditingDescription(false)
+                setIsDescriptionExpanded(false)
+                setCreatedTaskId(null)
+                prevTaskRef.current = null
+                prevTitleRef.current = ""
+                prevDescriptionRef.current = ""
+                prevStatusRef.current = "Not Started"
+                prevPriorityRef.current = "Medium"
+                prevDueDateRef.current = null
+                prevAssigneeIdRef.current = null
+                taskFetchedForRef.current = null
+            } else if (!task && !isCreateMode) {
+                // Task is null but modal is open and not in create mode - reset
+                setEditedTitle("")
+                setEditedDescription("")
+                setCurrentStatus("Not Started")
+                setCurrentPriority("Medium")
+                setCurrentDueDate(null)
+                setCurrentAssigneeId(null)
+                setCurrentAssigneeName(null)
+                prevTaskRef.current = null
+            }
             return
         }
 

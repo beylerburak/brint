@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,9 +19,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { IconX, IconDots, IconPhoto, IconVideo, IconFileUpload, IconCalendar, IconHash, IconMoodSmile, IconSparkles, IconChevronDown, IconGripVertical, IconSend, IconStar, IconCheck, IconClock, IconPin, IconLock } from "@tabler/icons-react"
+import { IconX, IconDots, IconPhoto, IconVideo, IconFileUpload, IconCalendar, IconHash, IconMoodSmile, IconSparkles, IconChevronDown, IconGripVertical, IconSend, IconStar, IconCheck, IconClock, IconPin, IconLock, IconTrash, IconBrandGoogleDrive } from "@tabler/icons-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-import { PLATFORM_RULES, type ContentFormFactor, type SocialPlatform, getCaptionLimitFor } from "@brint/shared-config/platform-rules"
+import { PLATFORM_RULES, type ContentFormFactor, type SocialPlatform, getCaptionLimitFor, requiresMedia } from "@brint/shared-config/platform-rules"
+import { GoogleDrivePickerDialog } from "./google-drive-picker-dialog"
 import { SocialPlatformIcon, getPlatformColor } from "@/components/social-platform-icon"
 import * as TagsInput from "@diceui/tags-input"
 import { useDropzone } from "react-dropzone"
@@ -28,6 +40,7 @@ import {
   ALLOWED_IMAGE_TYPES, 
   ALLOWED_VIDEO_TYPES, 
   MAX_FILE_SIZE_BYTES,
+  MAX_FILE_SIZE_MB,
   isFileSizeValid,
   isAllowedFileType,
   getFileTypeCategory
@@ -102,6 +115,13 @@ export function ContentCreationModal({
   // Loading states
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Content status (for delete confirmation)
+  const [contentStatus, setContentStatus] = useState<'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED' | null>(null)
+  
+  // Delete confirmation state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   
   // Media state - stored as blobs until submit
   const [selectedMedia, setSelectedMedia] = useState<Array<{
@@ -122,6 +142,11 @@ export function ContentCreationModal({
   }>>([])
   const [isLoadingTags, setIsLoadingTags] = useState(false)
   const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+
+  // Google Drive state
+  const [isGoogleDrivePickerOpen, setIsGoogleDrivePickerOpen] = useState(false)
+  const [isGoogleDriveAvailable, setIsGoogleDriveAvailable] = useState(false)
+  const [isCheckingGoogleDrive, setIsCheckingGoogleDrive] = useState(false)
   
   // Data
   const [socialAccounts, setSocialAccounts] = useState<Array<{
@@ -134,33 +159,107 @@ export function ContentCreationModal({
   }>>([])
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
   
-  // Load content for edit mode
+  // Suppress console warnings
+  useEffect(() => {
+    if (!open) return
+    
+    const originalWarn = console.warn
+    console.warn = (...args: any[]) => {
+      const message = args[0]?.toString() || ''
+      // Filter out react-dropzone warnings about invalid file extensions
+      if (message.includes('Skipped') && message.includes('because an invalid file extension was provided')) {
+        return // Suppress this warning
+      }
+      // Filter out Dialog Description warnings
+      if (message.includes('Missing `Description`') || message.includes('aria-describedby')) {
+        return // Suppress this warning
+      }
+      originalWarn.apply(console, args)
+    }
+    
+    return () => {
+      console.warn = originalWarn
+    }
+  }, [open])
+
+  // Check Google Drive availability
+  useEffect(() => {
+    const checkDrive = async () => {
+      if (!open || !currentWorkspace) {
+        setIsGoogleDriveAvailable(false)
+        return
+      }
+      setIsCheckingGoogleDrive(true)
+      try {
+        const res = await apiClient.getGoogleDriveStatus(currentWorkspace.id)
+        setIsGoogleDriveAvailable(res?.status?.connected === true)
+      } catch {
+        setIsGoogleDriveAvailable(false)
+      } finally {
+        setIsCheckingGoogleDrive(false)
+      }
+    }
+    void checkDrive()
+  }, [open, currentWorkspace])
+
+  // Load content for edit mode or reset form for new content
   useEffect(() => {
     const loadContent = async () => {
-      if (!currentWorkspace || !brandSlug || !open || !contentId) {
-        // Reset form when not in edit mode
-        if (!contentId && open) {
-          setFormFactor(null)
-          setSelectedAccountIds([])
-          setTitle("")
-          setCaption("")
-          setTags([])
-          setSelectedMedia([])
-          setScheduledAt("")
-          setPublishMode('now')
-          setSelectedDate(undefined)
-          setSelectedTime("")
-          // Reset change tracking
-          setHasChanges(false)
-          setInitialState({
-            formFactor: null,
-            selectedAccountIds: [],
-            title: "",
-            caption: "",
-            tags: [],
-            mediaIds: [],
+      if (!currentWorkspace || !brandSlug) {
+        return
+      }
+
+      // If modal is closed, don't do anything (reset is handled by the close effect)
+      if (!open) {
+        return
+      }
+
+      // If no contentId, reset form for new content creation
+      if (!contentId) {
+        // Clean up media blob URLs before resetting (use current state)
+        setSelectedMedia(prev => {
+          prev.forEach(media => {
+            if (media.file && media.preview) {
+              // Only revoke blob URLs, not S3/external URLs
+              try {
+                URL.revokeObjectURL(media.preview)
+              } catch (e) {
+                // Ignore errors when revoking URLs
+              }
+            }
           })
-        }
+          return []
+        })
+        
+        setFormFactor(null)
+        setSelectedAccountIds([])
+        setTitle("")
+        setCaption("")
+        setTags([])
+        setScheduledAt("")
+        setPublishMode('now')
+        setShowPublishOptions(false)
+        setShowDateTimePicker(false)
+        setSelectedDate(undefined)
+        setSelectedTime("")
+        setContentStatus(null)
+        setShowDeleteDialog(false)
+        setTagSearchQuery("")
+        setTagSuggestions([])
+        setShowTagSuggestions(false)
+        setIsDraft(true)
+        setCreateAnother(false)
+        setIsLoadingContent(false)
+        // Reset change tracking
+        setHasChanges(false)
+        setInitialState({
+          formFactor: null,
+          selectedAccountIds: [],
+          title: "",
+          caption: "",
+          tags: [],
+          mediaIds: [],
+        })
         return
       }
       
@@ -174,6 +273,7 @@ export function ContentCreationModal({
         setTitle(content.title || "")
         setCaption(content.baseCaption || "")
         setTags(content.tags?.map((t: any) => t.name) || [])
+        setContentStatus(content.status as 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'PARTIALLY_PUBLISHED' | 'FAILED' | 'ARCHIVED')
         
         // Set selected accounts
         if (content.contentAccounts) {
@@ -253,6 +353,8 @@ export function ContentCreationModal({
     if (!initialState) return
 
     const currentMediaIds = selectedMedia.map(m => m.mediaId).filter(Boolean)
+    const hasNewMediaFiles = selectedMedia.some(m => m.file && !m.mediaId) // New files that haven't been uploaded yet
+    const mediaCountChanged = selectedMedia.length !== initialState.mediaIds.length
 
     const hasAnyChange =
       formFactor !== initialState.formFactor ||
@@ -260,6 +362,8 @@ export function ContentCreationModal({
       title !== initialState.title ||
       caption !== initialState.caption ||
       JSON.stringify(tags.sort()) !== JSON.stringify(initialState.tags.sort()) ||
+      hasNewMediaFiles || // If there are new files to upload, there are changes
+      mediaCountChanged || // If media count changed, there are changes
       JSON.stringify(currentMediaIds.sort()) !== JSON.stringify(initialState.mediaIds.sort())
 
     setHasChanges(hasAnyChange)
@@ -349,9 +453,13 @@ export function ContentCreationModal({
       setTagSearchQuery("")
       setTagSuggestions([])
       setShowTagSuggestions(false)
+      setContentStatus(null)
+      setShowDeleteDialog(false)
       // Clean up media blob URLs
       selectedMedia.forEach(media => {
-        URL.revokeObjectURL(media.preview)
+        if (media.file && media.preview) {
+          try { URL.revokeObjectURL(media.preview) } catch {}
+        }
       })
       setSelectedMedia([])
       // Reset change tracking
@@ -364,7 +472,9 @@ export function ContentCreationModal({
   useEffect(() => {
     return () => {
       selectedMedia.forEach(media => {
-        URL.revokeObjectURL(media.preview)
+        if (media.file && media.preview) {
+          try { URL.revokeObjectURL(media.preview) } catch {}
+        }
       })
     }
   }, [])
@@ -391,23 +501,75 @@ export function ContentCreationModal({
   }
   
   // File dropzone configuration
+  const isVerticalVideo = formFactor === 'VERTICAL_VIDEO'
+  const maxFilesAllowed = isVerticalVideo ? 1 : 10
+  
+  // Map MIME types to file extensions for react-dropzone
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov']
+  
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      'image/*': ALLOWED_IMAGE_TYPES,
-      'video/*': ALLOWED_VIDEO_TYPES,
-    },
+    accept: isVerticalVideo
+      ? { 'video/*': videoExtensions } // Only videos for vertical video
+      : { 
+          'image/*': imageExtensions,
+          'video/*': videoExtensions,
+        },
     maxSize: MAX_FILE_SIZE_BYTES,
-    maxFiles: 10,
+    maxFiles: maxFilesAllowed,
     onDrop: (acceptedFiles, rejectedFiles) => {
       // Handle rejected files
       if (rejectedFiles.length > 0) {
-        console.warn('Some files were rejected:', rejectedFiles)
-        // TODO: Show error toast
+        // Show error toast for specific rejections
+        const hasFileTooLarge = rejectedFiles.some(r => r.errors.some(e => e.code === 'file-too-large'))
+        const hasFileTypeError = rejectedFiles.some(r => r.errors.some(e => e.code === 'file-invalid-type'))
+        
+        if (hasFileTooLarge) {
+          toast.error(t('content.fileTooLarge') || `File size exceeds the maximum limit of ${MAX_FILE_SIZE_MB}MB`)
+        }
+        if (hasFileTypeError && isVerticalVideo) {
+          toast.error(t('content.onlyVideosAllowed') || 'Only video files are allowed for vertical video')
+        }
       }
       
-      // Process accepted files
+      // For vertical video, only allow videos and replace existing media
+      if (isVerticalVideo) {
+        const videoFiles = acceptedFiles.filter(file => {
+          const category = getFileTypeCategory(file.type)
+          return category === 'video'
+        })
+        
+        if (videoFiles.length > 0) {
+          // Replace all existing media with the new video
+          selectedMedia.forEach(media => {
+            if (media.file && media.preview) {
+              try { URL.revokeObjectURL(media.preview) } catch {}
+            }
+          })
+          
+          const newVideo = videoFiles[0] // Take only the first video
+          const id = `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          const preview = URL.createObjectURL(newVideo)
+          
+          setSelectedMedia([{
+            id,
+            file: newVideo,
+            preview,
+            type: 'video',
+          }])
+          
+          if (videoFiles.length > 1) {
+            toast.warning(t('content.onlyOneVideoAllowed') || 'Only one video is allowed for vertical video. Using the first video.')
+          }
+        } else if (acceptedFiles.length > 0) {
+          toast.error(t('content.onlyVideosAllowed') || 'Only video files are allowed for vertical video')
+        }
+        return
+      }
+      
+      // For other form factors, process normally
       const newMedia = acceptedFiles
-        .slice(0, 10 - selectedMedia.length) // Only take what we can fit
+        .slice(0, maxFilesAllowed - selectedMedia.length) // Only take what we can fit
         .map(file => {
           const id = `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           const preview = URL.createObjectURL(file)
@@ -424,18 +586,37 @@ export function ContentCreationModal({
       
       setSelectedMedia(prev => [...prev, ...newMedia])
     },
-    disabled: selectedMedia.length >= 10,
+    disabled: selectedMedia.length >= maxFilesAllowed,
   })
   
   // Remove media
-  const handleRemoveMedia = (mediaId: string) => {
-    setSelectedMedia(prev => {
-      const media = prev.find(m => m.id === mediaId)
-      if (media) {
-        URL.revokeObjectURL(media.preview)
+  const handleRemoveMedia = async (mediaId: string) => {
+    const media = selectedMedia.find(m => m.id === mediaId)
+    
+    // If media has a mediaId (imported from Google Drive or existing media), delete from backend
+    if (media?.mediaId && currentWorkspace) {
+      try {
+        await apiClient.deleteMedia(currentWorkspace.id, media.mediaId)
+        toast.success(t("mediaDeleted") || "Media deleted successfully")
+      } catch (error: any) {
+        console.error('Failed to delete media:', error)
+        toast.error(t("mediaDeleteError") || "Failed to delete media", {
+          description: error.message || t("mediaDeleteErrorDescription") || "An error occurred"
+        })
+        // Continue with local removal even if backend deletion fails
       }
-      return prev.filter(m => m.id !== mediaId)
-    })
+    }
+    
+    // Clean up blob URLs for local files
+    if (media && media.file && media.preview) {
+      // Only revoke blob URLs, not S3/external URLs
+      try {
+        URL.revokeObjectURL(media.preview)
+      } catch {}
+    }
+    
+    // Remove from state
+    setSelectedMedia(prev => prev.filter(m => m.id !== mediaId))
   }
   
   // Handle tag input change
@@ -462,13 +643,36 @@ export function ContentCreationModal({
   }
   
   // Check account compatibility
+  // Helper to check if a platform supports a form factor
+  const isFormFactorSupported = (platform: SocialPlatform | undefined | null, factor: ContentFormFactor): boolean => {
+    if (!platform) return false
+    const rule = PLATFORM_RULES[platform]
+    if (!rule) return false
+    
+    const limits = rule.captionLimits
+    // Check if there's a specific limit for this form factor, or if DEFAULT exists
+    switch (factor) {
+      case "FEED_POST":
+        return limits.FEED_POST !== undefined || limits.DEFAULT !== undefined
+      case "STORY":
+        return limits.STORY !== undefined || limits.DEFAULT !== undefined
+      case "VERTICAL_VIDEO":
+        return limits.VERTICAL_VIDEO !== undefined || limits.DEFAULT !== undefined
+      case "BLOG_ARTICLE":
+        return limits.BLOG_ARTICLE !== undefined || limits.DEFAULT !== undefined
+      case "LONG_VIDEO":
+        return limits.LONG_VIDEO !== undefined || limits.DEFAULT !== undefined
+      default:
+        return limits.DEFAULT !== undefined
+    }
+  }
+
   const isAccountIncompatible = (accountId: string): boolean => {
     if (!formFactor) return false
     const account = socialAccounts.find((a) => a.id === accountId)
     if (!account) return false
     
-    const rule = PLATFORM_RULES[account.platform]
-    return !rule.supports[formFactor]
+    return !isFormFactorSupported(account.platform, formFactor)
   }
   
   const handleAccountToggle = (accountId: string) => {
@@ -481,13 +685,36 @@ export function ContentCreationModal({
   
   const handleFormFactorChange = (factor: ContentFormFactor) => {
     setFormFactor(factor)
+    
+    // If switching to vertical video, remove non-video media
+    if (factor === 'VERTICAL_VIDEO') {
+      setSelectedMedia(prev => {
+        const videoMedia = prev.filter(m => m.type === 'video')
+        // Clean up preview URLs for removed media
+        prev.forEach(media => {
+          if (media.type !== 'video' && media.file && media.preview) {
+            try { URL.revokeObjectURL(media.preview) } catch {}
+          }
+        })
+        // If multiple videos exist, keep only the first one
+        if (videoMedia.length > 1) {
+          videoMedia.slice(1).forEach(media => {
+            if (media.file && media.preview) {
+              try { URL.revokeObjectURL(media.preview) } catch {}
+            }
+          })
+          return [videoMedia[0]]
+        }
+        return videoMedia
+      })
+    }
+    
     // Remove incompatible accounts
     setSelectedAccountIds(prev => 
       prev.filter(accountId => {
         const account = socialAccounts.find(a => a.id === accountId)
         if (!account) return false
-        const rule = PLATFORM_RULES[account.platform]
-        return rule.supports[factor]
+        return isFormFactorSupported(account.platform, factor)
       })
     )
   }
@@ -502,13 +729,72 @@ export function ContentCreationModal({
     
     // Select only compatible accounts
     const compatibleAccountIds = socialAccounts
-      .filter(account => {
-        const rule = PLATFORM_RULES[account.platform]
-        return rule.supports[formFactor]
-      })
+      .filter(account => isFormFactorSupported(account.platform, formFactor))
       .map(account => account.id)
     
     setSelectedAccountIds(compatibleAccountIds)
+  }
+
+  // Handle content deletion
+  const handleDeleteContent = async () => {
+    if (!currentWorkspace || !brandSlug || !contentId) {
+      return
+    }
+
+    setIsDeleting(true)
+    setShowDeleteDialog(false)
+    
+    try {
+      await apiClient.deleteContent(currentWorkspace.id, brandSlug, contentId)
+      
+      toast.success(t("deleteDialog.deleteSuccess"))
+      
+      // Clean up media blob URLs
+      selectedMedia.forEach(media => {
+        if (media.file && media.preview) {
+          try { URL.revokeObjectURL(media.preview) } catch {}
+        }
+      })
+      
+      // Close modal
+      onOpenChange(false)
+    } catch (error: any) {
+      console.error('Failed to delete content:', error)
+      toast.error(t("deleteDialog.deleteError"), {
+        description: error.message || t("deleteDialog.deleteErrorDescription")
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Get delete dialog translations based on content status
+  const getDeleteDialogTranslations = () => {
+    const isPublished = contentStatus === 'PUBLISHED' || contentStatus === 'PARTIALLY_PUBLISHED';
+    const isDraftOrFailed = contentStatus === 'DRAFT' || contentStatus === 'FAILED';
+    
+    if (isPublished) {
+      return {
+        title: t("deleteDialog.published.title"),
+        description: t("deleteDialog.published.description"),
+        cancel: t("deleteDialog.published.cancel"),
+        confirm: t("deleteDialog.published.confirm"),
+      };
+    } else if (isDraftOrFailed) {
+      return {
+        title: t("deleteDialog.draft.title"),
+        description: t("deleteDialog.draft.description"),
+        cancel: t("deleteDialog.draft.cancel"),
+        confirm: t("deleteDialog.draft.confirm"),
+      };
+    } else {
+      return {
+        title: t("deleteDialog.default.title"),
+        description: t("deleteDialog.default.description"),
+        cancel: t("deleteDialog.default.cancel"),
+        confirm: t("deleteDialog.default.confirm"),
+      };
+    }
   }
 
   // Calculate caption limits for validation
@@ -539,19 +825,22 @@ export function ContentCreationModal({
   const hasMedia = selectedMedia.length > 0
   const hasCaption = caption.trim().length > 0
   
-  // Check if Instagram is selected
-  const hasInstagram = selectedPlatforms.includes('INSTAGRAM')
-  // Check if TikTok is selected
-  const hasTikTok = selectedPlatforms.includes('TIKTOK')
+  // Check media requirements based on selected platforms and form factor
+  // Media is required if any selected platform requires media for this form factor
+  const isMediaRequired = formFactor ? selectedPlatforms.some((platform) => 
+    requiresMedia(platform as SocialPlatform, formFactor)
+  ) : false
   
   // Feed post validation rules:
   // 1. Caption is required for feed posts (at minimum)
-  // 2. Media is required if Instagram is selected
-  // 3. Media is required if TikTok is selected (for feed posts)
   const isCaptionRequired = isFeedPost && hasSelectedAccounts
-  const isMediaRequiredForInstagram = isFeedPost && hasInstagram
-  const isMediaRequiredForTikTok = isFeedPost && hasTikTok
-  const isMediaRequired = isMediaRequiredForInstagram || isMediaRequiredForTikTok
+  
+  // Check specific platforms for error messages
+  const hasInstagram = selectedPlatforms.includes('INSTAGRAM')
+  const hasTikTok = selectedPlatforms.includes('TIKTOK')
+  const isMediaRequiredForInstagram = formFactor && hasInstagram && requiresMedia('INSTAGRAM', formFactor)
+  const isMediaRequiredForTikTok = formFactor && hasTikTok && requiresMedia('TIKTOK', formFactor)
+  const isMediaRequiredForFacebook = formFactor && selectedPlatforms.includes('FACEBOOK') && requiresMedia('FACEBOOK', formFactor)
   
   const isCaptionMissing = isCaptionRequired && !hasCaption
   const isMediaMissing = isMediaRequired && !hasMedia
@@ -563,6 +852,9 @@ export function ContentCreationModal({
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Content Creation</DialogTitle>
+        <DialogDescription className="sr-only">
+          Create or edit content for your social media accounts
+        </DialogDescription>
 
         {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-4 pt-3 sm:pt-4 pb-2 sm:pb-3 flex-shrink-0 border-b">
@@ -606,16 +898,35 @@ export function ContentCreationModal({
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                // TODO: Add menu functionality
-              }}
-              className="h-8 w-8"
-            >
-              <IconDots className="h-4 w-4" />
-            </Button>
+            {contentId && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                  >
+                    <IconDots className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0" align="end">
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!contentId || !currentWorkspace || !brandSlug || isDeleting) return;
+                        setShowDeleteDialog(true);
+                      }}
+                      disabled={isDeleting}
+                      className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <IconTrash className="h-4 w-4" />
+                      <span>{t("delete")}</span>
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -888,6 +1199,25 @@ export function ContentCreationModal({
                         {t("filesSelected", { count: selectedMedia.length })}
                       </p>
                     )}
+                    {/* Google Drive button */}
+                    {isGoogleDriveAvailable && selectedMedia.length < maxFilesAllowed && (
+                      <div className="mt-2 flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIsGoogleDrivePickerOpen(true)
+                          }}
+                          className="h-8 text-xs gap-1"
+                          disabled={isCheckingGoogleDrive}
+                        >
+                          <IconBrandGoogleDrive className="h-3 w-3" />
+                          <span>{t("chooseFromDrive") || "Choose from Google Drive"}</span>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -1101,8 +1431,11 @@ export function ContentCreationModal({
                   return
                 }
 
-                // If no changes, skip API call and show success immediately
-                if (!hasChanges) {
+                // Check if there are new media files to upload
+                const hasNewMediaFiles = selectedMedia.some(m => m.file && !m.mediaId)
+                
+                // If no changes AND no new media files, skip API call and show success immediately
+                if (!hasChanges && !hasNewMediaFiles) {
                   toast.success(t("saveDraftSuccess"))
                   onOpenChange(false)
                   return
@@ -1171,7 +1504,9 @@ export function ContentCreationModal({
 
                   // Step 3: Clean up
                   selectedMedia.forEach(media => {
-                    URL.revokeObjectURL(media.preview)
+                    if (media.file && media.preview) {
+                      try { URL.revokeObjectURL(media.preview) } catch {}
+                    }
                   })
 
                   // Step 4: Show success message and handle create another or close
@@ -1397,7 +1732,7 @@ export function ContentCreationModal({
 
             {/* Schedule/Publish Button */}
             {(() => {
-              const isDisabled = !formFactor || selectedAccountIds.length === 0 || isBaseCaptionExceeded || isCaptionMissing || isMediaMissing
+              const isDisabled: boolean = !formFactor || selectedAccountIds.length === 0 || isBaseCaptionExceeded || isCaptionMissing || isMediaMissing
               let disabledMessage = ""
               
               if (isDisabled) {
@@ -1410,12 +1745,39 @@ export function ContentCreationModal({
                 } else if (isCaptionMissing) {
                   disabledMessage = t("publishButtonDisabledNoCaption")
                 } else if (isMediaMissing) {
-                  if (isMediaRequiredForInstagram && isMediaRequiredForTikTok) {
-                    disabledMessage = t("publishButtonDisabledNoMediaInstagramTikTok")
-                  } else if (isMediaRequiredForInstagram) {
-                    disabledMessage = t("publishButtonDisabledNoMediaInstagram")
-                  } else if (isMediaRequiredForTikTok) {
-                    disabledMessage = t("publishButtonDisabledNoMediaTikTok")
+                  // Generate appropriate error message based on which platforms require media
+                  const platformsRequiringMedia: string[] = []
+                  if (isMediaRequiredForInstagram) platformsRequiringMedia.push("Instagram")
+                  if (isMediaRequiredForTikTok) platformsRequiringMedia.push("TikTok")
+                  if (isMediaRequiredForFacebook) platformsRequiringMedia.push("Facebook")
+                  // Add other platforms if needed
+                  selectedPlatforms.forEach((platform) => {
+                    if (platform !== 'INSTAGRAM' && platform !== 'TIKTOK' && platform !== 'FACEBOOK') {
+                      if (formFactor && requiresMedia(platform as SocialPlatform, formFactor)) {
+                        platformsRequiringMedia.push(platform)
+                      }
+                    }
+                  })
+
+                  if (platformsRequiringMedia.length > 1) {
+                    // Multiple platforms require media
+                    if (platformsRequiringMedia.includes("Instagram") && platformsRequiringMedia.includes("TikTok")) {
+                      disabledMessage = t("publishButtonDisabledNoMediaInstagramTikTok")
+                    } else {
+                      disabledMessage = `Media is required for ${platformsRequiringMedia.join(" and ")}`
+                    }
+                  } else if (platformsRequiringMedia.length === 1) {
+                    // Single platform
+                    if (platformsRequiringMedia[0] === "Instagram") {
+                      disabledMessage = t("publishButtonDisabledNoMediaInstagram")
+                    } else if (platformsRequiringMedia[0] === "TikTok") {
+                      disabledMessage = t("publishButtonDisabledNoMediaTikTok")
+                    } else {
+                      disabledMessage = `Media is required for ${platformsRequiringMedia[0]}`
+                    }
+                  } else {
+                    // Fallback
+                    disabledMessage = "Media is required"
                   }
                 }
               }
@@ -1521,7 +1883,9 @@ export function ContentCreationModal({
 
                       // Step 3: Clean up
                       selectedMedia.forEach(media => {
-                        URL.revokeObjectURL(media.preview)
+                        if (media.file && media.preview) {
+                          try { URL.revokeObjectURL(media.preview) } catch {}
+                        }
                       })
 
                       // Step 4: Handle create another or close
@@ -1577,22 +1941,81 @@ export function ContentCreationModal({
         </div>
 
         {/* Loading Overlay */}
-        {(isSavingDraft || isPublishing) && (
+        {(isSavingDraft || isPublishing || isDeleting) && (
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
             <div className="flex flex-col items-center gap-4 p-6 bg-background border border-border rounded-lg shadow-lg">
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
               <div className="text-center">
                 <p className="text-sm font-medium">
-                  {isSavingDraft ? t("savingDraft") : t("publishingContent")}
+                  {isDeleting ? t("deleteDialog.deleting") : isSavingDraft ? t("savingDraft") : t("publishingContent")}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t("uploadingMedia")}
+                  {isDeleting ? t("deleteDialog.deleting") : t("uploadingMedia")}
                 </p>
               </div>
             </div>
           </div>
         )}
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{getDeleteDialogTranslations().title}</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line">
+              {getDeleteDialogTranslations().description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>
+              {getDeleteDialogTranslations().cancel}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContent}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? t("deleteDialog.deleting") : getDeleteDialogTranslations().confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Google Drive Picker Dialog */}
+      <GoogleDrivePickerDialog
+        open={isGoogleDrivePickerOpen}
+        onOpenChange={setIsGoogleDrivePickerOpen}
+        onFilesSelected={(mediaItems) => {
+          // Vertical video için yine tek video kuralı geçerli
+          if (formFactor === 'VERTICAL_VIDEO') {
+            // sadece ilk video'yu al, diğerlerini ignore et
+            const firstVideo = mediaItems.find(m => m.type === 'video')
+            if (!firstVideo) {
+              toast.warning(t('content.onlyVideosAllowed') || 'Only video files are allowed for vertical video')
+              return
+            }
+            // mevcut blob preview'leri temizle
+            setSelectedMedia(prev => {
+              prev.forEach(m => {
+                if (m.file && m.preview) {
+                  try { URL.revokeObjectURL(m.preview) } catch {}
+                }
+              })
+              return []
+            })
+            setSelectedMedia([firstVideo])
+            return
+          }
+
+          // Normal case: mevcut listeye ekle, limit içinde kal
+          setSelectedMedia(prev => {
+            const availableSlots = maxFilesAllowed - prev.length
+            const toAdd = mediaItems.slice(0, availableSlots)
+            return [...prev, ...toAdd]
+          })
+        }}
+      />
     </Dialog>
   )
 }
@@ -1619,6 +2042,60 @@ function SortableMediaItem({ media, onRemove }: SortableMediaItemProps) {
     isDragging,
   } = useSortable({ id: media.id })
 
+  const [videoThumbnail, setVideoThumbnail] = React.useState<string | null>(null)
+
+  // Generate video thumbnail
+  React.useEffect(() => {
+    if (media.type === 'video' && media.preview && !videoThumbnail) {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.muted = true
+      video.playsInline = true
+      
+      const handleLoadedMetadata = () => {
+        // Seek to 1 second or middle of video, whichever is smaller
+        const seekTime = Math.min(1, video.duration / 2)
+        video.currentTime = seekTime
+      }
+      
+      const handleSeeked = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.8)
+            setVideoThumbnail(thumbnail)
+          }
+        } catch (error) {
+          console.error('Failed to generate video thumbnail:', error)
+          setVideoThumbnail(null)
+        }
+      }
+      
+      const handleError = () => {
+        // If thumbnail generation fails, just show icon
+        setVideoThumbnail(null)
+      }
+      
+      video.addEventListener('loadedmetadata', handleLoadedMetadata)
+      video.addEventListener('seeked', handleSeeked)
+      video.addEventListener('error', handleError)
+      
+      video.src = media.preview
+      video.load()
+      
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+        video.removeEventListener('seeked', handleSeeked)
+        video.removeEventListener('error', handleError)
+        video.src = ''
+      }
+    }
+  }, [media.type, media.preview])
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -1639,8 +2116,25 @@ function SortableMediaItem({ media, onRemove }: SortableMediaItemProps) {
           className="w-full h-full object-cover"
         />
       ) : media.type === 'video' ? (
-        <div className="w-full h-full flex items-center justify-center bg-muted">
-          <IconVideo className="h-8 w-8 text-muted-foreground" />
+        <div className="w-full h-full relative">
+          {videoThumbnail ? (
+            <>
+              <img
+                src={videoThumbnail}
+                alt={media.file?.name || media.mediaId || 'Video'}
+                className="w-full h-full object-cover"
+              />
+              {/* Video icon overlay on thumbnail */}
+              <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 rounded text-xs text-white flex items-center gap-1">
+                <IconVideo className="h-3 w-3" />
+                <span>Video</span>
+              </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <IconVideo className="h-8 w-8 text-muted-foreground" />
+            </div>
+          )}
         </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-muted">
@@ -1671,8 +2165,9 @@ function SortableMediaItem({ media, onRemove }: SortableMediaItemProps) {
       
       {/* Video Indicator */}
       {media.type === 'video' && (
-        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 rounded text-xs text-white">
-          Video
+        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 rounded text-xs text-white flex items-center gap-1">
+          <IconVideo className="h-3 w-3" />
+          <span>Video</span>
         </div>
       )}
     </div>

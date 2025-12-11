@@ -1,28 +1,32 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useSearchParams, useRouter } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { IconDots, IconPlus } from "@tabler/icons-react"
 import { ContentCreationModal } from "@/features/content/content-creation-modal"
-import { DataViewTable } from "@/components/data-view/data-view-table"
-import { TableTask } from "@/components/data-view/types"
+import { ContentTable } from "@/components/content/content-table"
 import { toast } from "sonner"
+import { usePublicationWebSocket } from "@/hooks/use-publication-websocket"
 
 export default function PublishPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const brandSlug = params?.brandSlug as string
   const { currentWorkspace } = useWorkspace()
   const t = useTranslations('publish')
   const contentIdFromUrl = searchParams.get('contentId')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedContentId, setSelectedContentId] = useState<string | null>(contentIdFromUrl)
-  const [brandInfo, setBrandInfo] = useState<{ name: string; slug: string; logoUrl?: string | null } | null>(null)
+  
+  // Track if we're on the publish page (this component is always on publish page)
+  const isPublishPage = pathname?.includes('/publish') ?? true
+  const [brandInfo, setBrandInfo] = useState<{ id: string; name: string; slug: string; logoUrl?: string | null } | null>(null)
   const [contents, setContents] = useState<Array<{
     id: string
     title: string | null
@@ -45,10 +49,21 @@ export default function PublishPage() {
       slug: string
       color: string | null
     }>
+    publicationStatuses?: Array<{
+      id: string
+      status: string
+      platform: string
+    }>
   }>>([])
   const [isLoadingContents, setIsLoadingContents] = useState(false)
-  const [filterTab, setFilterTab] = useState<"all" | "todo" | "inProgress" | "overdue" | "completed">("all")
-
+  
+  // Use ref to track the last fetch key and prevent duplicate requests
+  const lastFetchKeyRef = useRef<string | null>(null)
+  const isFetchingRef = useRef(false)
+  
+  // Ref to prevent modal from reopening when URL is updated after close
+  const isManuallyClosingRef = useRef(false)
+  
   useEffect(() => {
     const fetchBrandInfo = async () => {
       if (!currentWorkspace || !brandSlug) return
@@ -58,6 +73,7 @@ export default function PublishPage() {
         const brand = brandsResponse.brands.find((b) => b.slug === brandSlug)
         if (brand) {
           setBrandInfo({
+            id: brand.id,
             name: brand.name,
             slug: brand.slug,
             logoUrl: brand.logoUrl,
@@ -71,98 +87,256 @@ export default function PublishPage() {
     fetchBrandInfo()
   }, [currentWorkspace, brandSlug])
 
-  // Sync URL with modal state - only when modal is not already open
+  // Sync URL with modal state - only open modal when URL has contentId
+  // Only sync when we're on the publish page
   useEffect(() => {
+    // Only handle URL sync on publish page
+    if (!isPublishPage) {
+      // If we're not on publish page, ensure modal is closed and contentId is cleared
+      if (isModalOpen) {
+        setIsModalOpen(false)
+        setSelectedContentId(null)
+      }
+      return
+    }
+
+    // Skip if we just manually closed the modal (prevent reopening)
+    if (isManuallyClosingRef.current) {
+      isManuallyClosingRef.current = false
+      return
+    }
+
     const contentIdFromUrl = searchParams.get('contentId')
+    
+    // Only open modal if URL has contentId and modal is closed
+    // Don't close modal here - let handleModalOpenChange handle closing
+    // Don't close modal if it was manually opened (for new content creation)
     if (contentIdFromUrl && !isModalOpen) {
       setSelectedContentId(contentIdFromUrl)
       setIsModalOpen(true)
     }
-  }, [searchParams]) // Remove isModalOpen from dependencies to prevent race conditions
+    // Removed the else clause that was closing modal when contentId is not in URL
+    // This was preventing "New Content" button from working
+  }, [searchParams, isModalOpen, isPublishPage])
 
   useEffect(() => {
-    const fetchContents = async () => {
-      if (!currentWorkspace || !brandSlug) return
+    if (!currentWorkspace || !brandSlug) return
 
-      setIsLoadingContents(true)
+    // Create a unique key for this fetch request
+    const fetchKey = `${currentWorkspace.id}:${brandSlug}`
+    
+    // Skip if we already fetched with the same key and not currently fetching
+    if (lastFetchKeyRef.current === fetchKey && !isFetchingRef.current) {
+      return
+    }
+
+    // Skip if already fetching with the same key
+    if (isFetchingRef.current && lastFetchKeyRef.current === fetchKey) {
+      return
+    }
+
+    isFetchingRef.current = true
+    setIsLoadingContents(true)
+    
+    const fetchContents = async () => {
       try {
         const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
         setContents(response.contents)
+        lastFetchKeyRef.current = fetchKey
       } catch (error) {
         console.error('Failed to fetch contents:', error)
         toast.error('Failed to load contents')
+        lastFetchKeyRef.current = null
       } finally {
         setIsLoadingContents(false)
+        isFetchingRef.current = false
       }
     }
 
     fetchContents()
-  }, [currentWorkspace, brandSlug, isModalOpen])
+  }, [currentWorkspace?.id, brandSlug])
+
+  // Refetch contents when modal closes (for updates)
+  const previousModalOpenRef = useRef(isModalOpen)
+  useEffect(() => {
+    // Only refetch if modal was open and now closed (not on initial mount)
+    const wasOpen = previousModalOpenRef.current
+    const isNowOpen = isModalOpen
+    previousModalOpenRef.current = isModalOpen
+
+    if (wasOpen && !isNowOpen && currentWorkspace && brandSlug) {
+      const fetchKey = `${currentWorkspace.id}:${brandSlug}`
+      
+      // Small delay to ensure modal close animation completes
+      const timeoutId = setTimeout(() => {
+        // Only refetch if not already fetching
+        if (!isFetchingRef.current) {
+          // Reset fetch key to allow new fetch
+          lastFetchKeyRef.current = null
+          
+          const fetchContents = async () => {
+            isFetchingRef.current = true
+            try {
+              const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
+              setContents(response.contents)
+              lastFetchKeyRef.current = fetchKey
+            } catch (error) {
+              console.error('Failed to fetch contents:', error)
+            } finally {
+              isFetchingRef.current = false
+            }
+          }
+          fetchContents()
+        }
+      }, 100)
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isModalOpen, currentWorkspace?.id, brandSlug])
 
   // Update URL when modal opens/closes
   const handleModalOpenChange = (open: boolean) => {
-    setIsModalOpen(open)
-
     if (!open) {
-      // Modal is closing - remove contentId from URL and reset state immediately
+      // Modal is closing - mark as manually closing to prevent useEffect from reopening
+      isManuallyClosingRef.current = true
+      
+      // Reset selectedContentId immediately when closing
+      setSelectedContentId(null)
+      
+      // Remove contentId from URL
       const params = new URLSearchParams(searchParams.toString())
       params.delete('contentId')
       const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
       router.push(newUrl, { scroll: false })
-
-      // Reset selectedContentId immediately when closing
-      setSelectedContentId(null)
-
-      // Reload contents when modal closes
-      if (currentWorkspace && brandSlug) {
-        const fetchContents = async () => {
-          try {
-            const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
-            setContents(response.contents)
-          } catch (error) {
-            console.error('Failed to fetch contents:', error)
-          }
-        }
-        fetchContents()
-      }
     }
+    
+    setIsModalOpen(open)
     // Note: URL update for opening is handled by the click handlers (table click, new content button)
+    // Contents refresh is handled by the useEffect above
   }
 
-  // Transform contents to TableTask format for DataViewTable
-  const contentsData: TableTask[] = contents.map((content) => {
-    const statusMap: Record<string, string> = {
-      DRAFT: t('status.draft') || 'Draft',
-      SCHEDULED: t('status.scheduled') || 'Scheduled',
-      PUBLISHED: t('status.published') || 'Published',
-      PARTIALLY_PUBLISHED: t('status.partiallyPublished') || 'Partially Published',
-      FAILED: t('status.failed') || 'Failed',
-      ARCHIVED: t('status.archived') || 'Archived',
-    }
+  const statusMap: Record<string, string> = {
+    DRAFT: t('status.draft') || 'Draft',
+    SCHEDULED: t('status.scheduled') || 'Scheduled',
+    PUBLISHING: t('status.publishing') || 'Publishing',
+    PUBLISHED: t('status.published') || 'Published',
+    PARTIALLY_PUBLISHED: t('status.partiallyPublished') || 'Partially Published',
+    FAILED: t('status.failed') || 'Failed',
+    ARCHIVED: t('status.archived') || 'Archived',
+  }
 
-    const formFactorMap: Record<string, string> = {
-      FEED_POST: t('formFactor.feedPost') || 'Feed Post',
-      STORY: t('formFactor.story') || 'Story',
-      VERTICAL_VIDEO: t('formFactor.verticalVideo') || 'Vertical Video',
-      BLOG_ARTICLE: t('formFactor.blogArticle') || 'Blog Article',
-      LONG_VIDEO: t('formFactor.longVideo') || 'Long Video',
-    }
+  const formFactorMap: Record<string, string> = {
+    FEED_POST: t('formFactor.feedPost') || 'Feed Post',
+    STORY: t('formFactor.story') || 'Story',
+    VERTICAL_VIDEO: t('formFactor.verticalVideo') || 'Vertical Video',
+    BLOG_ARTICLE: t('formFactor.blogArticle') || 'Blog Article',
+    LONG_VIDEO: t('formFactor.longVideo') || 'Long Video',
+  }
 
-    const platforms = content.contentAccounts.map(ca => ca.socialAccount.platform).join(', ')
+  // WebSocket connection for real-time publication/content updates
+  usePublicationWebSocket({
+    workspaceId: currentWorkspace?.id || "",
+    brandId: brandInfo?.id || undefined,
+    enabled: !!currentWorkspace && !!brandInfo?.id,
+    onEvent: (event) => {
+      switch (event.type) {
+        case "content.status.changed": {
+          // Update content status and publication statuses in the list
+          setContents((prev) =>
+            prev.map((content) => {
+              if (content.id === event.data.id) {
+                // Calculate effective status: if any publication is PUBLISHING, show PUBLISHING
+                const hasPublishing = event.data.publications?.some(
+                  (p: any) => p.status === 'PUBLISHING'
+                )
+                const effectiveStatus = hasPublishing ? 'PUBLISHING' : event.data.status
+                
+                return {
+                  ...content,
+                  status: effectiveStatus,
+                  publicationStatuses: event.data.publications || [],
+                }
+              }
+              return content
+            })
+          )
+          break
+        }
 
-    return {
-      id: content.id,
-      taskNumber: 0, // Content doesn't have task numbers
-      title: content.title || content.baseCaption || 'Untitled',
-      description: content.baseCaption,
-      header: content.title || content.baseCaption || 'Untitled',
-      type: formFactorMap[content.formFactor] || content.formFactor,
-      priority: 'MEDIUM', // Content doesn't have priority
-      status: statusMap[content.status] || content.status,
-      dueDate: content.scheduledAt || content.createdAt,
-      assignedTo: [], // Content doesn't have assignees
-      commentCount: 0, // Content doesn't have comments yet
-    } as TableTask
+        case "publication.status.changed": {
+          // Update content based on publication status change
+          // If publication is PUBLISHING, update content to show PUBLISHING status
+          setContents((prev) =>
+            prev.map((content) => {
+              if (content.id === event.data.contentId) {
+                // Update publication statuses
+                const updatedPublicationStatuses = content.publicationStatuses || []
+                const pubIndex = updatedPublicationStatuses.findIndex(
+                  (p: any) => p.id === event.data.id
+                )
+                
+                if (pubIndex >= 0) {
+                  updatedPublicationStatuses[pubIndex] = {
+                    id: event.data.id,
+                    status: event.data.status,
+                    platform: event.data.platform,
+                  }
+                } else {
+                  updatedPublicationStatuses.push({
+                    id: event.data.id,
+                    status: event.data.status,
+                    platform: event.data.platform,
+                  })
+                }
+                
+                // Check if any publication is PUBLISHING
+                const hasPublishing = updatedPublicationStatuses.some(
+                  (p: any) => p.status === 'PUBLISHING'
+                )
+                
+                // If publication failed or succeeded, we should refetch to get accurate content status
+                // But for PUBLISHING status, we can update optimistically
+                if (event.data.status === 'PUBLISHING') {
+                  return {
+                    ...content,
+                    status: 'PUBLISHING',
+                    publicationStatuses: updatedPublicationStatuses,
+                  }
+                } else {
+                  // For SUCCESS/FAILED, trigger a refetch to get accurate overall content status
+                  if (currentWorkspace && brandSlug && !isFetchingRef.current) {
+                    const fetchKey = `${currentWorkspace.id}:${brandSlug}`
+                    lastFetchKeyRef.current = null
+                    
+                    const fetchContents = async () => {
+                      isFetchingRef.current = true
+                      try {
+                        const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
+                        setContents(response.contents)
+                        lastFetchKeyRef.current = fetchKey
+                      } catch (error) {
+                        console.error('Failed to fetch contents:', error)
+                      } finally {
+                        isFetchingRef.current = false
+                      }
+                    }
+                    // Small delay to ensure backend has updated
+                    setTimeout(fetchContents, 500)
+                  }
+                  
+                  return {
+                    ...content,
+                    publicationStatuses: updatedPublicationStatuses,
+                  }
+                }
+              }
+              return content
+            })
+          )
+          break
+        }
+      }
+    },
   })
 
   return (
@@ -191,21 +365,22 @@ export default function PublishPage() {
         </div>
 
         {/* Table */}
-        <div className="w-full sm:px-6 px-0 flex-1 min-h-0 flex flex-col">
+        <div className="w-full sm:px-6 px-0 flex-1 min-h-0 flex flex-col overflow-auto">
           {isLoadingContents ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-muted-foreground">Loading...</div>
             </div>
           ) : (
-            <DataViewTable
-              data={contentsData}
-              filterTab={filterTab}
-              onTaskClick={(task) => {
-                setSelectedContentId(task.id)
+            <ContentTable
+              contents={contents}
+              statusMap={statusMap}
+              formFactorMap={formFactorMap}
+              onContentClick={(contentId) => {
+                setSelectedContentId(contentId)
                 setIsModalOpen(true)
                 // Update URL with contentId
                 const params = new URLSearchParams(searchParams.toString())
-                params.set('contentId', task.id)
+                params.set('contentId', contentId)
                 router.push(`?${params.toString()}`, { scroll: false })
               }}
             />

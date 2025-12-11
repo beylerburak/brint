@@ -21,6 +21,7 @@ export const ENDPOINT_MIN_ROLE = {
   // Workspace management
   'workspace:view': 'VIEWER',
   'workspace:update': 'ADMIN',
+  'workspace:settings': 'ADMIN',
   'workspace:delete': 'OWNER',
   'workspace:members:list': 'ADMIN',
   'workspace:members:add': 'ADMIN',

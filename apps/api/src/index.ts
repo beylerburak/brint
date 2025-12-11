@@ -20,6 +20,10 @@ import { redis } from './lib/redis.js';
 import { createServer } from './core/http/server.js';
 import { createMediaWorker } from './core/queue/media-worker.js';
 
+// Initialize queue scheduler and worker for publications
+import './core/queue/publication.queue.js'; // Initializes queue scheduler
+import './core/queue/publication.worker.js'; // Initializes publication worker
+
 let app: FastifyInstance | null = null;
 let worker: Worker | null = null;
 
@@ -41,6 +45,9 @@ async function main() {
     // Start media processing worker
     worker = createMediaWorker();
     logger.info('Media processing worker started with API server');
+
+    // Publication queue and worker are initialized via imports above
+    logger.info('Publication queue and worker initialized with API server');
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);

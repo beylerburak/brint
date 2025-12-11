@@ -30,6 +30,7 @@ import {
 import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
 import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 import { prisma } from '../../lib/prisma.js';
+import { getCache, setCache, deleteCachePattern } from '../../lib/redis.js';
 
 export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
   // POST /workspaces/:workspaceId/brands - Create brand
@@ -46,6 +47,9 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const brand = await createBrand(workspaceId, request.body as any, userId);
+
+      // Invalidate brands cache for this workspace
+      await deleteCachePattern(`brands:workspace:${workspaceId}:*`);
 
       return reply.status(201).send({
         success: true,
@@ -123,6 +127,15 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
       offset?: string;
     };
 
+    // Build cache key
+    const cacheKey = `brands:workspace:${workspaceId}:status:${status || 'all'}:limit:${limit || 'all'}:offset:${offset || '0'}`;
+
+    // Try to get from cache first
+    const cached = await getCache<{ success: true; brands: any[]; total: number }>(cacheKey);
+    if (cached) {
+      return reply.status(200).send(cached);
+    }
+
     const brands = await prisma.brand.findMany({
       where: {
         workspaceId,
@@ -185,11 +198,16 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
       })
     );
 
-    return reply.status(200).send({
-      success: true,
+    const response = {
+      success: true as const,
       brands: brandsWithUrls,
       total: brandsWithUrls.length,
-    });
+    };
+
+    // Cache for 60 seconds (presigned URLs are typically valid for a few minutes)
+    await setCache(cacheKey, response, 60);
+
+    return reply.status(200).send(response);
   });
 
   // GET /workspaces/:workspaceId/brands/slug/:slug - Get brand by slug
@@ -410,6 +428,9 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
     try {
       const brand = await updateBrand(brandId, workspaceId, request.body as any, userId);
 
+      // Invalidate brands cache for this workspace
+      await deleteCachePattern(`brands:workspace:${workspaceId}:*`);
+
       return reply.status(200).send({
         success: true,
         brand: {
@@ -465,6 +486,9 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       await deleteBrand(brandId, workspaceId, userId);
+
+      // Invalidate brands cache for this workspace
+      await deleteCachePattern(`brands:workspace:${workspaceId}:*`);
 
       return reply.status(200).send({
         success: true,

@@ -124,6 +124,7 @@
     "status": {
       "draft": "Taslak",
       "scheduled": "Planlandı",
+      "publishing": "Yayınlanıyor",
       "published": "Yayınlandı",
       "partiallyPublished": "Kısmen Yayınlandı",
       "failed": "Başarısız",
@@ -146,6 +147,9 @@
     "createSuccess": "İçerik başarıyla oluşturuldu",
     "updateSuccess": "İçerik başarıyla güncellendi",
     "contentType": "İçerik Tipi",
+    "fileTooLarge": "Dosya boyutu maksimum limiti aşıyor",
+    "onlyVideosAllowed": "Dikey video için yalnızca video dosyalarına izin verilir",
+    "onlyOneVideoAllowed": "Dikey video için yalnızca bir videoya izin verilir. İlk video kullanılıyor.",
     "feedPost": "Feed Post",
     "story": "Story",
     "verticalVideo": "Dikey Video",
@@ -162,6 +166,7 @@
     "dropFilesHere": "Dosyaları buraya bırakın...",
     "maxFilesReached": "Maksimum 10 dosya seçildi",
     "filesSelected": "{count}/10 dosya seçildi",
+    "chooseFromDrive": "Google Drive'dan Seç",
     "preview": "Önizleme",
     "previewPlaceholder": "İçerik önizlemesi burada görünecek",
     "tags": "Etiketler",
@@ -197,7 +202,35 @@
     "saveDraftErrorDescription": "Taslak kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.",
     "savingDraft": "Taslak kaydediliyor...",
     "publishingContent": "İçerik yayınlanıyor...",
-    "uploadingMedia": "Medya dosyaları yükleniyor..."
+    "uploadingMedia": "Medya dosyaları yükleniyor...",
+    "delete": "Sil",
+    "deleteDialog": {
+      "published": {
+        "title": "Yayınlanmış İçeriği Sil",
+        "description": "Bu içerik sosyal medya platformlarında yayınlanmış.\n\nBuradan silmek sadece sistemden siler. İçeriği tamamen kaldırmak için ilgili sosyal medya platformlarına girip oradan da silmeniz gerekir.\n\nDevam etmek istiyor musunuz?",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      },
+      "draft": {
+        "title": "İçeriği Sil",
+        "description": "Bu içeriği silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz.",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      },
+      "default": {
+        "title": "İçeriği Sil",
+        "description": "Bu içeriği silmek istediğinizden emin misiniz?",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      },
+      "deleting": "Siliniyor...",
+      "deleteSuccess": "İçerik başarıyla silindi",
+      "deleteError": "İçerik silinemedi",
+      "deleteErrorDescription": "İçerik silinirken bir hata oluştu. Lütfen tekrar deneyin."
+    },
+    "mediaDeleted": "Medya başarıyla silindi",
+    "mediaDeleteError": "Medya silinemedi",
+    "mediaDeleteErrorDescription": "Medya silinirken bir hata oluştu. Lütfen tekrar deneyin."
   },
   "tasks": {
     "title": "Görevler",
@@ -1157,6 +1190,7 @@
     "general": "Genel",
     "profile": "Profil",
     "workspace": "Çalışma Alanı",
+    "integrations": "Entegrasyonlar",
     "generalTitle": "Genel Ayarlar",
     "generalDescription": "Genel uygulama ayarları ve tercihleri",
     "profileTitle": "Profil Ayarları",

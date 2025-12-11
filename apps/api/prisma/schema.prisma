@@ -178,6 +178,21 @@ enum TagEntityType {
   TASK
 }
 
+enum IntegrationType {
+  GOOGLE_DRIVE
+  META_BUSINESS
+  SLACK
+  SHOPIFY
+  NOTION
+}
+
+enum IntegrationStatus {
+  PENDING
+  ACTIVE
+  ERROR
+  DISCONNECTED
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -213,7 +228,7 @@ model User {
   sessions         Session[]
   media            Media[]
   avatarMedia      Media?            @relation("UserAvatar", fields: [avatarMediaId], references: [id])
-  
+
   // Project & Task relations
   createdProjects         Project[]           @relation("ProjectCreatedBy")
   updatedProjects         Project[]           @relation("ProjectUpdatedBy")
@@ -223,12 +238,15 @@ model User {
   createdChecklistItems   TaskChecklistItem[] @relation("ChecklistItemCreatedBy")
   completedChecklistItems TaskChecklistItem[] @relation("ChecklistItemCompletedBy")
   createdTaskAttachments  TaskAttachment[]    @relation("TaskAttachmentCreatedBy")
-  
+
   // Comment relations
   authoredComments Comment[] @relation("CommentAuthor")
 
   // Email verification
   emailVerificationCodes EmailVerificationCode[]
+
+  // Integration relations
+  connectedIntegrations WorkspaceIntegration[]
 
   @@map("users")
 }
@@ -262,7 +280,7 @@ model Workspace {
   brands       Brand[]
   media        Media[]
   activityLogs ActivityLog[]
-  
+
   // Project & Task relations
   projects     Project[]
   taskStatuses TaskStatus[]
@@ -275,6 +293,9 @@ model Workspace {
   // Tag relations
   tags         Tag[]
   tagRelations TagRelation[]
+
+  // Integration relations
+  integrations WorkspaceIntegration[]
 
   @@map("workspaces")
 }
@@ -333,13 +354,13 @@ model Brand {
   /// Yeni relations
   contactChannels BrandContactChannel[]
   profile         BrandProfile?
-  
+
   // Project & Task relations
   projects     Project[]
   taskStatuses TaskStatus[]
   tasks        Task[]
   comments     Comment[]
-  
+
   // Social Account relations
   socialAccounts SocialAccount[]
 
@@ -464,7 +485,7 @@ model Media {
   owner       User      @relation(fields: [ownerUserId], references: [id])
   userAvatars User[]    @relation("UserAvatar")
   brandLogos  Brand[]   @relation("BrandLogo")
-  
+
   // Task relations
   taskAttachments TaskAttachment[]
 
@@ -737,7 +758,7 @@ model EmailVerificationCode {
   usedAt       DateTime? // When the code was successfully used (null if unused)
   attemptCount Int       @default(0) // Number of failed verification attempts
   createdAt    DateTime  @default(now())
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -751,7 +772,7 @@ model EmailVerificationCode {
 
 model SocialAccount {
   id String @id @default(cuid())
-  
+
   // Brand relation
   brandId String
   brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
@@ -968,20 +989,20 @@ model ContentAccountOptions {
 }
 
 model Tag {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name        String   // Ekranda görünen isim. Örn: "Black Friday 2025"
-  slug        String   // Normalize edilmiş, unique key: "black-friday-2025"
-  color       String?  // (opsiyonel) İleride UI'da renk göstermek için
-  description String?  // (opsiyonel) Etiketle ilgili açıklama
+  name        String // Ekranda görünen isim. Örn: "Black Friday 2025"
+  slug        String // Normalize edilmiş, unique key: "black-friday-2025"
+  color       String? // (opsiyonel) İleride UI'da renk göstermek için
+  description String? // (opsiyonel) Etiketle ilgili açıklama
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  relations   TagRelation[]
+  relations TagRelation[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -990,22 +1011,47 @@ model Tag {
 }
 
 model TagRelation {
-  id         String        @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  tagId      String
-  tag        Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   entityType TagEntityType
-  entityId   String        // contentId, taskId vs.
+  entityId   String // contentId, taskId vs.
 
-  createdAt  DateTime      @default(now())
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   @@index([workspaceId, entityType, entityId])
   @@index([tagId, entityType])
   @@index([workspaceId, tagId])
   @@index([deletedAt])
   @@map("tag_relations")
+}
+
+model WorkspaceIntegration {
+  id String @id @default(cuid())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  integrationType IntegrationType
+  status          IntegrationStatus @default(PENDING)
+  statusMessage   String?
+
+  auth   Json? // access_token, refresh_token, expiry, scope, token_type vs.
+  config Json? // entegrasyona özel ayarlar (ör. rootFolderId)
+
+  connectedByUserId String?
+  connectedByUser   User?   @relation(fields: [connectedByUserId], references: [id], onDelete: SetNull)
+
+  lastSyncedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, integrationType])
+  @@map("workspace_integrations")
 }

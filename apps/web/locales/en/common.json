@@ -124,6 +124,7 @@
     "status": {
       "draft": "Draft",
       "scheduled": "Scheduled",
+      "publishing": "Publishing",
       "published": "Published",
       "partiallyPublished": "Partially Published",
       "failed": "Failed",
@@ -146,6 +147,9 @@
     "createSuccess": "Content created successfully",
     "updateSuccess": "Content updated successfully",
     "contentType": "Content Type",
+    "fileTooLarge": "File size exceeds the maximum limit",
+    "onlyVideosAllowed": "Only video files are allowed for vertical video",
+    "onlyOneVideoAllowed": "Only one video is allowed for vertical video. Using the first video.",
     "feedPost": "Feed Post",
     "story": "Story",
     "verticalVideo": "Vertical Video",
@@ -162,6 +166,7 @@
     "dropFilesHere": "Drop files here...",
     "maxFilesReached": "Maximum 10 files reached",
     "filesSelected": "{count}/10 files selected",
+    "chooseFromDrive": "Choose from Google Drive",
     "preview": "Preview",
     "previewPlaceholder": "Content preview will be here",
     "tags": "Tags",
@@ -197,7 +202,35 @@
     "saveDraftErrorDescription": "An error occurred while saving the draft. Please try again.",
     "savingDraft": "Saving draft...",
     "publishingContent": "Publishing content...",
-    "uploadingMedia": "Uploading media files..."
+    "uploadingMedia": "Uploading media files...",
+    "delete": "Delete",
+    "deleteDialog": {
+      "published": {
+        "title": "Delete Published Content",
+        "description": "This content has been published on social media platforms.\n\nDeleting from here will only remove it from the system. To completely remove the content, you need to go to the relevant social media platforms and delete it from there as well.\n\nDo you want to continue?",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      },
+      "draft": {
+        "title": "Delete Content",
+        "description": "Are you sure you want to delete this content?\n\nThis action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      },
+      "default": {
+        "title": "Delete Content",
+        "description": "Are you sure you want to delete this content?",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      },
+      "deleting": "Deleting...",
+      "deleteSuccess": "Content deleted successfully",
+      "deleteError": "Failed to delete content",
+      "deleteErrorDescription": "An error occurred while deleting the content. Please try again."
+    },
+    "mediaDeleted": "Media deleted successfully",
+    "mediaDeleteError": "Failed to delete media",
+    "mediaDeleteErrorDescription": "An error occurred while deleting the media. Please try again."
   },
   "tasks": {
     "title": "Tasks",
@@ -1157,6 +1190,7 @@
     "general": "General",
     "profile": "Profile",
     "workspace": "Workspace",
+    "integrations": "Integrations",
     "generalTitle": "General Settings",
     "generalDescription": "General application settings and preferences",
     "profileTitle": "Profile Settings",

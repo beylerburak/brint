@@ -129,66 +129,12 @@ export const ContentCaptionAndMedia = React.memo(function ContentCaptionAndMedia
           </div>
         )}
         
-        {/* Dropzone and Media Lookup Toggle Card - Side by Side */}
-        <div className="m-3 flex gap-3">
-          {/* Media Lookup Toggle Card - Left Side */}
-          <div
-            onClick={() => onUseMediaLookupChange(!useMediaLookupOnPublish)}
-            className="w-1/2 text-left p-3 rounded-lg border border-border bg-card hover:bg-accent transition-colors cursor-pointer"
-          >
-            <div className="flex items-start gap-3">
-              <Switch
-                id="use-media-lookup"
-                checked={useMediaLookupOnPublish}
-                onCheckedChange={(checked) => {
-                  onUseMediaLookupChange(checked)
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <div className="space-y-0.5 flex-1 min-w-0">
-                <Label htmlFor="use-media-lookup" className="text-xs font-medium cursor-pointer">
-                  {t("useMediaLookupOnPublishLabel") || "Medya yüklemeden paylaş"}
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  {t("useMediaLookupOnPublishDescription") || "Bu seçenek açıkken, medya yüklemesen bile paylaşım sırasında bu içerik için oluşturulan medya anahtarıyla Drive'da dosya aranır."}
-                </p>
-              </div>
-            </div>
-            
-            {/* Media Lookup ID Display - Only show when toggle is ON */}
-            {useMediaLookupOnPublish && mediaLookupId && (
-              <div className="mt-3 space-y-1.5">
-                <Label className="text-[11px] text-muted-foreground block">
-                  {t("mediaLookupIdLabel") || "Medya anahtarı:"}
-                </Label>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCopyMediaLookupId()
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded bg-background border border-border hover:bg-accent transition-colors group cursor-pointer"
-                >
-                  <code className="text-[10px] font-mono whitespace-nowrap">
-                    {mediaLookupId}
-                  </code>
-                  {isCopied ? (
-                    <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 flex-shrink-0">
-                      <IconCheck className="h-3 w-3" />
-                      <span>{t("copied") || "Kopyalandı"}</span>
-                    </div>
-                  ) : (
-                    <IconCopy className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {/* Dropzone - Right Side */}
+        {/* Dropzone and Media Lookup Toggle Card - Stacked on mobile, side by side on desktop */}
+        <div className="m-3 flex flex-col sm:flex-row gap-3">
+          {/* Dropzone - Top on mobile, Right on desktop */}
           <div
             {...(useMediaLookupOnPublish ? {} : getRootProps())}
-            className={`w-1/2 border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+            className={`w-full sm:w-1/2 border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
               useMediaLookupOnPublish
                 ? 'border-border/50 cursor-not-allowed opacity-50'
                 : isDragActive
@@ -240,6 +186,60 @@ export const ContentCaptionAndMedia = React.memo(function ContentCaptionAndMedia
                   <IconBrandGoogleDrive className="h-3 w-3" />
                   <span>{t("chooseFromDrive") || "Choose from Google Drive"}</span>
                 </Button>
+              </div>
+            )}
+          </div>
+          
+          {/* Media Lookup Toggle Card - Bottom on mobile, Left on desktop */}
+          <div
+            onClick={() => onUseMediaLookupChange(!useMediaLookupOnPublish)}
+            className="w-full sm:w-1/2 text-left p-3 rounded-lg border border-border bg-card hover:bg-accent transition-colors cursor-pointer"
+          >
+            <div className="flex items-start gap-3">
+              <Switch
+                id="use-media-lookup"
+                checked={useMediaLookupOnPublish}
+                onCheckedChange={(checked) => {
+                  onUseMediaLookupChange(checked)
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <div className="space-y-0.5 flex-1 min-w-0">
+                <Label htmlFor="use-media-lookup" className="text-xs font-medium cursor-pointer">
+                  {t("useMediaLookupOnPublishLabel") || "Medya yüklemeden paylaş"}
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("useMediaLookupOnPublishDescription") || "Bu seçenek açıkken, medya yüklemesen bile paylaşım sırasında bu içerik için oluşturulan medya anahtarıyla Drive'da dosya aranır."}
+                </p>
+              </div>
+            </div>
+            
+            {/* Media Lookup ID Display - Only show when toggle is ON */}
+            {useMediaLookupOnPublish && mediaLookupId && (
+              <div className="mt-3 space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground block">
+                  {t("mediaLookupIdLabel") || "Medya anahtarı:"}
+                </Label>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCopyMediaLookupId()
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded bg-background border border-border hover:bg-accent transition-colors group cursor-pointer"
+                >
+                  <code className="text-[10px] font-mono whitespace-nowrap">
+                    {mediaLookupId}
+                  </code>
+                  {isCopied ? (
+                    <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 flex-shrink-0">
+                      <IconCheck className="h-3 w-3" />
+                      <span>{t("copied") || "Kopyalandı"}</span>
+                    </div>
+                  ) : (
+                    <IconCopy className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                  )}
+                </button>
               </div>
             )}
           </div>

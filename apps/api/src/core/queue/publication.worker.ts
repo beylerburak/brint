@@ -19,6 +19,10 @@ import {
 } from "@prisma/client";
 import { FacebookPublicationProvider } from "../../modules/publication/providers/facebook-publication.provider";
 import { InstagramPublicationProvider } from "../../modules/publication/providers/instagram-publication.provider";
+import { LinkedInPublicationProvider } from "../../modules/publication/providers/linkedin-publication.provider";
+import { XPublicationProvider } from "../../modules/publication/providers/x-publication.provider";
+import { TikTokPublicationProvider } from "../../modules/publication/providers/tiktok-publication.provider";
+import { PinterestPublicationProvider } from "../../modules/publication/providers/pinterest-publication.provider";
 import { PublicationService } from "../../modules/publication/publication.service";
 import { deleteCachePattern } from "../../lib/redis.js";
 import { broadcastPublicationEvent } from "../../modules/publication/publication-websocket.routes.js";
@@ -29,6 +33,10 @@ import { requiresMedia } from "@brint/shared-config/platform-rules";
 const prisma = new PrismaClient();
 const facebookProvider = new FacebookPublicationProvider();
 const instagramProvider = new InstagramPublicationProvider();
+const linkedinProvider = new LinkedInPublicationProvider();
+const xProvider = new XPublicationProvider();
+const tiktokProvider = new TikTokPublicationProvider();
+const pinterestProvider = new PinterestPublicationProvider();
 const publicationService = new PublicationService();
 
 /**
@@ -214,6 +222,18 @@ createWorker(
         break;
       case "INSTAGRAM":
         result = await instagramProvider.publish(publication as any);
+        break;
+      case "LINKEDIN":
+        result = await linkedinProvider.publish(publication as any);
+        break;
+      case "X":
+        result = await xProvider.publish(publication as any);
+        break;
+      case "TIKTOK":
+        result = await tiktokProvider.publish(publication as any);
+        break;
+      case "PINTEREST":
+        result = await pinterestProvider.publish(publication as any);
         break;
       default:
         throw new Error(`Unsupported platform: ${publication.platform}`);

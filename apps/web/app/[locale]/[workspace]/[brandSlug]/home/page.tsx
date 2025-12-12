@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { IconDots, IconPin, IconPinFilled } from "@tabler/icons-react"
+import { SocialIcon } from "react-social-icons"
 
 export default function BrandHomePage() {
   const params = useParams()
@@ -121,6 +122,17 @@ export default function BrandHomePage() {
       
       <div>
         <p className="text-muted-foreground">Brand: @{brandSlug}</p>
+      </div>
+      
+      {/* Social Media Icons Demo */}
+      <div className="flex items-center gap-4 p-6 border rounded-lg">
+        <SocialIcon network="facebook" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="instagram" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="youtube" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="linkedin" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="tiktok" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="x" style={{ height: 40, width: 40 }} />
+        <SocialIcon network="pinterest" style={{ height: 40, width: 40 }} />
       </div>
     </div>
   )

@@ -67,11 +67,51 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
 }: ContentFooterActionsProps) {
   const t = useTranslations("contentCreation")
 
+  // Calculate minimum date/time (10 minutes from now)
+  const minDateTime = useMemo(() => {
+    const now = new Date()
+    const minTime = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes from now
+    return minTime
+  }, [])
+
+  // Get minimum time value for time input (HH:MM format)
+  const minTimeValue = useMemo(() => {
+    if (!selectedDate) return undefined
+    
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const selected = new Date(selectedDate)
+    selected.setHours(0, 0, 0, 0)
+    
+    // If selected date is today, return minimum time (current time + 10 minutes)
+    if (selected.getTime() === today.getTime()) {
+      const minTime = new Date(minDateTime)
+      const hours = String(minTime.getHours()).padStart(2, '0')
+      const minutes = String(minTime.getMinutes()).padStart(2, '0')
+      return `${hours}:${minutes}`
+    }
+    
+    // For future dates, no minimum time restriction
+    return undefined
+  }, [selectedDate, minDateTime])
+
+  // Check if selected date/time is valid (at least 10 minutes in the future)
+  const isDateTimeValid = useMemo(() => {
+    if (!selectedDate || !selectedTime) return false
+    
+    const dateTime = new Date(selectedDate)
+    const [hours, minutes] = selectedTime.split(':')
+    dateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+    
+    return dateTime >= minDateTime
+  }, [selectedDate, selectedTime, minDateTime])
+
   return (
     <div className="flex-shrink-0 border-t bg-background px-4 py-3 flex items-center justify-between gap-4">
       {/* Left Side - Create Another & Save Drafts */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+        {/* Create Another - Hidden on mobile */}
+        <div className="hidden sm:flex items-center gap-2">
           <Checkbox
             id="create-another"
             checked={createAnother}
@@ -81,13 +121,14 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
             {t("createAnother")}
           </Label>
         </div>
-        <div className="h-4 w-px bg-border"></div>
+        <div className="hidden sm:block h-4 w-px bg-border"></div>
+        {/* Save Draft - Hidden on mobile (shown in header instead) */}
         <Button
           variant="ghost"
           size="sm"
           onClick={onSaveDraft}
           disabled={!canSaveDraft || isSavingDraft}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          className="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground"
         >
           {t("saveDrafts")}
         </Button>
@@ -180,9 +221,20 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
                     type="button"
                     onClick={() => {
                       onPublishModeChange('setDateTime')
+                      const today = new Date()
+                      today.setHours(0, 0, 0, 0)
+                      
                       if (!selectedDate) {
-                        onDateChange(new Date())
+                        onDateChange(today)
                       }
+                      
+                      // Set time to 10 minutes from now
+                      const now = new Date()
+                      const minTime = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes from now
+                      const hours = String(minTime.getHours()).padStart(2, '0')
+                      const minutes = String(minTime.getMinutes()).padStart(2, '0')
+                      onTimeChange(`${hours}:${minutes}`)
+                      
                       onShowDateTimePickerChange(true)
                     }}
                     className={`w-full text-left p-2.5 rounded-md transition-colors mt-2 ${
@@ -213,8 +265,37 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
                     <Calendar
                       mode="single"
                       selected={selectedDate}
-                      onSelect={onDateChange}
+                      onSelect={(date) => {
+                        onDateChange(date)
+                        
+                        // If today is selected and current time is less than 10 minutes from now, set time to 10 minutes from now
+                        if (date) {
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          const selected = new Date(date)
+                          selected.setHours(0, 0, 0, 0)
+                          
+                          if (selected.getTime() === today.getTime()) {
+                            const now = new Date()
+                            const minTime = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes from now
+                            const hours = String(minTime.getHours()).padStart(2, '0')
+                            const minutes = String(minTime.getMinutes()).padStart(2, '0')
+                            onTimeChange(`${hours}:${minutes}`)
+                          } else if (!selectedTime) {
+                            // For future dates, set a default time if none is set
+                            onTimeChange("09:00")
+                          }
+                        }
+                      }}
                       initialFocus
+                      disabled={(date) => {
+                        // Disable past dates (before today)
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const checkDate = new Date(date)
+                        checkDate.setHours(0, 0, 0, 0)
+                        return checkDate < today
+                      }}
                     />
                   </div>
 
@@ -230,9 +311,15 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
                         type="time"
                         value={selectedTime}
                         onChange={(e) => onTimeChange(e.target.value)}
+                        min={minTimeValue}
                         className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto flex-1 w-full"
                       />
                     </div>
+                    {!isDateTimeValid && selectedDate && selectedTime && (
+                      <p className="text-xs text-destructive mt-1.5">
+                        {t("scheduleMinimumTime")}
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -249,7 +336,7 @@ export const ContentFooterActions = React.memo(function ContentFooterActions({
                     <Button
                       size="sm"
                       onClick={onDateTimeConfirm}
-                      disabled={!selectedDate || !selectedTime}
+                      disabled={!selectedDate || !selectedTime || !isDateTimeValid}
                     >
                       {t("done")}
                     </Button>

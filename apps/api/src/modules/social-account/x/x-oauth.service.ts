@@ -24,6 +24,7 @@ export const X_SCOPES = [
   'tweet.read',
   'tweet.write',
   'users.read',
+  'media.write', // Required for media uploads
   'offline.access', // For refresh token
 ];
 

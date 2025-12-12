@@ -34,7 +34,7 @@ export function usePublishOptions({
     } else if (publishMode === 'setDateTime' && selectedDate && selectedTime) {
       const dateTime = new Date(selectedDate)
       const [hours, minutes] = selectedTime.split(':')
-      dateTime.setHours(parseInt(hours), parseInt(minutes))
+      dateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
       return {
         scheduledAt: dateTime.toISOString(),
         status: 'SCHEDULED',

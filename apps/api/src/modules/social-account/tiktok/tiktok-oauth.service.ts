@@ -22,6 +22,7 @@ export const TIKTOK_SCOPES = [
   'user.info.basic',
   'video.list',
   'video.upload',
+  'video.publish', // Required for publishing videos
 ];
 
 // ============================================================================

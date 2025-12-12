@@ -4,6 +4,8 @@ import { IntegrationRepository } from '../integration.repository.js';
 import { IntegrationType, IntegrationStatus } from '@prisma/client';
 import { GoogleDriveOAuthClient } from './google-drive.client.js';
 import { GOOGLE_DRIVE_CONFIG } from '../../../config/integration-config.js';
+import { getCache, setCache } from '../../../lib/redis.js';
+import { logger } from '../../../lib/logger.js';
 
 interface WorkspaceContext {
   workspaceId: string;
@@ -466,6 +468,19 @@ export class GoogleDriveIntegrationService {
       });
     }
 
+    // Check Redis cache first
+    const cacheKey = `gdrive:thumbnail:${ctx.workspaceId}:${fileId}`;
+    const cached = await getCache<{ buffer: string; contentType: string }>(cacheKey);
+    
+    if (cached) {
+      // Decode base64 buffer
+      const buffer = Buffer.from(cached.buffer, 'base64');
+      return {
+        buffer,
+        contentType: cached.contentType,
+      };
+    }
+
     // Get file metadata to get thumbnail link
     const metadata = await this.oauth.getFileMetadata(accessToken, fileId);
     
@@ -475,6 +490,21 @@ export class GoogleDriveIntegrationService {
 
     // Download thumbnail with access token
     const thumbnailBuffer = await this.oauth.downloadThumbnail(accessToken, fileId);
+    
+    // Cache thumbnail in Redis (24 hours TTL)
+    try {
+      await setCache(
+        cacheKey,
+        {
+          buffer: thumbnailBuffer.toString('base64'),
+          contentType: 'image/jpeg',
+        },
+        86400 // 24 hours
+      );
+    } catch (cacheError) {
+      // Log but don't fail if cache fails
+      logger.warn({ err: cacheError, cacheKey }, 'Failed to cache Google Drive thumbnail');
+    }
     
     return {
       buffer: thumbnailBuffer,

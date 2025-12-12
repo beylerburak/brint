@@ -12,6 +12,9 @@ interface ContentModalHeaderProps {
   isDeleting: boolean
   onClose: () => void
   onDeleteClick: () => void
+  onSaveDraft?: () => void
+  isSavingDraft?: boolean
+  canSaveDraft?: boolean
 }
 
 export const ContentModalHeader = React.memo(function ContentModalHeader({
@@ -22,6 +25,9 @@ export const ContentModalHeader = React.memo(function ContentModalHeader({
   isDeleting,
   onClose,
   onDeleteClick,
+  onSaveDraft,
+  isSavingDraft,
+  canSaveDraft,
 }: ContentModalHeaderProps) {
   const t = useTranslations("contentCreation")
 
@@ -66,6 +72,18 @@ export const ContentModalHeader = React.memo(function ContentModalHeader({
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+        {/* Save Draft - Only visible on mobile */}
+        {onSaveDraft && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSaveDraft}
+            disabled={!canSaveDraft || isSavingDraft}
+            className="sm:hidden text-xs text-muted-foreground hover:text-foreground h-8 px-2"
+          >
+            {t("saveDrafts")}
+          </Button>
+        )}
         {contentId && (
           <Popover>
             <PopoverTrigger asChild>

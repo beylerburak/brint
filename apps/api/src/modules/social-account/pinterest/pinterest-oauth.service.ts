@@ -242,6 +242,142 @@ export async function handlePinterestCallback(
     businessName: userAccount.business_name
   }, 'Fetched Pinterest user account');
 
+  // Step 3.5: Fetch first board ID to save as default
+  // Try sandbox first (for trial access), fallback to production
+  let defaultBoardId: string | undefined;
+  const PINTEREST_API_SANDBOX = 'https://api-sandbox.pinterest.com/v5';
+  const PINTEREST_API_PRODUCTION = 'https://api.pinterest.com/v5';
+  
+  try {
+    logger.info('Pinterest callback - fetching user boards to get default board (trying sandbox first)');
+    
+    // Try sandbox first
+    let boardsUrl = `${PINTEREST_API_SANDBOX}/boards`;
+    let boardsResponse = await fetch(boardsUrl, {
+      headers: {
+        'Authorization': `Bearer ${tokenResult.accessToken}`,
+      },
+    });
+
+    // If sandbox fails, try production
+    if (!boardsResponse.ok && (boardsResponse.status === 403 || boardsResponse.status === 404)) {
+      logger.info('Pinterest callback - sandbox boards API failed, trying production');
+      boardsUrl = `${PINTEREST_API_PRODUCTION}/boards`;
+      boardsResponse = await fetch(boardsUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokenResult.accessToken}`,
+        },
+      });
+    }
+
+    if (boardsResponse.ok) {
+      const boardsData = await boardsResponse.json();
+      const boards = boardsData?.items || boardsData?.data || [];
+      
+      if (Array.isArray(boards) && boards.length > 0) {
+        defaultBoardId = boards[0]?.id;
+        logger.info(
+          {
+            boardId: defaultBoardId,
+            boardName: boards[0]?.name,
+            totalBoards: boards.length,
+            endpoint: boardsUrl.includes('sandbox') ? 'sandbox' : 'production',
+          },
+          'Pinterest callback - found default board'
+        );
+      } else {
+        logger.warn('Pinterest callback - no boards found for user, will try to create default board');
+      }
+    } else {
+      logger.warn(
+        {
+          status: boardsResponse.status,
+          statusText: boardsResponse.statusText,
+          endpoint: boardsUrl,
+        },
+        'Pinterest callback - failed to fetch boards, will try to create default board'
+      );
+    }
+  } catch (boardError: any) {
+    logger.warn(
+      {
+        error: boardError?.message,
+        errorStack: boardError?.stack,
+      },
+      'Pinterest callback - error fetching boards, will try to create default board'
+    );
+  }
+  
+  // If no board found, try to create a default board
+  if (!defaultBoardId) {
+    try {
+      logger.info('Pinterest callback - creating default board');
+      
+      // Try sandbox first
+      let createBoardUrl = `${PINTEREST_API_SANDBOX}/boards`;
+      const boardPayload = {
+        name: 'All Pins',
+        description: 'Default board for pins',
+        privacy: 'PUBLIC',
+      };
+      
+      let createResponse = await fetch(createBoardUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(boardPayload),
+      });
+      
+      // If sandbox fails, try production
+      if (!createResponse.ok && (createResponse.status === 403 || createResponse.status === 404)) {
+        logger.info('Pinterest callback - sandbox board creation failed, trying production');
+        createBoardUrl = `${PINTEREST_API_PRODUCTION}/boards`;
+        createResponse = await fetch(createBoardUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenResult.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(boardPayload),
+        });
+      }
+      
+      if (createResponse.ok) {
+        const boardData = await createResponse.json();
+        defaultBoardId = boardData?.id;
+        logger.info(
+          {
+            boardId: defaultBoardId,
+            boardName: boardData?.name,
+            endpoint: createBoardUrl.includes('sandbox') ? 'sandbox' : 'production',
+          },
+          'Pinterest callback - created default board'
+        );
+      } else {
+        const errorText = await createResponse.text().catch(() => '');
+        logger.warn(
+          {
+            status: createResponse.status,
+            statusText: createResponse.statusText,
+            errorText,
+            endpoint: createBoardUrl,
+          },
+          'Pinterest callback - failed to create default board (non-fatal, continuing)'
+        );
+      }
+    } catch (createError: any) {
+      logger.warn(
+        {
+          error: createError?.message,
+          errorStack: createError?.stack,
+        },
+        'Pinterest callback - error creating default board (non-fatal, continuing)'
+      );
+    }
+  }
+
   // Step 4: Save as SocialAccount
   logger.info({ brandId: decoded.brandId }, 'Pinterest callback - saving social account');
   
@@ -266,9 +402,11 @@ export async function handlePinterestCallback(
         scopes: tokenResult.scope,
         rawProfile: {
           user: userAccount,
+          defaultBoardId, // Save default board ID in rawProfile
         },
         tokenData: {
           accountId: userAccount.id,
+          boardId: defaultBoardId, // Also save in tokenData for easy access
         },
         canPublish: true,
       },

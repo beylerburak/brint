@@ -83,7 +83,8 @@ export function ContentCreationModal({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   
   // Google Drive state
-  const [isGoogleDrivePickerOpen, setIsGoogleDrivePickerOpen] = useState(false)
+  const [isGoogleDrivePickerOpen, setIsGoogleDrivePickerOpen] = useState(false) // Keep for backward compatibility but not used for modal
+  const [showGoogleDrivePickerInPreview, setShowGoogleDrivePickerInPreview] = useState(false)
   const [isGoogleDriveAvailable, setIsGoogleDriveAvailable] = useState(false)
   const [isCheckingGoogleDrive, setIsCheckingGoogleDrive] = useState(false)
   
@@ -92,6 +93,9 @@ export function ContentCreationModal({
   
   // Store random number for media lookup ID (generated once per modal open)
   const mediaLookupRandomRef = useRef<number | null>(null)
+  
+  // Store loaded media to set to mediaManager later
+  const loadedMediaRef = useRef<ContentMediaItem[] | null>(null)
 
   // Load content callback for useContentFormState
   const loadContent = useCallback(async (contentId: string) => {
@@ -122,6 +126,9 @@ export function ContentCreationModal({
         })
       }
     }
+    
+    // Store media in ref to set to mediaManager later
+    loadedMediaRef.current = media
     
     return {
       formFactor: content.formFactor as ContentFormFactor,
@@ -271,11 +278,21 @@ export function ContentCreationModal({
     }
   }, [open])
 
+  // Set loaded media to mediaManager when content is loaded (for draft/edit mode)
+  useEffect(() => {
+    if (loadedMediaRef.current !== null && contentId && !formState.isLoadingContent) {
+      mediaManager.setSelectedMedia(loadedMediaRef.current)
+      loadedMediaRef.current = null // Clear ref after setting
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentId, formState.isLoadingContent, mediaManager.setSelectedMedia]) // Trigger when content loading is complete
+
   // Reset form when modal closes
   useEffect(() => {
     if (!open) {
       formState.resetForm()
       mediaManager.setSelectedMedia([])
+      loadedMediaRef.current = null // Clear loaded media ref
       setShowDeleteDialog(false)
       setIsGoogleDrivePickerOpen(false)
     }
@@ -346,18 +363,25 @@ export function ContentCreationModal({
   }, [])
 
   const isAccountIncompatible = useCallback((accountId: string): boolean => {
-    if (!formState.formFactor) return false
     const account = socialAccounts.find((a) => a.id === accountId)
     if (!account) return false
+    
+    // Temporarily disable TikTok and Pinterest accounts
+    if (account.platform === 'TIKTOK' || account.platform === 'PINTEREST') {
+      return true
+    }
+    
+    if (!formState.formFactor) return false
     return !isFormFactorSupported(account.platform, formState.formFactor)
   }, [formState.formFactor, socialAccounts, isFormFactorSupported])
 
   // Select all compatible accounts (toggle behavior)
   const handleSelectAll = useCallback(() => {
-    // Get compatible accounts
-    const compatibleAccounts = formState.formFactor
+    // Get compatible accounts (exclude TikTok and Pinterest temporarily)
+    const compatibleAccounts = (formState.formFactor
       ? socialAccounts.filter(account => isFormFactorSupported(account.platform, formState.formFactor!))
       : socialAccounts
+    ).filter(account => account.platform !== 'TIKTOK' && account.platform !== 'PINTEREST')
     
     const compatibleAccountIds = compatibleAccounts.map(account => account.id)
     
@@ -661,6 +685,19 @@ export function ContentCreationModal({
     setIsPublishing(true)
     try {
       const { scheduledAt: finalScheduledAt, status: finalStatus } = publishOptions.getFinalScheduledAtAndStatus()
+      
+      // Validate scheduled time if scheduling
+      if (finalScheduledAt && status === 'SCHEDULED') {
+        const scheduledDateTime = new Date(finalScheduledAt)
+        const now = new Date()
+        const minDateTime = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes from now
+        
+        if (scheduledDateTime < minDateTime) {
+          toast.error(t("scheduleMinimumTimeError") || "Schedule time must be at least 10 minutes in the future")
+          setIsPublishing(false)
+          return
+        }
+      }
 
       const uploadedMediaIds: string[] = []
 
@@ -789,12 +826,22 @@ export function ContentCreationModal({
     if (formState.selectedDate && formState.selectedTime) {
       const dateTime = new Date(formState.selectedDate)
       const [hours, minutes] = formState.selectedTime.split(':')
-      dateTime.setHours(parseInt(hours), parseInt(minutes))
+      dateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+      
+      // Validate: must be at least 10 minutes in the future
+      const now = new Date()
+      const minDateTime = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes from now
+      
+      if (dateTime < minDateTime) {
+        toast.error(t("scheduleMinimumTimeError") || "Schedule time must be at least 10 minutes in the future")
+        return
+      }
+      
       formState.setPublishMode('setDateTime')
       formState.setShowPublishOptions(false)
       formState.setShowDateTimePicker(false)
     }
-  }, [formState])
+  }, [formState, t])
 
   // Handle Google Drive files selected
   const handleGoogleDriveFilesSelected = useCallback((mediaItems: ContentMediaItem[]) => {
@@ -820,6 +867,9 @@ export function ContentCreationModal({
           isDeleting={isDeleting}
           onClose={() => onOpenChange(false)}
           onDeleteClick={() => setShowDeleteDialog(true)}
+          onSaveDraft={handleSaveDraft}
+          isSavingDraft={isSavingDraft}
+          canSaveDraft={!!formState.formFactor && formState.selectedAccountIds.length > 0}
         />
 
         {/* Main Content Area - Two Columns */}
@@ -861,7 +911,7 @@ export function ContentCreationModal({
                 sensors={sensors}
                 isGoogleDriveAvailable={isGoogleDriveAvailable}
                 isCheckingGoogleDrive={isCheckingGoogleDrive}
-                onOpenDrivePicker={() => setIsGoogleDrivePickerOpen(true)}
+                onOpenDrivePicker={() => setShowGoogleDrivePickerInPreview(true)}
                 useMediaLookupOnPublish={formState.useMediaLookupOnPublish}
                 onUseMediaLookupChange={formState.setUseMediaLookupOnPublish}
                 mediaLookupId={formState.mediaLookupId}
@@ -894,7 +944,12 @@ export function ContentCreationModal({
             </div>
           </div>
 
-          <ContentPreviewPanel />
+          <ContentPreviewPanel
+            isGoogleDriveAvailable={isGoogleDriveAvailable}
+            onFilesSelected={handleGoogleDriveFilesSelected}
+            showGoogleDrivePicker={showGoogleDrivePickerInPreview}
+            onShowGoogleDrivePickerChange={setShowGoogleDrivePickerInPreview}
+          />
         </div>
 
         <ContentFooterActions
@@ -948,11 +1003,7 @@ export function ContentCreationModal({
         onConfirm={handleDeleteContent}
       />
 
-      <GoogleDrivePickerDialog
-        open={isGoogleDrivePickerOpen}
-        onOpenChange={setIsGoogleDrivePickerOpen}
-        onFilesSelected={handleGoogleDriveFilesSelected}
-      />
+      {/* Google Drive picker is now integrated into preview panel, no separate dialog needed */}
     </Dialog>
   )
 }

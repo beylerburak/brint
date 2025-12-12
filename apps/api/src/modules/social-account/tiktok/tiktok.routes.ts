@@ -95,10 +95,10 @@ export async function registerTikTokRoutes(app: FastifyInstance): Promise<void> 
   });
 
   // ============================================================================
-  // GET /v1/social-accounts/oauth/tiktok/callback
+  // GET /api/social-accounts/tiktok/callback
   // TikTok OAuth callback handler
   // ============================================================================
-  app.get('/v1/social-accounts/oauth/tiktok/callback', {
+  app.get('/api/social-accounts/tiktok/callback', {
     schema: {
       tags: ['Social Account - TikTok'],
       summary: 'TikTok OAuth callback',

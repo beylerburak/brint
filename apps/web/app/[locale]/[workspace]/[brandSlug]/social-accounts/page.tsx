@@ -27,14 +27,6 @@ import {
 import { 
   IconDots, 
   IconPlus,
-  IconBrandInstagram,
-  IconBrandFacebook,
-  IconBrandTiktok,
-  IconBrandLinkedin,
-  IconBrandX,
-  IconBrandYoutube,
-  IconBrandWhatsapp,
-  IconBrandPinterest,
   IconRefresh,
   IconUnlink,
   IconTrash,
@@ -45,6 +37,7 @@ import {
   IconInfoCircle,
   IconBuildingStore,
 } from "@tabler/icons-react"
+import { SocialIcon } from "react-social-icons"
 import { toast } from "sonner"
 import { apiClient, type SocialAccountDto, type SocialPlatform, type SocialAccountStatus } from "@/lib/api-client"
 import { useWorkspace } from "@/contexts/workspace-context"
@@ -62,7 +55,7 @@ import { UpgradeDialog } from "@/features/workspace/upgrade-dialog"
 
 type PlatformConfig = {
   name: string;
-  icon: React.ComponentType<{ className?: string }>;
+  network: string;
   color: string;
   bgColor: string;
   connectUrl?: string;
@@ -71,49 +64,49 @@ type PlatformConfig = {
 const PLATFORM_CONFIG: Record<SocialPlatform, PlatformConfig> = {
   INSTAGRAM: {
     name: "Instagram",
-    icon: IconBrandInstagram,
+    network: "instagram",
     color: "text-pink-500",
     bgColor: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400",
   },
   FACEBOOK: {
     name: "Facebook",
-    icon: IconBrandFacebook,
+    network: "facebook",
     color: "text-blue-600",
     bgColor: "bg-blue-600",
   },
   TIKTOK: {
     name: "TikTok",
-    icon: IconBrandTiktok,
+    network: "tiktok",
     color: "text-black dark:text-white",
     bgColor: "bg-black dark:bg-white",
   },
   LINKEDIN: {
     name: "LinkedIn",
-    icon: IconBrandLinkedin,
+    network: "linkedin",
     color: "text-blue-700",
     bgColor: "bg-blue-700",
   },
   X: {
     name: "X",
-    icon: IconBrandX,
+    network: "x",
     color: "text-black dark:text-white",
     bgColor: "bg-black dark:bg-white",
   },
   YOUTUBE: {
     name: "YouTube",
-    icon: IconBrandYoutube,
+    network: "youtube",
     color: "text-red-600",
     bgColor: "bg-red-600",
   },
   WHATSAPP: {
     name: "WhatsApp",
-    icon: IconBrandWhatsapp,
+    network: "whatsapp",
     color: "text-green-500",
     bgColor: "bg-green-500",
   },
   PINTEREST: {
     name: "Pinterest",
-    icon: IconBrandPinterest,
+    network: "pinterest",
     color: "text-red-600",
     bgColor: "bg-red-600",
   },
@@ -174,7 +167,6 @@ function SocialAccountCard({
   brandAvatarUrl?: string | null;
 }) {
   const config = PLATFORM_CONFIG[account.platform];
-  const Icon = config.icon;
 
   // Use account avatar, fallback to brand avatar, then to icon
   // For YouTube, use brand avatar as fallback if external avatar is not available
@@ -194,13 +186,21 @@ function SocialAccountCard({
         <div className="relative flex-shrink-0">
           <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
             <AvatarImage src={avatarUrl} />
-            <AvatarFallback className="bg-muted">
-              <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${config.color}`} />
+            <AvatarFallback className="bg-muted flex items-center justify-center">
+              <SocialIcon 
+                network={config.network} 
+                style={{ height: 40, width: 40 }} 
+                className="!h-10 !w-10 sm:!h-12 sm:!w-12"
+              />
             </AvatarFallback>
           </Avatar>
           {/* Platform Icon Overlay - bottom right corner */}
-          <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 p-0.5 sm:p-1 rounded-full ${config.bgColor} border-2 border-background`}>
-            <Icon className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${account.platform === 'X' || account.platform === 'TIKTOK' ? 'text-white dark:text-black' : 'text-white'}`} />
+          <div className="absolute -bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5">
+            <SocialIcon 
+              network={config.network} 
+              style={{ height: 20, width: 20 }} 
+              className="!h-5 !w-5 sm:!h-6 sm:!w-6"
+            />
           </div>
         </div>
 
@@ -416,7 +416,7 @@ function ConnectAccountDialog({
     {
       id: 'facebook',
       name: 'Facebook Page',
-      icon: IconBrandFacebook,
+      network: 'facebook',
       bgColor: 'bg-blue-600',
       enabled: true,
       platform: 'FACEBOOK' as SocialPlatform,
@@ -426,7 +426,7 @@ function ConnectAccountDialog({
     {
       id: 'linkedin',
       name: 'LinkedIn',
-      icon: IconBrandLinkedin,
+      network: 'linkedin',
       bgColor: 'bg-blue-700',
       enabled: true,
       platform: 'LINKEDIN' as SocialPlatform,
@@ -436,7 +436,7 @@ function ConnectAccountDialog({
     {
       id: 'twitter',
       name: 'X',
-      icon: IconBrandX,
+      network: 'x',
       bgColor: 'bg-black dark:bg-white',
       iconColor: 'text-white dark:text-black',
       enabled: true,
@@ -447,7 +447,7 @@ function ConnectAccountDialog({
     {
       id: 'tiktok',
       name: 'TikTok',
-      icon: IconBrandTiktok,
+      network: 'tiktok',
       bgColor: 'bg-black dark:bg-white',
       iconColor: 'text-white dark:text-black',
       enabled: true,
@@ -458,7 +458,7 @@ function ConnectAccountDialog({
     {
       id: 'youtube',
       name: 'YouTube',
-      icon: IconBrandYoutube,
+      network: 'youtube',
       bgColor: 'bg-red-600',
       enabled: true,
       platform: 'YOUTUBE' as SocialPlatform,
@@ -468,7 +468,7 @@ function ConnectAccountDialog({
     {
       id: 'instagram',
       name: 'Instagram Page',
-      icon: IconBrandInstagram,
+      network: 'instagram',
       bgColor: 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400',
       enabled: true,
       platform: 'INSTAGRAM' as SocialPlatform,
@@ -478,7 +478,7 @@ function ConnectAccountDialog({
     {
       id: 'pinterest',
       name: 'Pinterest',
-      icon: IconBrandPinterest,
+      network: 'pinterest',
       bgColor: 'bg-red-600',
       enabled: true,
       platform: 'PINTEREST' as SocialPlatform,
@@ -496,7 +496,6 @@ function ConnectAccountDialog({
         
         <div className="grid grid-cols-3 gap-4 py-4">
           {platforms.map((platform) => {
-            const Icon = platform.icon;
             const isDisabled = !platform.enabled || platform.loading;
             
             return (
@@ -526,12 +525,12 @@ function ConnectAccountDialog({
                 </div>
 
                 {/* Platform icon */}
-                <div className={`
-                  w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center
-                  ${platform.bgColor}
-                  ${isDisabled ? 'opacity-50' : ''}
-                `}>
-                  <Icon className={`h-8 w-8 ${platform.iconColor || 'text-white'}`} />
+                <div className={`mx-auto mb-4 ${isDisabled ? 'opacity-50' : ''}`}>
+                  <SocialIcon 
+                    network={platform.network} 
+                    style={{ height: 64, width: 64 }} 
+                    className="!h-16 !w-16"
+                  />
                 </div>
 
                 {/* Platform name */}
@@ -727,8 +726,12 @@ function LinkedInSelectionDialog({
                   
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={account.avatarUrl || account.externalAvatarUrl || undefined} />
-                    <AvatarFallback>
-                      <IconBrandLinkedin className="h-5 w-5 text-blue-700" />
+                    <AvatarFallback className="flex items-center justify-center">
+                      <SocialIcon 
+                        network="linkedin" 
+                        style={{ height: 40, width: 40 }} 
+                        className="!h-10 !w-10"
+                      />
                     </AvatarFallback>
                   </Avatar>
 

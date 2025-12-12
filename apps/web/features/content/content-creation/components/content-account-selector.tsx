@@ -1,9 +1,24 @@
 import React from "react"
 import { useTranslations } from "next-intl"
 import { Label } from "@/components/ui/label"
-import { SocialPlatformIcon, getPlatformColor } from "@/components/social-platform-icon"
+import { SocialIcon } from "react-social-icons"
 import type { ContentFormFactor } from "@brint/shared-config/platform-rules"
 import type { SocialAccount } from "../content-creation.types"
+
+// Map platform enum to react-social-icons network string
+const getSocialIconNetwork = (platform: string): string => {
+  const networkMap: Record<string, string> = {
+    INSTAGRAM: "instagram",
+    FACEBOOK: "facebook",
+    TIKTOK: "tiktok",
+    LINKEDIN: "linkedin",
+    X: "x",
+    YOUTUBE: "youtube",
+    WHATSAPP: "whatsapp",
+    PINTEREST: "pinterest",
+  };
+  return networkMap[platform] || "facebook";
+};
 
 interface ContentAccountSelectorProps {
   socialAccounts: SocialAccount[]
@@ -65,7 +80,7 @@ export const ContentAccountSelector = React.memo(function ContentAccountSelector
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+        <div className="grid grid-cols-6 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-11 gap-3">
           {socialAccounts.map((account) => {
             const isIncompatible = isAccountIncompatible(account.id)
             const isSelected = selectedAccountIds.includes(account.id)
@@ -91,84 +106,58 @@ export const ContentAccountSelector = React.memo(function ContentAccountSelector
                 `}
                 style={{ width: 48, height: 48 }}
               >
-                {/* Account Avatar with Platform Border + Icon */}
+                {/* Account Avatar with Platform Icon */}
                 <div className="relative w-full h-full">
-                  {/* Outer border with platform color */}
-                  <div
-                    className={`rounded-full p-0.5 flex items-center justify-center ${
-                      isIncompatible
-                        ? 'border border-border/50 dark:border-border/40'
-                        : account.platform === 'X' || account.platform === 'TIKTOK'
-                        ? 'border-2 border-gray-400 dark:border-gray-500'
-                        : ''
-                    }`}
-                    style={{
-                      backgroundColor: isIncompatible
-                        ? 'transparent'
-                        : account.platform === 'X' || account.platform === 'TIKTOK'
-                        ? 'transparent'
-                        : getPlatformColor(account.platform),
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
-                    {/* Inner white/background circle with padding */}
-                    <div className="h-full w-full rounded-full bg-background p-0.5 flex items-center justify-center">
-                      {/* Avatar */}
-                      <div className="h-full w-full rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border/50 dark:border-border/40">
-                        {account.avatarUrl || account.externalAvatarUrl ? (
-                          <img
-                            src={account.avatarUrl || account.externalAvatarUrl || ''}
-                            alt={account.displayName || account.username || account.platform}
-                            className="h-full w-full rounded-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                              const parent = target.parentElement
-                              if (parent && !parent.querySelector('img[data-brand-logo]') && brandLogoUrl) {
-                                const fallback = document.createElement('img')
-                                fallback.src = brandLogoUrl
-                                fallback.alt = brandName || brandSlug || ''
-                                fallback.className = 'h-full w-full rounded-full object-cover'
-                                fallback.setAttribute('data-brand-logo', 'true')
-                                parent.appendChild(fallback)
-                              } else if (parent && !parent.querySelector('span[data-initials]')) {
-                                const fallback = document.createElement('span')
-                                fallback.className = 'text-[10px] font-semibold'
-                                fallback.setAttribute('data-initials', 'true')
-                                fallback.textContent = (account.displayName || account.username || account.platform).substring(0, 2).toUpperCase()
-                                parent.appendChild(fallback)
-                              }
-                            }}
-                          />
-                        ) : brandLogoUrl ? (
-                          <img
-                            src={brandLogoUrl}
-                            alt={brandName || brandSlug || ''}
-                            className="h-full w-full rounded-full object-cover"
-                            data-brand-logo="true"
-                          />
-                        ) : (
-                          <span className="text-[10px] font-semibold" data-initials="true">
-                            {(account.displayName || account.username || account.platform).substring(0, 2).toUpperCase()}
-                          </span>
-                        )}
+                  {/* Avatar */}
+                  <div className="h-full w-full rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border/50 dark:border-border/40">
+                    {account.avatarUrl || account.externalAvatarUrl ? (
+                      <img
+                        src={account.avatarUrl || account.externalAvatarUrl || ''}
+                        alt={account.displayName || account.username || account.platform}
+                        className="h-full w-full rounded-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const parent = target.parentElement
+                          if (parent && !parent.querySelector('img[data-brand-logo]') && brandLogoUrl) {
+                            const fallback = document.createElement('img')
+                            fallback.src = brandLogoUrl
+                            fallback.alt = brandName || brandSlug || ''
+                            fallback.className = 'h-full w-full rounded-full object-cover'
+                            fallback.setAttribute('data-brand-logo', 'true')
+                            parent.appendChild(fallback)
+                          } else if (parent && !parent.querySelector('[data-social-icon-fallback]')) {
+                            const fallback = document.createElement('div')
+                            fallback.setAttribute('data-social-icon-fallback', 'true')
+                            fallback.className = 'h-full w-full flex items-center justify-center'
+                            parent.appendChild(fallback)
+                          }
+                        }}
+                      />
+                    ) : brandLogoUrl ? (
+                      <img
+                        src={brandLogoUrl}
+                        alt={brandName || brandSlug || ''}
+                        className="h-full w-full rounded-full object-cover"
+                        data-brand-logo="true"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <SocialIcon 
+                          network={getSocialIconNetwork(account.platform)} 
+                          style={{ height: 48, width: 48 }} 
+                          className="!h-12 !w-12"
+                        />
                       </div>
-                    </div>
+                    )}
                   </div>
                   
-                  {/* Platform Icon - positioned at bottom right, overlapping border */}
-                  <div 
-                    className="absolute rounded-full bg-background p-0.5 border border-border dark:border-border/60 shadow-sm"
-                    style={{
-                      bottom: -2,
-                      right: -2,
-                    }}
-                  >
-                    <SocialPlatformIcon
-                      platform={account.platform}
-                      size={16}
-                      className="flex-shrink-0"
+                  {/* Platform Icon - positioned at bottom right, at the edge of avatar */}
+                  <div className={`absolute -bottom-0.5 -right-0.5 ${!isSelected ? 'grayscale' : ''}`}>
+                    <SocialIcon 
+                      network={getSocialIconNetwork(account.platform)} 
+                      style={{ height: 24, width: 24 }} 
+                      className="!h-6 !w-6"
                     />
                   </div>
                   

@@ -3,6 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
+# Lockfiles (pnpm workspace - use pnpm-lock.yaml at root)
+package-lock.json
+yarn.lock
+
 # Testing
 coverage/
 *.lcov

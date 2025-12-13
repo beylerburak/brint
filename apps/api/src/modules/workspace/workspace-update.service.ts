@@ -18,6 +18,7 @@ const UpdateWorkspaceSchema = z.object({
   timezone: z.string().optional(),
   locale: z.string().optional(),
   baseCurrency: z.string().length(3).optional(),
+  avatarMediaId: z.string().nullable().optional(),
 });
 
 export type UpdateWorkspaceInput = z.infer<typeof UpdateWorkspaceSchema>;

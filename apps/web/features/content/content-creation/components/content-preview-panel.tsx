@@ -331,7 +331,7 @@ export const ContentPreviewPanel = React.memo(function ContentPreviewPanel({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowGoogleDrivePicker(false)}
+              onClick={() => onShowGoogleDrivePickerChange(false)}
               disabled={isImporting}
               className="flex-1"
             >

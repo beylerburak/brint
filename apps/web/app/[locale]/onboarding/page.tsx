@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useParams } from "next/navigation"
 import { useLocale } from "next-intl"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
@@ -9,16 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { LogOut } from "lucide-react"
+import { buildWorkspaceUrl, buildLoginUrl, getLocaleFromPathnameOrParams } from "@/lib/locale-path"
 
 export default function OnboardingPage() {
   const router = useRouter()
   const pathname = usePathname()
+  const params = useParams()
   const locale = useLocale()
   
-  // Extract locale from pathname for redirect
-  const pathParts = pathname.split('/').filter(Boolean)
-  const potentialLocale = pathParts[0]
-  const currentLocale = ['en', 'tr'].includes(potentialLocale) ? potentialLocale : locale
+  // Extract locale from pathname or params
+  const currentLocale = getLocaleFromPathnameOrParams(pathname, params as { locale?: string })
   const [isLoading, setIsLoading] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -38,19 +38,12 @@ export default function OnboardingPage() {
       if (response.user.onboardingCompletedAt) {
         if (response.workspaces.length > 0) {
           const firstWorkspace = response.workspaces[0]
-          // Use locale prefix if locale is not default
-          const redirectPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/${firstWorkspace.slug}/home`
-            : `/${firstWorkspace.slug}/home`
-          router.replace(redirectPath)
+          router.replace(buildWorkspaceUrl(currentLocale, firstWorkspace.slug, "/home"))
           return
         }
         // If onboarding completed but no workspaces, still redirect away
         // (shouldn't happen, but handle gracefully)
-        const loginPath = currentLocale && currentLocale !== 'en'
-          ? `/${currentLocale}/login`
-          : '/login'
-        router.replace(loginPath)
+        router.replace(buildLoginUrl(currentLocale))
         return
       }
       
@@ -64,7 +57,7 @@ export default function OnboardingPage() {
       }
     } catch (error) {
       console.error('Failed to check onboarding status:', error)
-      router.replace('/login')
+      router.replace(buildLoginUrl(currentLocale))
     } finally {
       setIsLoading(false)
     }
@@ -83,35 +76,19 @@ export default function OnboardingPage() {
         const response = await apiClient.getMe()
         if (response.workspaces.length > 0) {
           const firstWorkspace = response.workspaces[0]
-          // Use locale prefix if locale is not default
-          const redirectPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/${firstWorkspace.slug}/home`
-            : `/${firstWorkspace.slug}/home`
-          router.replace(redirectPath)
+          router.replace(buildWorkspaceUrl(currentLocale, firstWorkspace.slug, "/home"))
         } else if (firstWorkspaceSlug) {
           // Fallback to stored slug if refresh fails
-          const redirectPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/${firstWorkspaceSlug}/home`
-            : `/${firstWorkspaceSlug}/home`
-          router.replace(redirectPath)
+          router.replace(buildWorkspaceUrl(currentLocale, firstWorkspaceSlug, "/home"))
         } else {
-          const loginPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/login`
-            : '/login'
-          router.replace(loginPath)
+          router.replace(buildLoginUrl(currentLocale))
         }
       } catch (refreshError) {
         // If refresh fails, use stored slug
         if (firstWorkspaceSlug) {
-          const redirectPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/${firstWorkspaceSlug}/home`
-            : `/${firstWorkspaceSlug}/home`
-          router.replace(redirectPath)
+          router.replace(buildWorkspaceUrl(currentLocale, firstWorkspaceSlug, "/home"))
         } else {
-          const loginPath = currentLocale && currentLocale !== 'en'
-            ? `/${currentLocale}/login`
-            : '/login'
-          router.replace(loginPath)
+          router.replace(buildLoginUrl(currentLocale))
         }
       }
     } catch (error) {
@@ -127,7 +104,7 @@ export default function OnboardingPage() {
       setIsLoggingOut(true)
       await apiClient.logout()
       toast.success('Logged out successfully')
-      router.push('/login')
+      router.push(buildLoginUrl(currentLocale))
       router.refresh()
     } catch (error) {
       console.error('Failed to logout:', error)

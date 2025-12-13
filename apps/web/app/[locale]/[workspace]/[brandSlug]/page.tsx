@@ -5,6 +5,7 @@
  */
 
 import { redirect } from "next/navigation";
+import { withLocale } from "@/lib/locale-path";
 
 export default async function BrandRootPage({
   params,
@@ -12,6 +13,6 @@ export default async function BrandRootPage({
   params: Promise<{ locale: string; workspace: string; brandSlug: string }>;
 }) {
   const { locale, workspace, brandSlug } = await params;
-  redirect(`/${locale}/${workspace}/${brandSlug}/home`);
+  redirect(withLocale(locale, `/${workspace}/${brandSlug}/home`));
 }
 

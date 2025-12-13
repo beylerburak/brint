@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { apiClient } from "@/lib/api-client"
 import {
+  IconShieldCheck,
   IconCamera,
   IconChartBar,
   IconCirclePlusFilled,
@@ -20,13 +21,19 @@ import {
   IconMail,
   IconSearch,
   IconSettings,
-  IconShare3,
   IconUsers,
   type Icon,
 } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +51,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useSettingsModal } from "@/stores/use-settings-modal"
 
 // Navigation data structure
 export const navigationData = {
@@ -58,7 +66,7 @@ export const navigationData = {
       title: "Brands",
       titleKey: "nav.brands",
       url: `/${locale}/${workspaceSlug}/brands`,
-      icon: IconShare3,
+      icon: IconShieldCheck,
     },
     {
       title: "Lifecycle",
@@ -137,8 +145,9 @@ export const navigationData = {
     {
       title: "Settings",
       titleKey: "nav.settings",
-      url: `/${locale}/${workspaceSlug}/settings`,
+      url: "#",
       icon: IconSettings,
+      isSettings: true,
     },
     {
       title: "Get Help",
@@ -190,21 +199,39 @@ export function NavMain() {
         <SidebarMenu>
           {items.map((item) => {
             const translatedTitle = item.titleKey ? t(item.titleKey.split('.')[1]) : item.title
+            const isComingSoon = item.url === '#'
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton tooltip={translatedTitle} asChild={item.url !== '#'}>
-                  {item.url === '#' ? (
-                    <>
-                      {item.icon && <item.icon />}
-                      <span>{translatedTitle}</span>
-                    </>
-                  ) : (
+                {isComingSoon ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton
+                          disabled
+                          className="opacity-50 pointer-events-none cursor-not-allowed"
+                          aria-disabled="true"
+                          tabIndex={-1}
+                        >
+                          {item.icon && <item.icon />}
+                          <span>{translatedTitle}</span>
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            Soon
+                          </Badge>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Coming soon</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <SidebarMenuButton tooltip={translatedTitle} asChild>
                     <Link href={item.url}>
                       {item.icon && <item.icon />}
                       <span>{translatedTitle}</span>
                     </Link>
-                  )}
-                </SidebarMenuButton>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
             )
           })}
@@ -222,37 +249,46 @@ export function NavBrands() {
   const workspaceSlug = params?.workspace as string
   const locale = (params?.locale as string) || 'en'
   
-  // Get pinned brand from localStorage
-  const [pinnedBrand, setPinnedBrand] = React.useState<{ 
-    brandSlug: string; 
-    brandName?: string;
-    logoUrl?: string | null;
+  // Store only brandSlug in state, fetch fresh data from API always
+  const [pinnedBrandSlug, setPinnedBrandSlug] = React.useState<string | null>(null)
+  const [brandData, setBrandData] = React.useState<{
+    brandName: string;
+    logoUrl: string | null;
   } | null>(null)
 
-  // Try to fetch fresh brand info if logoUrl is missing
+  // Always fetch fresh brand info from API (to get fresh presigned URLs)
   React.useEffect(() => {
     const fetchBrandInfo = async () => {
-      if (!pinnedBrand || !currentWorkspace?.id || pinnedBrand.logoUrl !== undefined) {
+      if (!pinnedBrandSlug || !currentWorkspace?.id) {
+        setBrandData(null)
         return
       }
 
       try {
         const response = await apiClient.listBrands(currentWorkspace.id)
-        const brand = response.brands.find(b => b.slug === pinnedBrand.brandSlug)
+        const brand = response.brands.find(b => b.slug === pinnedBrandSlug)
         if (brand) {
-          setPinnedBrand(prev => prev ? {
-            ...prev,
+          setBrandData({
             brandName: brand.name,
             logoUrl: brand.logoUrl,
-          } : null)
+          })
+        } else {
+          // Brand not found, clear pinned brand
+          setPinnedBrandSlug(null)
+          setBrandData(null)
+          if (typeof window !== 'undefined') {
+            const key = `pinned-brand-${workspaceSlug}`
+            localStorage.removeItem(key)
+          }
         }
       } catch (error) {
         console.error('Failed to fetch brand info:', error)
+        setBrandData(null)
       }
     }
 
     fetchBrandInfo()
-  }, [pinnedBrand, currentWorkspace?.id])
+  }, [pinnedBrandSlug, currentWorkspace?.id, workspaceSlug])
 
   const loadPinnedBrand = React.useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -260,13 +296,18 @@ export function NavBrands() {
       const stored = localStorage.getItem(key)
       if (stored) {
         try {
-          setPinnedBrand(JSON.parse(stored))
+          const parsed = JSON.parse(stored)
+          // Extract brandSlug from localStorage (support both old and new formats)
+          // Old format: { brandSlug, brandName, logoUrl }
+          // We only need brandSlug, logoUrl will be fetched fresh from API
+          const slug = parsed.brandSlug || parsed.slug
+          setPinnedBrandSlug(slug || null)
         } catch {
           // Invalid JSON, ignore
-          setPinnedBrand(null)
+          setPinnedBrandSlug(null)
         }
       } else {
-        setPinnedBrand(null)
+        setPinnedBrandSlug(null)
       }
     }
   }, [workspaceSlug])
@@ -286,12 +327,12 @@ export function NavBrands() {
   }, [loadPinnedBrand])
 
   // Don't render if no brand is pinned
-  if (!pinnedBrand) {
+  if (!pinnedBrandSlug) {
     return null
   }
 
-  const brandUrl = `/${locale}/${workspaceSlug}/${pinnedBrand.brandSlug}/home`
-  const displayName = pinnedBrand.brandName || pinnedBrand.brandSlug
+  const brandUrl = `/${locale}/${workspaceSlug}/${pinnedBrandSlug}/home`
+  const displayName = brandData?.brandName || pinnedBrandSlug
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -302,14 +343,14 @@ export function NavBrands() {
             <Link href={brandUrl} className="flex items-center gap-2">
               <Avatar className="h-5 w-5 rounded-md">
                 <AvatarImage 
-                  src={pinnedBrand.logoUrl || undefined} 
+                  src={brandData?.logoUrl || undefined} 
                   alt={displayName}
                 />
                 <AvatarFallback className="rounded-md text-xs">
                   {displayName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span>@{pinnedBrand.brandSlug}</span>
+              <span>@{pinnedBrandSlug}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -328,6 +369,7 @@ export function NavSecondary({
   const locale = (params?.locale as string) || 'en'
   
   const items = navigationData.navSecondary(workspaceSlug, locale)
+  const { setOpen } = useSettingsModal()
 
   return (
     <SidebarGroup {...props}>
@@ -335,21 +377,55 @@ export function NavSecondary({
         <SidebarMenu>
           {items.map((item) => {
             const translatedTitle = item.titleKey ? t(item.titleKey.split('.')[1]) : item.title
+            const isComingSoon = item.url === '#'
+            const isSettings = (item as any).isSettings === true
+            
+            if (isSettings) {
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    onClick={() => setOpen(true)}
+                    tooltip={translatedTitle}
+                  >
+                    <item.icon />
+                    <span>{translatedTitle}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            }
+            
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
-                  {item.url === '#' ? (
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{translatedTitle}</span>
-                    </a>
-                  ) : (
+                {isComingSoon ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton
+                          disabled
+                          className="opacity-50 pointer-events-none cursor-not-allowed"
+                          aria-disabled="true"
+                          tabIndex={-1}
+                        >
+                          <item.icon />
+                          <span>{translatedTitle}</span>
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            Soon
+                          </Badge>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Coming soon</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <SidebarMenuButton asChild>
                     <Link href={item.url}>
                       <item.icon />
                       <span>{translatedTitle}</span>
                     </Link>
-                  )}
-                </SidebarMenuButton>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
             )
           })}

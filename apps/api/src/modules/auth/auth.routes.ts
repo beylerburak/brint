@@ -14,6 +14,7 @@ import { magicLinkService } from './magic-link.service.js';
 import { sendMagicLinkEmailStub } from './email.stub.js';
 import { sendVerificationCodeEmail } from './email.service.js';
 import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
+import { parseUserSettings } from '@brint/shared-config';
 
 /**
  * Registers authentication routes
@@ -65,6 +66,21 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
                 phoneNumber: { type: ['string', 'null'] },
                 phoneVerifiedAt: { type: ['string', 'null'], format: 'date-time' },
                 onboardingCompletedAt: { type: ['string', 'null'], format: 'date-time' },
+                settings: {
+                  type: 'object',
+                  properties: {
+                    version: { type: 'number' },
+                    ui: {
+                      type: 'object',
+                      properties: {
+                        theme: { type: 'string', enum: ['system', 'light', 'dark'] },
+                        language: { type: 'string', enum: ['tr', 'en'] },
+                      },
+                      required: ['theme', 'language'],
+                    },
+                  },
+                  required: ['version', 'ui'],
+                },
                 createdAt: { type: 'string', format: 'date-time' },
                 updatedAt: { type: 'string', format: 'date-time' },
               },
@@ -149,6 +165,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         phoneNumber: true,
         phoneVerifiedAt: true,
         onboardingCompletedAt: true,
+        settings: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -173,27 +190,55 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
             id: true,
             name: true,
             slug: true,
-            avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                id: true,
+                bucket: true,
+                variants: true,
+                isPublic: true,
+              },
+            },
             timezone: true,
             locale: true,
             baseCurrency: true,
             plan: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    const workspaces = memberships.map((m) => ({
-      id: m.workspace.id,
-      name: m.workspace.name,
-      slug: m.workspace.slug,
-      avatarUrl: m.workspace.avatarUrl,
-      timezone: m.workspace.timezone,
-      locale: m.workspace.locale,
-      baseCurrency: m.workspace.baseCurrency,
-      plan: m.workspace.plan,
-      role: m.role,
+    // Generate avatar URLs for workspaces
+    const workspaces = await Promise.all(memberships.map(async (m) => {
+      let avatarUrl: string | null = null;
+      if (m.workspace.avatarMediaId && m.workspace.avatarMedia) {
+        try {
+          const isPublic = m.workspace.avatarMedia.isPublic ?? false;
+          avatarUrl = await getMediaVariantUrlAsync(
+            m.workspace.avatarMedia.bucket,
+            m.workspace.avatarMedia.variants,
+            'thumbnail',
+            isPublic
+          );
+        } catch (error) {
+          console.error('Failed to generate workspace avatar URL:', error);
+        }
+      }
+      
+      return {
+        id: m.workspace.id,
+        name: m.workspace.name,
+        slug: m.workspace.slug,
+        avatarUrl,
+        timezone: m.workspace.timezone,
+        locale: m.workspace.locale,
+        baseCurrency: m.workspace.baseCurrency,
+        plan: m.workspace.plan,
+        role: m.role,
+      };
     }));
 
     // Generate avatar URLs from media variants (send only URLs, not full media object)
@@ -208,6 +253,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         large: await getMediaVariantUrlAsync(user.avatarMedia.bucket, user.avatarMedia.variants, 'large', isPublic),
       };
     }
+
+    // Normalize user settings
+    const normalizedSettings = parseUserSettings(user.settings);
 
     const responseData = {
       success: true,
@@ -227,6 +275,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         phoneNumber: user.phoneNumber,
         phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
         onboardingCompletedAt: user.onboardingCompletedAt?.toISOString() ?? null,
+        settings: normalizedSettings,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       },
@@ -1008,8 +1057,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // 4. Check if user has any workspace
       const workspaceMember = await prisma.workspaceMember.findFirst({
         where: { userId: user.id },
-        include: {
-          workspace: true,
+        select: {
+          workspace: {
+            select: {
+              slug: true,
+            },
+          },
         },
       });
 

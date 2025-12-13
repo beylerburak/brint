@@ -261,7 +261,7 @@ model Workspace {
   owner       User   @relation(fields: [ownerUserId], references: [id])
 
   // Visual / branding
-  avatarUrl String?
+  avatarMediaId String? // Reference to Media for avatar
 
   // Config / localization
   timezone     String @default("Europe/Istanbul")
@@ -279,6 +279,7 @@ model Workspace {
   members      WorkspaceMember[]
   brands       Brand[]
   media        Media[]
+  avatarMedia  Media?            @relation("WorkspaceAvatar", fields: [avatarMediaId], references: [id])
   activityLogs ActivityLog[]
 
   // Project & Task relations
@@ -480,11 +481,12 @@ model Media {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  brand       Brand?    @relation(fields: [brandId], references: [id])
-  owner       User      @relation(fields: [ownerUserId], references: [id])
-  userAvatars User[]    @relation("UserAvatar")
-  brandLogos  Brand[]   @relation("BrandLogo")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  brand          Brand?    @relation(fields: [brandId], references: [id])
+  owner          User      @relation(fields: [ownerUserId], references: [id])
+  userAvatars    User[]    @relation("UserAvatar")
+  brandLogos     Brand[]   @relation("BrandLogo")
+  workspaceAvatars Workspace[] @relation("WorkspaceAvatar")
 
   // Task relations
   taskAttachments TaskAttachment[]

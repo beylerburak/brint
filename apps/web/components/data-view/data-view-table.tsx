@@ -16,6 +16,11 @@ interface DataViewTableProps {
   onDeleteTask?: (taskId: string | number) => void
   workspaceId?: string
   brandId?: string
+  taskStatuses?: {
+    TODO: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    IN_PROGRESS: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    DONE: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+  }
 }
 
 export const DataViewTable = memo(function DataViewTable({
@@ -30,6 +35,7 @@ export const DataViewTable = memo(function DataViewTable({
   onStatusChange,
   workspaceId,
   brandId,
+  taskStatuses,
 }: DataViewTableProps & { onStatusChange?: (taskId: string | number, newStatus: string) => void }) {
   // Filter data based on filterTab
   const filteredData = useMemo(() => {
@@ -48,6 +54,7 @@ export const DataViewTable = memo(function DataViewTable({
         onStatusChange={onStatusChange}
         workspaceId={workspaceId}
         brandId={brandId}
+        taskStatuses={taskStatuses}
       />
     </div>
   )

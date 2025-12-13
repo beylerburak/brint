@@ -54,7 +54,7 @@ export class WorkspaceRepository {
     name: string;
     slug: string;
     ownerUserId: string;
-    avatarUrl?: string | null;
+    avatarMediaId?: string | null;
     timezone?: string;
     locale?: string;
     baseCurrency?: string;
@@ -67,7 +67,7 @@ export class WorkspaceRepository {
           name: data.name,
           slug: data.slug,
           ownerUserId: data.ownerUserId,
-          avatarUrl: data.avatarUrl ?? null,
+          avatarMediaId: data.avatarMediaId ?? null,
           timezone: data.timezone ?? APP_CONFIG.defaults.timezone,
           locale: data.locale ?? APP_CONFIG.defaults.locale,
           baseCurrency: data.baseCurrency ?? APP_CONFIG.defaults.baseCurrency,
@@ -103,7 +103,7 @@ export class WorkspaceRepository {
     userName?: string | null;
     workspaceName: string;
     workspaceSlug: string;
-    avatarUrl?: string | null;
+    avatarMediaId?: string | null;
     timezone?: string;
     locale?: string;
     baseCurrency?: string;
@@ -135,7 +135,7 @@ export class WorkspaceRepository {
           name: params.workspaceName,
           slug: params.workspaceSlug,
           ownerUserId: user.id,
-          avatarUrl: params.avatarUrl ?? null,
+          avatarMediaId: params.avatarMediaId ?? null,
           timezone: params.timezone ?? APP_CONFIG.defaults.timezone,
           locale: params.locale ?? APP_CONFIG.defaults.locale,
           baseCurrency: params.baseCurrency ?? APP_CONFIG.defaults.baseCurrency,

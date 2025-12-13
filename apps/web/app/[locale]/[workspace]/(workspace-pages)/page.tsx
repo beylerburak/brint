@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { buildWorkspaceUrl } from "@/lib/locale-path";
 
 export default async function WorkspaceRootPage({
   params,
@@ -8,6 +9,5 @@ export default async function WorkspaceRootPage({
   const { workspace, locale } = await params;
   
   // Redirect to home
-  const redirectPath = locale ? `/${locale}/${workspace}/home` : `/${workspace}/home`;
-  redirect(redirectPath);
+  redirect(buildWorkspaceUrl(locale, workspace, "/home"));
 }

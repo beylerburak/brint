@@ -3,6 +3,8 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Languages } from "lucide-react"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { apiClient } from "@/lib/api-client"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +28,9 @@ const languageFlags: Record<Locale, string> = {
 export function LanguageSwitcher() {
   const router = useRouter()
   const pathname = usePathname()
+  const { user, refreshUser } = useWorkspace()
   const [mounted, setMounted] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
 
   // Hydration mismatch'i önlemek için
   React.useEffect(() => {
@@ -44,23 +48,47 @@ export function LanguageSwitcher() {
 
   const currentLocale = mounted ? getCurrentLocale() : "en"
 
-  const handleLocaleChange = (newLocale: Locale) => {
+  const handleLocaleChange = async (newLocale: Locale) => {
     if (newLocale === currentLocale) return
+    if (isSaving) return
 
-    // Replace current locale in pathname
-    const segments = pathname.split("/").filter(Boolean)
-    const oldLocale = getCurrentLocale()
-    
-    // If pathname starts with a locale, replace it
-    if (locales.includes(segments[0] as Locale)) {
-      segments[0] = newLocale
-    } else {
-      // If no locale in path, prepend new locale
-      segments.unshift(newLocale)
+    setIsSaving(true)
+    try {
+      // Save to user settings if user is logged in
+      if (user) {
+        await apiClient.updateMySettings({
+          ui: { language: newLocale },
+        })
+        await refreshUser()
+      }
+
+      // Replace current locale in pathname
+      const segments = pathname.split("/").filter(Boolean)
+      
+      // If pathname starts with a locale, replace it
+      if (locales.includes(segments[0] as Locale)) {
+        segments[0] = newLocale
+      } else {
+        // If no locale in path, prepend new locale
+        segments.unshift(newLocale)
+      }
+
+      const newPathname = "/" + segments.join("/")
+      router.push(newPathname)
+    } catch (error) {
+      console.error('Failed to update language preference:', error)
+      // Still navigate even if save fails
+      const segments = pathname.split("/").filter(Boolean)
+      if (locales.includes(segments[0] as Locale)) {
+        segments[0] = newLocale
+      } else {
+        segments.unshift(newLocale)
+      }
+      const newPathname = "/" + segments.join("/")
+      router.push(newPathname)
+    } finally {
+      setIsSaving(false)
     }
-
-    const newPathname = "/" + segments.join("/")
-    router.push(newPathname)
   }
 
   if (!mounted) {

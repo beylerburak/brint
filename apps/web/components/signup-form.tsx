@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
 import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { OTPInput } from "input-otp"
 import { OTPInputSlot } from "@/components/ui/otp-input"
 import { apiClient } from "@/lib/api-client"
+import { buildLoginUrl, buildWorkspaceUrl, getLocaleFromPathnameOrParams } from "@/lib/locale-path"
 
 export function SignupForm({
   className,
@@ -28,8 +29,10 @@ export function SignupForm({
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
+  const params = useParams()
   const searchParams = useSearchParams()
-  const loginPath = locale === "en" ? "/login" : `/${locale}/login`
+  const currentLocale = getLocaleFromPathnameOrParams(pathname, params as { locale?: string }) || locale
+  const loginPath = buildLoginUrl(currentLocale)
 
   // Form state
   const [name, setName] = useState("")
@@ -54,14 +57,8 @@ export function SignupForm({
       setEmail(emailParam)
       setShowOTP(true)
       
-      // Get password from sessionStorage if coming from login
-      if (typeof window !== 'undefined') {
-        const pendingPassword = sessionStorage.getItem('pendingLoginPassword')
-        const pendingEmail = sessionStorage.getItem('pendingLoginEmail')
-        if (pendingPassword && pendingEmail === emailParam) {
-          setPassword(pendingPassword)
-        }
-      }
+      // Note: We no longer store passwords in sessionStorage for security reasons
+      // User will need to login after email verification
       
       // Resend verification code
       apiClient.resendVerificationCode({ email: emailParam })
@@ -74,10 +71,6 @@ export function SignupForm({
     }
   }, [searchParams])
 
-  // Extract locale from pathname for redirect
-  const pathParts = pathname.split('/').filter(Boolean)
-  const potentialLocale = pathParts[0]
-  const currentLocale = ['en', 'tr'].includes(potentialLocale) ? potentialLocale : ''
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,42 +147,10 @@ export function SignupForm({
       if (result.success && result.data.emailVerified) {
         toast.success("Email verified successfully!")
         
-        // Clear sessionStorage if password was stored
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('pendingLoginPassword')
-          sessionStorage.removeItem('pendingLoginEmail')
-        }
-        
-        // Automatically login after verification if password is available
-        if (password) {
-          try {
-            const loginResult = await apiClient.login({
-              email,
-              password,
-            })
-
-            if (loginResult.success) {
-              // Redirect to the appropriate path
-              const redirectPath = currentLocale
-                ? `/${currentLocale}${loginResult.redirectTo || '/'}`
-                : loginResult.redirectTo || '/'
-              
-              router.push(redirectPath)
-              router.refresh()
-              return
-            }
-          } catch (loginErr: any) {
-            // If auto-login fails, redirect to login page
-            console.error('Auto-login failed:', loginErr)
-          }
-        }
-        
-        // If no password or login failed, redirect to login page
-        toast.info("Email verified. Please login.")
-        const loginPathWithLocale = currentLocale
-          ? `/${currentLocale}/login`
-          : '/login'
-        router.push(loginPathWithLocale)
+        // Security: We no longer auto-login after verification
+        // User must login with their password for security
+        toast.info("Email verified. Please login with your password.")
+        router.push(buildLoginUrl(currentLocale))
       }
     } catch (err: any) {
       // ApiError has message, code, and statusCode
@@ -222,7 +183,7 @@ export function SignupForm({
   // Show OTP input if signup was successful
   if (showOTP) {
     return (
-      <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <div className={cn("flex flex-col gap-6", className)}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-1 text-center">
             <h1 className="text-2xl font-bold">{t("verifyEmail") || "Verify your email"}</h1>

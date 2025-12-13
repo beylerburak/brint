@@ -70,13 +70,13 @@ function KanbanColumnContent({
       return estimatedCardHeight + (isLast ? 0 : gapSize)
     },
     overscan: 5,
-    measureElement: (element, index) => {
-      if (!element) {
-        const isLast = index === displayedTasks.length - 1
-        return estimatedCardHeight + (isLast ? 0 : gapSize)
+    measureElement: (element: Element, entry: ResizeObserverEntry | undefined) => {
+      if (!entry) {
+        return estimatedCardHeight + gapSize
       }
-      const height = element.getBoundingClientRect().height
+      const height = entry.target.getBoundingClientRect().height
       // Add gap to measured height except for the last item
+      const index = Array.from(element.parentElement?.children || []).indexOf(element)
       const isLast = index === displayedTasks.length - 1
       return height + (isLast ? 0 : gapSize)
     },

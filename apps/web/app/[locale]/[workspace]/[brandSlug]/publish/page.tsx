@@ -13,13 +13,15 @@ import { toast } from "sonner"
 import { usePublicationWebSocket } from "@/hooks/use-publication-websocket"
 
 export default function PublishPage() {
+  // All hooks must be called before any early returns (Rules of Hooks)
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const brandSlug = params?.brandSlug as string
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, status, isLoadingWorkspace } = useWorkspace()
   const t = useTranslations('publish')
+  
   const contentIdFromUrl = searchParams.get('contentId')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedContentId, setSelectedContentId] = useState<string | null>(contentIdFromUrl)
@@ -63,7 +65,9 @@ export default function PublishPage() {
   
   // Ref to prevent modal from reopening when URL is updated after close
   const isManuallyClosingRef = useRef(false)
+  const previousModalOpenRef = useRef(isModalOpen)
   
+  // All useEffect hooks must be called before early returns (Rules of Hooks)
   useEffect(() => {
     const fetchBrandInfo = async () => {
       if (!currentWorkspace || !brandSlug) return
@@ -140,6 +144,7 @@ export default function PublishPage() {
     
     const fetchContents = async () => {
       try {
+        // API now has caching, so this won't make duplicate requests
         const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
         setContents(response.contents)
         lastFetchKeyRef.current = fetchKey
@@ -154,10 +159,11 @@ export default function PublishPage() {
     }
 
     fetchContents()
+    // Use workspaceId directly instead of currentWorkspace?.id to avoid unnecessary re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspace?.id, brandSlug])
 
   // Refetch contents when modal closes (for updates)
-  const previousModalOpenRef = useRef(isModalOpen)
   useEffect(() => {
     // Only refetch if modal was open and now closed (not on initial mount)
     const wasOpen = previousModalOpenRef.current
@@ -177,7 +183,8 @@ export default function PublishPage() {
           const fetchContents = async () => {
             isFetchingRef.current = true
             try {
-              const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
+              // Use skipCache to force fresh data after modal close
+              const response = await apiClient.listContents(currentWorkspace.id, brandSlug, { skipCache: true })
               setContents(response.contents)
               lastFetchKeyRef.current = fetchKey
             } catch (error) {
@@ -194,50 +201,12 @@ export default function PublishPage() {
     }
   }, [isModalOpen, currentWorkspace?.id, brandSlug])
 
-  // Update URL when modal opens/closes
-  const handleModalOpenChange = (open: boolean) => {
-    if (!open) {
-      // Modal is closing - mark as manually closing to prevent useEffect from reopening
-      isManuallyClosingRef.current = true
-      
-      // Reset selectedContentId immediately when closing
-      setSelectedContentId(null)
-      
-      // Remove contentId from URL
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('contentId')
-      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
-      router.push(newUrl, { scroll: false })
-    }
-    
-    setIsModalOpen(open)
-    // Note: URL update for opening is handled by the click handlers (table click, new content button)
-    // Contents refresh is handled by the useEffect above
-  }
-
-  const statusMap: Record<string, string> = {
-    DRAFT: t('status.draft') || 'Draft',
-    SCHEDULED: t('status.scheduled') || 'Scheduled',
-    PUBLISHING: t('status.publishing') || 'Publishing',
-    PUBLISHED: t('status.published') || 'Published',
-    PARTIALLY_PUBLISHED: t('status.partiallyPublished') || 'Partially Published',
-    FAILED: t('status.failed') || 'Failed',
-    ARCHIVED: t('status.archived') || 'Archived',
-  }
-
-  const formFactorMap: Record<string, string> = {
-    FEED_POST: t('formFactor.feedPost') || 'Feed Post',
-    STORY: t('formFactor.story') || 'Story',
-    VERTICAL_VIDEO: t('formFactor.verticalVideo') || 'Vertical Video',
-    BLOG_ARTICLE: t('formFactor.blogArticle') || 'Blog Article',
-    LONG_VIDEO: t('formFactor.longVideo') || 'Long Video',
-  }
-
   // WebSocket connection for real-time publication/content updates
+  // Note: This hook must be called before early returns, but it's safe because enabled flag prevents execution
   usePublicationWebSocket({
     workspaceId: currentWorkspace?.id || "",
     brandId: brandInfo?.id || undefined,
-    enabled: !!currentWorkspace && !!brandInfo?.id,
+    enabled: !!currentWorkspace && !!brandInfo?.id && status === "READY",
     onEvent: (event) => {
       switch (event.type) {
         case "content.status.changed": {
@@ -311,7 +280,8 @@ export default function PublishPage() {
                     const fetchContents = async () => {
                       isFetchingRef.current = true
                       try {
-                        const response = await apiClient.listContents(currentWorkspace.id, brandSlug)
+                        // Use skipCache to force fresh data after publication status change
+                        const response = await apiClient.listContents(currentWorkspace.id, brandSlug, { skipCache: true })
                         setContents(response.contents)
                         lastFetchKeyRef.current = fetchKey
                       } catch (error) {
@@ -338,6 +308,70 @@ export default function PublishPage() {
       }
     },
   })
+
+  // Guard: Handle loading and error states (after all hooks)
+  if (isLoadingWorkspace || status === "LOADING") {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground">Loading workspace...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (status === "NO_ACCESS" || status === "ERROR" || !currentWorkspace) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-semibold">Workspace not available</p>
+          <p className="text-sm text-muted-foreground">
+            {status === "NO_ACCESS" ? "You don't have access to this workspace." : "Failed to load workspace."}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Update URL when modal opens/closes
+  const handleModalOpenChange = (open: boolean) => {
+    if (!open) {
+      // Modal is closing - mark as manually closing to prevent useEffect from reopening
+      isManuallyClosingRef.current = true
+      
+      // Reset selectedContentId immediately when closing
+      setSelectedContentId(null)
+      
+      // Remove contentId from URL
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('contentId')
+      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+      router.push(newUrl, { scroll: false })
+    }
+    
+    setIsModalOpen(open)
+    // Note: URL update for opening is handled by the click handlers (table click, new content button)
+    // Contents refresh is handled by the useEffect above
+  }
+
+  const statusMap: Record<string, string> = {
+    DRAFT: t('status.draft') || 'Draft',
+    SCHEDULED: t('status.scheduled') || 'Scheduled',
+    PUBLISHING: t('status.publishing') || 'Publishing',
+    PUBLISHED: t('status.published') || 'Published',
+    PARTIALLY_PUBLISHED: t('status.partiallyPublished') || 'Partially Published',
+    FAILED: t('status.failed') || 'Failed',
+    ARCHIVED: t('status.archived') || 'Archived',
+  }
+
+  const formFactorMap: Record<string, string> = {
+    FEED_POST: t('formFactor.feedPost') || 'Feed Post',
+    STORY: t('formFactor.story') || 'Story',
+    VERTICAL_VIDEO: t('formFactor.verticalVideo') || 'Vertical Video',
+    BLOG_ARTICLE: t('formFactor.blogArticle') || 'Blog Article',
+    LONG_VIDEO: t('formFactor.longVideo') || 'Long Video',
+  }
 
   return (
     <>

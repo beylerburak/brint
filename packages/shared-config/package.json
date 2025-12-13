@@ -37,12 +37,15 @@
         "src"
     ],
     "scripts": {
-        "build": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts --format cjs,esm --dts",
-        "dev": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts --format cjs,esm --dts --watch",
+        "build": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts src/user-settings.ts --format cjs,esm --dts --external zod",
+        "dev": "tsup src/index.ts src/upload.ts src/plans.ts src/platform-rules.ts src/queue-rules.ts src/user-settings.ts --format cjs,esm --dts --watch --external zod",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
         "tsup": "^8.0.1",
         "typescript": "^5.3.3"
+    },
+    "dependencies": {
+        "zod": "^3.25.76"
     }
 }

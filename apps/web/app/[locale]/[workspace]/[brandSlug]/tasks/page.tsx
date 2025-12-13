@@ -26,7 +26,6 @@ import {
   DataSummaryChart,
   DataViewTable,
   DataViewKanban,
-  TaskDetailModal,
   ViewMode,
   FilterTab,
   TableTask,
@@ -35,6 +34,7 @@ import {
   BaseTask,
 } from "@/components/data-view"
 import { useKanbanColumns } from "@/components/data-view/hooks/use-kanban-columns"
+import { TaskDetailModal } from "@/features/tasks/components/task-detail"
 import { useWebSocket } from "@/hooks/use-websocket"
 
 export default function BrandTasksPage() {
@@ -89,9 +89,9 @@ export default function BrandTasksPage() {
     totalPages: 0,
   })
   const [taskStatuses, setTaskStatuses] = useState<{
-    TODO: Array<{ id: string; label: string }>;
-    IN_PROGRESS: Array<{ id: string; label: string }>;
-    DONE: Array<{ id: string; label: string }>;
+    TODO: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    IN_PROGRESS: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    DONE: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
   } | null>(null)
 
   // Refs for preventing duplicate API calls
@@ -205,7 +205,7 @@ export default function BrandTasksPage() {
         taskNumber: task.taskNumber,
         title: task.title,
         description: task.description,
-        priority,
+        priority: priority as "High" | "Medium" | "Low",
         priorityColor,
         status: task.status.label,
         dueDate: task.dueDate || '', // Keep raw ISO date for modal
@@ -764,6 +764,7 @@ export default function BrandTasksPage() {
             isLoading={isLoadingMore}
             workspaceId={currentWorkspace?.id}
             brandId={brandId || undefined}
+            taskStatuses={taskStatuses || undefined}
             onTaskClick={(task) => {
               // Just select the task and open modal - hook handles fetching
               setSelectedTask(task)
@@ -835,6 +836,7 @@ export default function BrandTasksPage() {
           brandSlug={brandInfo?.slug}
           brandName={brandInfo?.name}
           brandLogoUrl={brandInfo?.logoUrl}
+          taskStatuses={taskStatuses || undefined}
           isCreateMode={isCreateMode}
           onTaskCreate={(newTask) => {
             // Add new task to list (prevent duplicates)
@@ -965,15 +967,17 @@ export default function BrandTasksPage() {
                   updated.description = updates.description
                 }
                 if (updates.status !== undefined) {
+                  const baseStatus = prev.status && typeof prev.status === 'object' ? prev.status : { id: '', label: '', color: null, group: 'TODO' as const };
                   updated.status = typeof updates.status === 'string'
-                    ? { ...prev.status, label: updates.status }
-                    : { ...prev.status, ...updates.status }
+                    ? { ...baseStatus, label: updates.status }
+                    : { ...baseStatus, ...updates.status }
                 }
                 if (updates.priority !== undefined) {
-                  updated.priority = updates.priority === 'High' ? 'HIGH' : updates.priority === 'Low' ? 'LOW' : 'MEDIUM'
+                  // Keep UI format (High/Medium/Low) for KanbanTask
+                  updated.priority = updates.priority as "High" | "Medium" | "Low";
                 }
                 if (updates.dueDate !== undefined) {
-                  updated.dueDate = updates.dueDate
+                  updated.dueDate = updates.dueDate || ''
                 }
                 if (updates.assigneeUserId !== undefined) {
                   updated.assigneeUserId = updates.assigneeUserId

@@ -1,14 +1,23 @@
+"use client"
+
 import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useLocale } from "next-intl"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { LoginForm } from "@/components/login-form"
+import { buildSignupUrl, getLocaleFromPathnameOrParams } from "@/lib/locale-path"
 
 export default function LoginPage() {
+  const params = useParams()
+  const locale = useLocale()
+  const currentLocale = getLocaleFromPathnameOrParams(undefined, params as { locale?: string }) || locale
+  
   return (
     <>
       <div className="container relative hidden h-screen flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
         <Link
-          href="/signup"
+          href={buildSignupUrl(currentLocale)}
           className={cn(
             buttonVariants({ variant: "ghost" }),
             "absolute right-4 top-4 md:right-8 md:top-8"

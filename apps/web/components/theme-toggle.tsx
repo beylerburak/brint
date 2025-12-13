@@ -3,11 +3,14 @@
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { apiClient } from "@/lib/api-client"
 
 import { Button } from "@/components/ui/button"
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
+  const { user, refreshUser } = useWorkspace()
   const [mounted, setMounted] = React.useState(false)
 
   // Hydration mismatch'i önlemek için
@@ -63,13 +66,34 @@ export function ThemeToggle() {
     }, 3000)
 
     // Use View Transitions API if available
-    const updateTheme = () => {
+    const updateTheme = async () => {
+      let nextTheme: "light" | "dark" | "system"
+      
+      // Cycle: light -> dark -> system -> light
       if (theme === "light") {
-        setTheme("dark")
+        nextTheme = "dark"
       } else if (theme === "dark") {
-        setTheme("light")
+        nextTheme = "system"
       } else {
-        setTheme("light")
+        // system or undefined
+        nextTheme = "light"
+      }
+
+      // Optimistic update
+      setTheme(nextTheme)
+
+      // Persist to backend if user is logged in
+      if (user) {
+        try {
+          await apiClient.updateMySettings({
+            ui: { theme: nextTheme },
+          })
+          // Refresh user data to get normalized settings
+          await refreshUser()
+        } catch (error) {
+          console.error('Failed to update theme preference:', error)
+          // Optionally revert on error, but usually optimistic is fine
+        }
       }
     }
 

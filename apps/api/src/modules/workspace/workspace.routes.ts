@@ -31,7 +31,17 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
                   name: { type: 'string' },
                   slug: { type: 'string' },
                   ownerUserId: { type: 'string' },
-                  avatarUrl: { type: ['string', 'null'] },
+                  avatarMediaId: { type: ['string', 'null'] },
+                avatarUrl: { type: ['string', 'null'] }, // Backward compatibility
+                avatarUrls: {
+                  type: ['object', 'null'],
+                  properties: {
+                    thumbnail: { type: ['string', 'null'] },
+                    small: { type: ['string', 'null'] },
+                    medium: { type: ['string', 'null'] },
+                    large: { type: ['string', 'null'] },
+                  },
+                },
                   timezone: { type: 'string' },
                   locale: { type: 'string' },
                   baseCurrency: { type: 'string' },
@@ -85,7 +95,15 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
             name: true,
             slug: true,
             ownerUserId: true,
-            avatarUrl: true,
+            avatarMediaId: true,
+            avatarMedia: {
+              select: {
+                id: true,
+                bucket: true,
+                variants: true,
+                isPublic: true,
+              },
+            },
             timezone: true,
             locale: true,
             baseCurrency: true,
@@ -98,19 +116,36 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
       orderBy: { createdAt: 'asc' },
     });
 
-    const workspaces = memberships.map((m) => ({
-      id: m.workspace.id,
-      name: m.workspace.name,
-      slug: m.workspace.slug,
-      ownerUserId: m.workspace.ownerUserId,
-      avatarUrl: m.workspace.avatarUrl,
-      timezone: m.workspace.timezone,
-      locale: m.workspace.locale,
-      baseCurrency: m.workspace.baseCurrency,
+    const workspaces = await Promise.all(memberships.map(async (m) => {
+      let avatarUrl: string | null = null;
+      if (m.workspace.avatarMediaId && m.workspace.avatarMedia) {
+        try {
+          const isPublic = m.workspace.avatarMedia.isPublic ?? false;
+          avatarUrl = await getMediaVariantUrlAsync(
+            m.workspace.avatarMedia.bucket,
+            m.workspace.avatarMedia.variants,
+            'thumbnail',
+            isPublic
+          );
+        } catch (error) {
+          console.error('Failed to generate workspace avatar URL:', error);
+        }
+      }
+      
+      return {
+        id: m.workspace.id,
+        name: m.workspace.name,
+        slug: m.workspace.slug,
+        ownerUserId: m.workspace.ownerUserId,
+        avatarUrl,
+        timezone: m.workspace.timezone,
+        locale: m.workspace.locale,
+        baseCurrency: m.workspace.baseCurrency,
       plan: m.workspace.plan,
       role: m.role,
       createdAt: m.workspace.createdAt.toISOString(),
       updatedAt: m.workspace.updatedAt.toISOString(),
+      };
     }));
 
     return reply.status(200).send({
@@ -145,7 +180,17 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
                 name: { type: 'string' },
                 slug: { type: 'string' },
                 ownerUserId: { type: 'string' },
-                avatarUrl: { type: ['string', 'null'] },
+                avatarMediaId: { type: ['string', 'null'] },
+                avatarUrl: { type: ['string', 'null'] }, // Backward compatibility
+                avatarUrls: {
+                  type: ['object', 'null'],
+                  properties: {
+                    thumbnail: { type: ['string', 'null'] },
+                    small: { type: ['string', 'null'] },
+                    medium: { type: ['string', 'null'] },
+                    large: { type: ['string', 'null'] },
+                  },
+                },
                 timezone: { type: 'string' },
                 locale: { type: 'string' },
                 baseCurrency: { type: 'string' },
@@ -210,6 +255,14 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
       include: {
+        avatarMedia: {
+          select: {
+            id: true,
+            bucket: true,
+            variants: true,
+            isPublic: true,
+          },
+        },
         _count: {
           select: { members: true },
         },
@@ -236,25 +289,39 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
       },
     });
 
-    return reply.status(200).send({
-      success: true,
-      workspace: {
-        id: workspace.id,
-        name: workspace.name,
-        slug: workspace.slug,
-        ownerUserId: workspace.ownerUserId,
-        avatarUrl: workspace.avatarUrl,
-        timezone: workspace.timezone,
-        locale: workspace.locale,
-        baseCurrency: workspace.baseCurrency,
-        plan: workspace.plan,
-        settings: workspace.settings as Record<string, any> | null,
-        createdAt: workspace.createdAt.toISOString(),
-        updatedAt: workspace.updatedAt.toISOString(),
-        memberCount: workspace._count.members,
-        userRole: membership!.role,
-      },
-    });
+      // Generate avatar URLs from media variants
+      let avatarUrls = null;
+      if (workspace.avatarMedia) {
+        const isPublic = workspace.avatarMedia.isPublic ?? false;
+        avatarUrls = {
+          thumbnail: await getMediaVariantUrlAsync(workspace.avatarMedia.bucket, workspace.avatarMedia.variants, 'thumbnail', isPublic),
+          small: await getMediaVariantUrlAsync(workspace.avatarMedia.bucket, workspace.avatarMedia.variants, 'small', isPublic),
+          medium: await getMediaVariantUrlAsync(workspace.avatarMedia.bucket, workspace.avatarMedia.variants, 'medium', isPublic),
+          large: await getMediaVariantUrlAsync(workspace.avatarMedia.bucket, workspace.avatarMedia.variants, 'large', isPublic),
+        };
+      }
+
+      return reply.status(200).send({
+        success: true,
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+          slug: workspace.slug,
+          ownerUserId: workspace.ownerUserId,
+          avatarMediaId: workspace.avatarMediaId,
+          avatarUrl: avatarUrls?.small || avatarUrls?.thumbnail || null, // Backward compatibility
+          avatarUrls: avatarUrls,
+          timezone: workspace.timezone,
+          locale: workspace.locale,
+          baseCurrency: workspace.baseCurrency,
+          plan: workspace.plan,
+          settings: workspace.settings as Record<string, any> | null,
+          createdAt: workspace.createdAt.toISOString(),
+          updatedAt: workspace.updatedAt.toISOString(),
+          memberCount: workspace._count.members,
+          userRole: membership!.role,
+        },
+      });
   });
 
   // GET /workspaces/slug/:slug/available - Check slug availability
@@ -292,12 +359,50 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     try {
       const workspace = await updateWorkspace(workspaceId, userId, request.body as any);
 
+      // Fetch updated workspace with avatarMedia
+      const updatedWorkspace = await prisma.workspace.findUnique({
+        where: { id: workspace.id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          avatarMediaId: true,
+          avatarMedia: {
+            select: {
+              id: true,
+              bucket: true,
+              variants: true,
+              isPublic: true,
+            },
+          },
+          timezone: true,
+          locale: true,
+          baseCurrency: true,
+          updatedAt: true,
+        },
+      });
+
+      // Generate avatar URLs if available
+      let avatarUrls = null;
+      if (updatedWorkspace?.avatarMedia) {
+        const isPublic = updatedWorkspace.avatarMedia.isPublic ?? false;
+        avatarUrls = {
+          thumbnail: await getMediaVariantUrlAsync(updatedWorkspace.avatarMedia.bucket, updatedWorkspace.avatarMedia.variants, 'thumbnail', isPublic),
+          small: await getMediaVariantUrlAsync(updatedWorkspace.avatarMedia.bucket, updatedWorkspace.avatarMedia.variants, 'small', isPublic),
+          medium: await getMediaVariantUrlAsync(updatedWorkspace.avatarMedia.bucket, updatedWorkspace.avatarMedia.variants, 'medium', isPublic),
+          large: await getMediaVariantUrlAsync(updatedWorkspace.avatarMedia.bucket, updatedWorkspace.avatarMedia.variants, 'large', isPublic),
+        };
+      }
+
       return reply.status(200).send({
         success: true,
         workspace: {
           id: workspace.id,
           name: workspace.name,
           slug: workspace.slug,
+          avatarMediaId: updatedWorkspace?.avatarMediaId || null,
+          avatarUrl: avatarUrls?.small || avatarUrls?.thumbnail || null, // Backward compatibility
+          avatarUrls: avatarUrls,
           timezone: workspace.timezone,
           locale: workspace.locale,
           baseCurrency: workspace.baseCurrency,
@@ -356,7 +461,17 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
                   name: { type: ['string', 'null'] },
                   email: { type: 'string' },
                   avatarMediaId: { type: ['string', 'null'] },
-                  avatarUrl: { type: ['string', 'null'] },
+                  avatarMediaId: { type: ['string', 'null'] },
+                avatarUrl: { type: ['string', 'null'] }, // Backward compatibility
+                avatarUrls: {
+                  type: ['object', 'null'],
+                  properties: {
+                    thumbnail: { type: ['string', 'null'] },
+                    small: { type: ['string', 'null'] },
+                    medium: { type: ['string', 'null'] },
+                    large: { type: ['string', 'null'] },
+                  },
+                },
                   role: { type: 'string' },
                 },
                 required: ['id', 'email', 'role'],

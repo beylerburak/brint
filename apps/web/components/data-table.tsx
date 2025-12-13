@@ -809,6 +809,7 @@ export function DataTable({
   onStatusChange,
   workspaceId,
   brandId,
+  taskStatuses,
   ...props
 }: {
   data: z.infer<typeof schema>[]
@@ -820,15 +821,32 @@ export function DataTable({
   onStatusChange?: (taskId: string | number, newStatus: string) => void
   workspaceId?: string
   brandId?: string
+  taskStatuses?: {
+    TODO: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    IN_PROGRESS: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+    DONE: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
+  }
 }) {
   const t = useTranslations("tasks")
   const [data, setData] = React.useState(() => initialData)
   const [availableStatuses, setAvailableStatuses] = React.useState<Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>>([])
   
-  // Fetch available statuses from API
+  // Use provided taskStatuses or fetch from API
   React.useEffect(() => {
     async function fetchStatuses() {
       if (!workspaceId) return
+      
+      // If taskStatuses prop is provided, use it instead of fetching
+      if (taskStatuses) {
+        const statusesWithGroup = [
+          ...taskStatuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
+          ...taskStatuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
+          ...taskStatuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
+        ]
+        setAvailableStatuses(statusesWithGroup)
+        return
+      }
+      
       try {
         const response = await apiClient.listTaskStatuses(workspaceId, brandId)
         const statusesWithGroup = [
@@ -842,8 +860,10 @@ export function DataTable({
         // Keep empty array, will fall back to hardcoded statuses
       }
     }
-    fetchStatuses()
-  }, [workspaceId, brandId])
+    if (workspaceId) {
+      fetchStatuses()
+    }
+  }, [workspaceId, brandId, taskStatuses])
   
   const columns = React.useMemo(() => createColumns(t, availableStatuses), [t, availableStatuses])
 

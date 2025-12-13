@@ -1,20 +1,26 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { GalleryVerticalEnd } from "lucide-react";
 import { SignupForm } from "@/components/signup-form";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { withLocale } from "@/lib/locale-path";
 
 export default function SignupPage() {
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
+  
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start relative">
-          <a href="#" className="flex items-center gap-2 font-medium">
+          <Link href={withLocale(locale, "/")} className="flex items-center gap-2 font-medium">
             <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
               <GalleryVerticalEnd className="size-4" />
             </div>
             Acme Inc.
-          </a>
+          </Link>
           <div className="absolute top-0 right-0">
             <ThemeToggle />
           </div>

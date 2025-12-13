@@ -764,6 +764,9 @@ export function ContentCreationModal({
                 isGoogleDriveAvailable={isGoogleDriveAvailable}
                 isCheckingGoogleDrive={isCheckingGoogleDrive}
                 onOpenDrivePicker={() => setIsGoogleDrivePickerOpen(true)}
+                useMediaLookupOnPublish={formState.useMediaLookupOnPublish || false}
+                onUseMediaLookupChange={formState.setUseMediaLookupOnPublish}
+                mediaLookupId={formState.mediaLookupId}
               />
 
               <div className="space-y-2">
@@ -793,7 +796,12 @@ export function ContentCreationModal({
             </div>
           </div>
 
-          <ContentPreviewPanel />
+          <ContentPreviewPanel
+            isGoogleDriveAvailable={isGoogleDriveAvailable}
+            onFilesSelected={handleGoogleDriveFilesSelected}
+            showGoogleDrivePicker={isGoogleDrivePickerOpen}
+            onShowGoogleDrivePickerChange={setIsGoogleDrivePickerOpen}
+          />
         </div>
 
         <ContentFooterActions

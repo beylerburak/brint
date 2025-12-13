@@ -12,7 +12,14 @@ export type WorkspaceProps = {
   name: string;
   slug: string;
   ownerUserId: string;
-  avatarUrl: string | null;
+  avatarMediaId: string | null;
+  avatarUrl: string | null; // Deprecated: use avatarUrls instead
+  avatarUrls: {
+    thumbnail: string | null;
+    small: string | null;
+    medium: string | null;
+    large: string | null;
+  } | null;
   timezone: string;
   locale: string;
   baseCurrency: string;
@@ -27,7 +34,14 @@ export class WorkspaceEntity {
   public readonly name: string;
   public readonly slug: string;
   public readonly ownerUserId: string;
-  public readonly avatarUrl: string | null;
+  public readonly avatarMediaId: string | null;
+  public readonly avatarUrl: string | null; // Deprecated: use avatarUrls instead
+  public readonly avatarUrls: {
+    thumbnail: string | null;
+    small: string | null;
+    medium: string | null;
+    large: string | null;
+  } | null;
   public readonly timezone: string;
   public readonly locale: string;
   public readonly baseCurrency: string;
@@ -41,7 +55,9 @@ export class WorkspaceEntity {
     this.name = props.name;
     this.slug = props.slug;
     this.ownerUserId = props.ownerUserId;
+    this.avatarMediaId = props.avatarMediaId;
     this.avatarUrl = props.avatarUrl;
+    this.avatarUrls = props.avatarUrls;
     this.timezone = props.timezone;
     this.locale = props.locale;
     this.baseCurrency = props.baseCurrency;
@@ -80,7 +96,11 @@ export class WorkspaceEntity {
     name: string;
     slug: string;
     ownerUserId: string;
-    avatarUrl: string | null;
+    avatarMediaId?: string | null;
+    avatarMedia?: {
+      bucket: string;
+      variants: any;
+    } | null;
     timezone: string;
     locale: string;
     baseCurrency: string;
@@ -88,13 +108,20 @@ export class WorkspaceEntity {
     settings: any;
     createdAt: Date;
     updatedAt: Date;
-  }): WorkspaceEntity {
+  }, avatarUrls?: {
+    thumbnail: string | null;
+    small: string | null;
+    medium: string | null;
+    large: string | null;
+  } | null): WorkspaceEntity {
     return new WorkspaceEntity({
       id: prismaWorkspace.id,
       name: prismaWorkspace.name,
       slug: prismaWorkspace.slug,
       ownerUserId: prismaWorkspace.ownerUserId,
-      avatarUrl: prismaWorkspace.avatarUrl,
+      avatarMediaId: prismaWorkspace.avatarMediaId ?? null,
+      avatarUrl: null, // Deprecated - always null, use avatarUrls instead
+      avatarUrls: avatarUrls || null,
       timezone: prismaWorkspace.timezone,
       locale: prismaWorkspace.locale,
       baseCurrency: prismaWorkspace.baseCurrency,
@@ -114,7 +141,9 @@ export class WorkspaceEntity {
       name: this.name,
       slug: this.slug,
       ownerUserId: this.ownerUserId,
+      avatarMediaId: this.avatarMediaId,
       avatarUrl: this.avatarUrl,
+      avatarUrls: this.avatarUrls,
       timezone: this.timezone,
       locale: this.locale,
       baseCurrency: this.baseCurrency,

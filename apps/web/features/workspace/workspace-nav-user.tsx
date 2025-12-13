@@ -1,15 +1,22 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import * as React from "react"
 import { useState } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { useLocale } from "next-intl"
+import { Sun, Moon, Monitor, Settings, LogOut } from "lucide-react"
 import {
   IconCreditCard,
   IconDotsVertical,
-  IconLogout,
   IconNotification,
   IconUserCircle,
 } from "@tabler/icons-react"
-
+import { toast } from "sonner"
+import { useTheme } from "next-themes"
+import { buildLoginUrl, getLocaleFromPathnameOrParams } from "@/lib/locale-path"
+import { apiClient } from "@/lib/api-client"
+import { useSettingsModal } from "@/stores/use-settings-modal"
+import { useWorkspace } from "@/contexts/workspace-context"
 import {
   Avatar,
   AvatarFallback,
@@ -24,14 +31,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { apiClient } from "@/lib/api-client"
-import { toast } from "sonner"
 
 function getAvatarUrl(user: any) {
   // Use presigned URLs from backend
@@ -59,14 +65,25 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const params = useParams()
+  const locale = useLocale()
+  const currentLocale = getLocaleFromPathnameOrParams(undefined, params as { locale?: string }) || locale
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { openWithItem } = useSettingsModal()
+  const { theme, setTheme } = useTheme()
+  const { user: workspaceUser, refreshUser } = useWorkspace()
+  const [mounted, setMounted] = useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true)
       await apiClient.logout()
       toast.success("Logged out successfully")
-      router.push("/login")
+      router.push(buildLoginUrl(currentLocale))
     } catch (error) {
       console.error("Logout failed:", error)
       toast.error("Failed to logout")
@@ -74,6 +91,25 @@ export function NavUser({
       setIsLoggingOut(false)
     }
   }
+
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    if (!mounted || !workspaceUser) return
+    
+    try {
+      setTheme(newTheme)
+      await apiClient.updateMySettings({
+        ui: { theme: newTheme },
+      })
+      await refreshUser()
+    } catch (error) {
+      console.error('Failed to update theme:', error)
+      // Revert on error
+      const currentTheme = workspaceUser.settings?.ui?.theme || 'system'
+      setTheme(currentTheme as 'light' | 'dark' | 'system')
+    }
+  }
+
+  const currentTheme = mounted ? (theme || workspaceUser?.settings?.ui?.theme || 'system') : 'system'
 
   return (
     <SidebarMenu>
@@ -125,23 +161,60 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            
+            {/* Theme Switcher */}
+            <div className="px-2 py-2">
+              <ToggleGroup 
+                type="single" 
+                value={currentTheme}
+                onValueChange={(value) => {
+                  if (value && (value === 'light' || value === 'dark' || value === 'system')) {
+                    handleThemeChange(value)
+                  }
+                }}
+                variant="outline"
+                spacing={0}
+                className="grid grid-cols-3 w-full"
+              >
+                <ToggleGroupItem 
+                  value="light" 
+                  aria-label="Light mode"
+                  className="flex-1"
+                >
+                  <Sun className="size-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="dark" 
+                  aria-label="Dark mode"
+                  className="flex-1"
+                >
+                  <Moon className="size-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="system" 
+                  aria-label="System theme"
+                  className="flex-1"
+                >
+                  <Monitor className="size-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            <DropdownMenuSeparator />
+            
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openWithItem('user')}>
                 <IconUserCircle />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconCreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
+              <DropdownMenuItem onClick={() => openWithItem('general')}>
+                <Settings className="size-4" />
+                Settings
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
-              <IconLogout />
+              <LogOut className="size-4" />
               {isLoggingOut ? "Logging out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>

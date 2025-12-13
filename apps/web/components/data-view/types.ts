@@ -11,6 +11,7 @@ export interface BaseTask {
   priority: "High" | "Medium" | "Low"
   status: string
   dueDate: string
+  assigneeUserId?: string | null
   assignedTo?: Array<{
     id: string
     name: string | null

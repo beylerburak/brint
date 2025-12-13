@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useDropzone } from "react-dropzone"
+import { useDropzone, type FileRejection } from "react-dropzone"
 import { DragEndEvent } from "@dnd-kit/core"
 import { arrayMove } from "@dnd-kit/sortable"
 import { toast } from "sonner"
@@ -45,7 +45,7 @@ export function useMediaManager({
         },
     maxSize: MAX_FILE_SIZE_BYTES,
     maxFiles: maxFilesAllowed,
-    onDrop: useCallback((acceptedFiles, rejectedFiles) => {
+    onDrop: useCallback((acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       // Handle rejected files
       if (rejectedFiles.length > 0) {
         const hasFileTooLarge = rejectedFiles.some(r => r.errors.some(e => e.code === 'file-too-large'))

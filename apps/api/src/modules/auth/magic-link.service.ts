@@ -134,7 +134,13 @@ export const magicLinkService = {
     // Check if user has existing workspace memberships
     const existingMembership = await prisma.workspaceMember.findFirst({
       where: { userId: user.id },
-      include: { workspace: true },
+      select: {
+        workspace: {
+          select: {
+            slug: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'asc' },
     });
 

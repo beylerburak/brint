@@ -1,12 +1,17 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
+import { useLocale } from "next-intl"
 import { apiClient } from "@/lib/api-client"
 import { Skeleton } from "@/components/ui/skeleton"
+import { buildWorkspaceUrl, buildOnboardingUrl, buildLoginUrl } from "@/lib/locale-path"
 
 export default function LocaleRootPage() {
   const router = useRouter()
+  const params = useParams()
+  const locale = useLocale()
+  const currentLocale = (params?.locale as string) || locale
 
   useEffect(() => {
     redirectToWorkspace()
@@ -19,14 +24,14 @@ export default function LocaleRootPage() {
       // Redirect to first workspace
       if (response.workspaces.length > 0) {
         const firstWorkspace = response.workspaces[0]
-        router.replace(`/${firstWorkspace.slug}/home`)
+        router.replace(buildWorkspaceUrl(currentLocale, firstWorkspace.slug, "/home"))
       } else {
         // No workspaces - go to onboarding
-        router.replace('/onboarding')
+        router.replace(buildOnboardingUrl(currentLocale))
       }
     } catch (error) {
       console.error('Failed to load workspaces:', error)
-      router.replace('/login')
+      router.replace(buildLoginUrl(currentLocale))
     }
   }
 

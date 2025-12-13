@@ -7,6 +7,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
 import { z } from 'zod';
+import { UserSettingsPatchSchema, mergeUserSettings, parseUserSettings } from '@brint/shared-config';
 
 const UpdateProfileSchema = z.object({
   name: z.string().optional(),
@@ -153,6 +154,83 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         error: {
           code: 'UPDATE_FAILED',
           message: 'Failed to update profile',
+        },
+      });
+    }
+  });
+
+  // PATCH /users/me/settings - Update user settings
+  app.patch('/users/me/settings', {
+    schema: {
+      tags: ['User'],
+      summary: 'Update user settings',
+      description: 'Updates the authenticated user settings (theme, language, etc.)',
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = request.auth?.tokenPayload?.sub;
+
+    if (!userId) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        },
+      });
+    }
+
+    try {
+      // Validate patch body
+      const patch = UserSettingsPatchSchema.parse(request.body);
+
+      // Fetch current user with settings
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { settings: true },
+      });
+
+      if (!currentUser) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User not found',
+          },
+        });
+      }
+
+      // Merge patch with current settings
+      const nextSettings = mergeUserSettings(currentUser.settings, patch);
+
+      // Update user settings
+      await prisma.user.update({
+        where: { id: userId },
+        data: { settings: nextSettings },
+      });
+
+      // Return normalized settings
+      return reply.send({
+        success: true,
+        settings: nextSettings,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid settings data',
+            details: error.errors,
+          },
+        });
+      }
+
+      request.log.error({ error, userId }, 'Failed to update user settings');
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'UPDATE_FAILED',
+          message: 'Failed to update settings',
         },
       });
     }

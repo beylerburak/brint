@@ -189,58 +189,35 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       return; // Already set
     }
 
-    // Prevent duplicate concurrent requests
-    if (isLoadingWorkspace) {
-      console.log(`[WorkspaceContext] Already loading workspace, skipping duplicate request for ${slug}`);
-      return;
-    }
+    // Convert workspace summary to WorkspaceDetails format
+    // We use the summary data from /me endpoint instead of making another API call
+    // Missing fields (ownerUserId, avatarMediaId, avatarUrls, settings, createdAt, updatedAt, memberCount)
+    // will be null/undefined and can be loaded lazily if needed
+    const workspaceDetails: WorkspaceDetails = {
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      userRole: workspace.role, // Map 'role' from summary to 'userRole' in details
+      ownerUserId: '', // Will be loaded lazily if needed
+      avatarMediaId: null,
+      avatarUrl: workspace.avatarUrl,
+      avatarUrls: null, // Not available in /me response, will be loaded lazily if needed
+      timezone: workspace.timezone,
+      locale: workspace.locale,
+      baseCurrency: workspace.baseCurrency,
+      plan: workspace.plan,
+      settings: null, // Will be loaded lazily if needed
+      createdAt: '', // Will be loaded lazily if needed
+      updatedAt: '', // Will be loaded lazily if needed
+      memberCount: 0, // Will be loaded lazily if needed (used in home page)
+    };
 
-    console.log(`[WorkspaceContext] Loading workspace details for ${slug} (id: ${workspace.id})`);
+    console.log(`[WorkspaceContext] Using workspace summary for ${slug} (id: ${workspace.id}) - avoiding unnecessary API call`);
 
-    // Fetch full workspace details from API (not just summary)
-    // Cache will prevent duplicate requests if called multiple times
-    try {
-      setIsLoadingWorkspace(true);
-      isLoadingWorkspaceRef.current = true;
-      setError(null);
-      const response = await apiClient.getWorkspace(workspace.id);
-      setCurrentWorkspace(response.workspace);
-      lastLoadedWorkspaceIdRef.current = workspace.id;
-      lastWorkspaceSlugRef.current = slug;
-      setStatus("READY");
-    } catch (err) {
-      console.error('Failed to load workspace details:', err);
-      
-      // Clear refs on error so we can retry
-      lastLoadedWorkspaceIdRef.current = null;
-      lastWorkspaceSlugRef.current = null;
-      
-      if (err instanceof ApiError) {
-        if (err.statusCode === 401 || err.statusCode === 403) {
-          // Auth issue - user lost access
-          setStatus("NO_ACCESS");
-          setError({ message: err.message, code: err.code });
-          // Don't redirect here - proxy or page will handle
-        } else if (err.statusCode === 404) {
-          // Workspace was deleted or doesn't exist - ERROR (not NO_ACCESS)
-          // This is different from auth failure
-          setStatus("ERROR");
-          setError({ message: 'Workspace not found', code: 'NOT_FOUND' });
-        } else {
-          setStatus("ERROR");
-          setError({ message: err.message, code: err.code });
-        }
-      } else {
-        setStatus("ERROR");
-        setError({ message: 'Failed to load workspace', code: 'UNKNOWN_ERROR' });
-      }
-      
-      setCurrentWorkspace(null);
-      // Refs already cleared in catch block
-    } finally {
-      setIsLoadingWorkspace(false);
-      isLoadingWorkspaceRef.current = false;
-    }
+    setCurrentWorkspace(workspaceDetails);
+    lastLoadedWorkspaceIdRef.current = workspace.id;
+    lastWorkspaceSlugRef.current = slug;
+    setStatus("READY");
   };
 
   const refreshUser = async () => {

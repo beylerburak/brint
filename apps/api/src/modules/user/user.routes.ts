@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
 import { z } from 'zod';
 import { UserSettingsPatchSchema, mergeUserSettings, parseUserSettings } from '@brint/shared-config';
+import { deleteCache } from '../../lib/redis.js';
 
 const UpdateProfileSchema = z.object({
   name: z.string().optional(),
@@ -132,6 +133,9 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
+      // Invalidate /me cache when user profile is updated
+      await deleteCache(`user:me:${userId}`);
+
       return reply.send({
         success: true,
         user: updatedUser,
@@ -207,6 +211,9 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         where: { id: userId },
         data: { settings: nextSettings },
       });
+
+      // Invalidate /me cache when user settings are updated
+      await deleteCache(`user:me:${userId}`);
 
       // Return normalized settings
       return reply.send({

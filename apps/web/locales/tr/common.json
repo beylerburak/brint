@@ -1405,5 +1405,82 @@
       "task": "görev",
       "tasks": "görev"
     }
+  },
+  "projects": {
+    "title": "Projeler",
+    "loading": "Projeler yükleniyor...",
+    "summary": {
+      "show": "Özeti Göster",
+      "hide": "Özeti Gizle"
+    },
+    "completed": {
+      "show": "Tamamlananları Göster",
+      "hide": "Tamamlananları Gizle"
+    },
+    "chart": {
+      "planned": "Planlanan",
+      "active": "Aktif",
+      "archived": "Arşivlenen",
+      "totalProjects": "Toplam Proje",
+      "completed": "Tamamlanan"
+    },
+    "toolbar": {
+      "create": "Yeni Proje",
+      "searchPlaceholder": "Projeleri ara...",
+      "filter": "Filtre",
+      "assignee": "Atanan",
+      "priority": "Öncelik",
+      "tabs": {
+        "planned": "Planlanan",
+        "active": "Aktif",
+        "overdue": "Gecikmiş",
+        "completed": "Tamamlanan",
+        "all": "Tümü"
+      }
+    },
+    "empty": {
+      "title": "Proje bulunamadı",
+      "description": "İlk projenizi oluşturarak başlayın.",
+      "action": "Proje Oluştur"
+    },
+    "comingSoon": {
+      "kanban": "Kanban görünümü yakında",
+      "calendar": "Takvim görünümü yakında"
+    },
+    "form": {
+      "title": "Proje Oluştur",
+      "description": "İşinizi organize etmek için yeni bir proje oluşturun.",
+      "name": "Proje Adı",
+      "namePlaceholder": "Proje adını girin",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "Proje açıklamasını girin (isteğe bağlı)",
+      "brand": "Marka",
+      "brandPlaceholder": "Bir marka seçin (isteğe bağlı)",
+      "brandNone": "Yok",
+      "status": "Durum",
+      "startDate": "Başlangıç Tarihi",
+      "endDate": "Bitiş Tarihi",
+      "cancel": "İptal",
+      "create": "Proje Oluştur",
+      "creating": "Oluşturuluyor...",
+      "success": "Proje başarıyla oluşturuldu",
+      "statuses": {
+        "planned": "Planlanan",
+        "active": "Aktif",
+        "completed": "Tamamlanan",
+        "archived": "Arşivlenen"
+      },
+      "errors": {
+        "nameRequired": "Proje adı gereklidir",
+        "createFailed": "Proje oluşturulamadı",
+        "loadBrandsFailed": "Markalar yüklenemedi"
+      }
+    },
+    "table": {
+      "brand": "Marka"
+    },
+    "detail": {
+      "title": "Proje Detayı"
+    }
   }
 }

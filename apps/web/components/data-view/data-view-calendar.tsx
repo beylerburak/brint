@@ -16,6 +16,8 @@ import {
   subMonths,
   addWeeks,
   subWeeks,
+  addDays,
+  subDays,
   startOfDay,
   parseISO,
 } from "date-fns"
@@ -25,6 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { IconFlagFilled } from "@tabler/icons-react"
 import { Status, StatusIndicator, StatusLabel } from "@/components/kibo-ui/status"
+import { useIsMobile } from "@/hooks/use-mobile"
 import * as React from "react"
 
 export type CalendarViewMode = "monthly" | "weekly" | "agenda"
@@ -256,13 +259,31 @@ export function DataViewCalendar({
 
   // Weekly View
   const WeeklyView = () => {
-    const weekStart = startOfWeek(date, { weekStartsOn: 1 }) // Monday
-    const weekEnd = endOfWeek(date, { weekStartsOn: 1 }) // Monday
-    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
+    const isMobile = useIsMobile()
+    
+    // On mobile, show only 3 days (yesterday, today, tomorrow)
+    // On desktop, show full week
+    const weekDays = useMemo(() => {
+      if (isMobile) {
+        // Show 3 days: yesterday, today, tomorrow
+        const yesterday = subDays(date, 1)
+        const today = date
+        const tomorrow = addDays(date, 1)
+        return [yesterday, today, tomorrow]
+      } else {
+        // Show full week
+        const weekStart = startOfWeek(date, { weekStartsOn: 1 }) // Monday
+        const weekEnd = endOfWeek(date, { weekStartsOn: 1 }) // Monday
+        return eachDayOfInterval({ start: weekStart, end: weekEnd })
+      }
+    }, [date, isMobile])
 
     return (
       <div className="flex flex-col h-full">
-        <div className="flex-1 grid grid-cols-7 gap-px border rounded-lg overflow-hidden bg-border">
+        <div className={cn(
+          "flex-1 grid gap-px border rounded-lg overflow-hidden bg-border",
+          isMobile ? "grid-cols-3" : "grid-cols-7"
+        )}>
           {weekDays.map((day) => {
             const dayTasks = getTasksForDate(day)
             const isToday = isSameDay(day, new Date())
@@ -345,25 +366,7 @@ export function DataViewCalendar({
                             {task.description}
                           </div>
                         )}
-                        <div className="flex items-center gap-2 mt-2 min-w-0">
-                          {/* Priority badge - same style as kanban card */}
-                          {(() => {
-                            // Map priority to color (same as kanban)
-                            const priorityColorMap: Record<string, string> = {
-                              "High": "text-red-500",
-                              "Medium": "text-yellow-500",
-                              "Low": "text-green-500",
-                            }
-                            const priorityColor = priorityColorMap[task.priority] || "text-yellow-500"
-                            
-                            return (
-                              <Badge variant="outline" className="text-muted-foreground px-1.5 h-5 flex-shrink-0">
-                                <IconFlagFilled className={`h-3.5 w-3.5 ${priorityColor}`} />
-                                <span className="truncate">{task.priority}</span>
-                              </Badge>
-                            )
-                          })()}
-                          
+                        <div className="flex flex-col gap-2 mt-2">
                           {/* Status badge - same style as kanban card (using Status component) */}
                           {task.status && (() => {
                             // Get status color from API
@@ -400,10 +403,28 @@ export function DataViewCalendar({
                             }
                             
                             return (
-                              <Status status={status} className="min-w-0">
+                              <Status status={status} className="w-fit min-w-0">
                                 <StatusIndicator color={statusColor} className="flex-shrink-0" />
-                                <StatusLabel className="truncate min-w-0">{task.status}</StatusLabel>
+                                <StatusLabel className="truncate max-w-[120px]">{task.status}</StatusLabel>
                               </Status>
+                            )
+                          })()}
+                          
+                          {/* Priority badge - same style as kanban card */}
+                          {(() => {
+                            // Map priority to color (same as kanban)
+                            const priorityColorMap: Record<string, string> = {
+                              "High": "text-red-500",
+                              "Medium": "text-yellow-500",
+                              "Low": "text-green-500",
+                            }
+                            const priorityColor = priorityColorMap[task.priority] || "text-yellow-500"
+                            
+                            return (
+                              <Badge variant="outline" className="text-muted-foreground px-1.5 h-5 w-fit">
+                                <IconFlagFilled className={`h-3.5 w-3.5 ${priorityColor}`} />
+                                <span className="truncate">{task.priority}</span>
+                              </Badge>
                             )
                           })()}
                         </div>

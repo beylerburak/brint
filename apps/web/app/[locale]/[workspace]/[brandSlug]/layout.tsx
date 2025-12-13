@@ -22,7 +22,9 @@ export default async function BrandLayout({
     <div className="min-h-screen flex flex-col">
       <BrandHeader />
       <main className="flex-1">
-        {children}
+        <div className="w-full px-4 py-4 md:px-6 md:py-6">
+          {children}
+        </div>
       </main>
     </div>
   );

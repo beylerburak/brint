@@ -220,6 +220,7 @@ model User {
 
   // Generic user settings (e.g. notifications, theme)
   settings Json?
+  preferences UserPreference[]
 
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -299,6 +300,21 @@ model Workspace {
   integrations WorkspaceIntegration[]
 
   @@map("workspaces")
+}
+
+model UserPreference {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String?
+  key         String
+  value       Json
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, workspaceId, key])
+  @@index([userId, key])
+  @@map("user_preferences")
 }
 
 model WorkspaceMember {

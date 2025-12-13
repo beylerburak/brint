@@ -1404,5 +1404,82 @@
       "task": "task",
       "tasks": "tasks"
     }
+  },
+  "projects": {
+    "title": "Projects",
+    "loading": "Loading projects...",
+    "summary": {
+      "show": "Show Summary",
+      "hide": "Hide Summary"
+    },
+    "completed": {
+      "show": "Show Completed",
+      "hide": "Hide Completed"
+    },
+    "chart": {
+      "planned": "Planned",
+      "active": "Active",
+      "archived": "Archived",
+      "totalProjects": "Total Projects",
+      "completed": "Completed"
+    },
+    "toolbar": {
+      "create": "New Project",
+      "searchPlaceholder": "Search projects...",
+      "filter": "Filter",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "tabs": {
+        "planned": "Planned",
+        "active": "Active",
+        "overdue": "Overdue",
+        "completed": "Completed",
+        "all": "All"
+      }
+    },
+    "empty": {
+      "title": "No projects found",
+      "description": "Get started by creating your first project.",
+      "action": "Create Project"
+    },
+    "comingSoon": {
+      "kanban": "Kanban view coming soon",
+      "calendar": "Calendar view coming soon"
+    },
+    "form": {
+      "title": "Create Project",
+      "description": "Create a new project to organize your work.",
+      "name": "Project Name",
+      "namePlaceholder": "Enter project name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter project description (optional)",
+      "brand": "Brand",
+      "brandPlaceholder": "Select a brand (optional)",
+      "brandNone": "None",
+      "status": "Status",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "cancel": "Cancel",
+      "create": "Create Project",
+      "creating": "Creating...",
+      "success": "Project created successfully",
+      "statuses": {
+        "planned": "Planned",
+        "active": "Active",
+        "completed": "Completed",
+        "archived": "Archived"
+      },
+      "errors": {
+        "nameRequired": "Project name is required",
+        "createFailed": "Failed to create project",
+        "loadBrandsFailed": "Failed to load brands"
+      }
+    },
+    "table": {
+      "brand": "Brand"
+    },
+    "detail": {
+      "title": "Project Detail"
+    }
   }
 }

@@ -83,7 +83,7 @@ export const navigationData = {
     {
       title: "Projects",
       titleKey: "nav.projects",
-      url: "#",
+      url: `/${locale}/${workspaceSlug}/projects`,
       icon: IconFolder,
     },
     {
@@ -237,6 +237,69 @@ export function NavMain() {
           })}
         </SidebarMenu>
       </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
+
+// NavProjects Component - Shows projects list
+export function NavProjects() {
+  const params = useParams()
+  const t = useTranslations('nav')
+  const { currentWorkspace } = useWorkspace()
+  const workspaceSlug = params?.workspace as string
+  const locale = (params?.locale as string) || 'en'
+  const [projects, setProjects] = React.useState<Array<{ id: string; name: string; status: string }>>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    const fetchProjects = async () => {
+      if (!currentWorkspace?.id) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const response = await apiClient.listProjects(currentWorkspace.id, { limit: 5 })
+        setProjects(response.projects)
+      } catch (error) {
+        console.error('Failed to fetch projects:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [currentWorkspace?.id])
+
+  // Don't render if loading or no projects
+  if (isLoading || projects.length === 0) {
+    return null
+  }
+
+  return (
+    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+      <SidebarGroupLabel>{t('projects')}</SidebarGroupLabel>
+      <SidebarMenu>
+        {projects.map((project) => (
+          <SidebarMenuItem key={project.id}>
+            <SidebarMenuButton asChild>
+              <Link href={`/${locale}/${workspaceSlug}/projects`}>
+                <IconFolder />
+                <span className="truncate">{project.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+        {projects.length >= 5 && (
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href={`/${locale}/${workspaceSlug}/projects`}>
+                <span className="text-xs text-muted-foreground">View all...</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+      </SidebarMenu>
     </SidebarGroup>
   )
 }

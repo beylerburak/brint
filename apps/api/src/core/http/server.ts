@@ -12,6 +12,7 @@ import { registerWorkspaceRoutes } from '../../modules/workspace/workspace.route
 import { registerBrandRoutes } from '../../modules/brand/brand.routes.js';
 import { registerMediaRoutes } from '../../modules/media/media.routes.js';
 import { registerUserRoutes } from '../../modules/user/user.routes.js';
+import { registerPreferenceRoutes } from '../../modules/preference/preference.routes.js';
 import { registerCommentRoutes } from '../../modules/comment/comment.routes.js';
 import { registerProjectRoutes } from '../../modules/project/project.routes.js';
 import { registerTaskRoutes } from '../../modules/task/task.routes.js';
@@ -91,6 +92,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerAuthRoutes(app);
   await registerUserRoutes(app);
+  await registerPreferenceRoutes(app);
   await registerWorkspaceRoutes(app);
   await registerBrandRoutes(app);
   await registerMediaRoutes(app);
@@ -115,4 +117,3 @@ export async function createServer(): Promise<FastifyInstance> {
 
   return app;
 }
-

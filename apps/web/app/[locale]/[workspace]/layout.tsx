@@ -7,6 +7,7 @@
 
 import { WorkspaceProvider } from "@/contexts/workspace-context"
 import { RouteTransition } from "@/components/route-transition"
+import { PreferenceProvider } from "@/lib/preferences"
 
 export default async function WorkspaceLayout({
   children,
@@ -19,9 +20,10 @@ export default async function WorkspaceLayout({
 
   return (
     <WorkspaceProvider>
-      <RouteTransition />
-      {children}
+      <PreferenceProvider>
+        <RouteTransition />
+        {children}
+      </PreferenceProvider>
     </WorkspaceProvider>
   );
 }
-

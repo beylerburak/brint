@@ -14,21 +14,21 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-interface DataTableActionBarProps<TData>
+interface DataViewActionBarProps<TData>
   extends React.ComponentProps<typeof motion.div> {
   table: Table<TData>;
   visible?: boolean;
   portalContainer?: Element | DocumentFragment | null;
 }
 
-function DataTableActionBar<TData>({
+function DataViewActionBar<TData>({
   table,
   visible: visibleProp,
   portalContainer: portalContainerProp,
   children,
   className,
   ...props
-}: DataTableActionBarProps<TData>) {
+}: DataViewActionBarProps<TData>) {
   const [mounted, setMounted] = React.useState(false);
 
   React.useLayoutEffect(() => {
@@ -78,13 +78,13 @@ function DataTableActionBar<TData>({
   );
 }
 
-interface DataTableActionBarActionProps
+interface DataViewActionBarActionProps
   extends React.ComponentProps<typeof Button> {
   tooltip?: string;
   isPending?: boolean;
 }
 
-function DataTableActionBarAction({
+function DataViewActionBarAction({
   size = "sm",
   tooltip,
   isPending,
@@ -124,13 +124,13 @@ function DataTableActionBarAction({
   );
 }
 
-interface DataTableActionBarSelectionProps<TData> {
+interface DataViewActionBarSelectionProps<TData> {
   table: Table<TData>;
 }
 
-function DataTableActionBarSelection<TData>({
+function DataViewActionBarSelection<TData>({
   table,
-}: DataTableActionBarSelectionProps<TData>) {
+}: DataViewActionBarSelectionProps<TData>) {
   const onClearSelection = React.useCallback(() => {
     table.toggleAllRowsSelected(false);
   }, [table]);
@@ -172,7 +172,7 @@ function DataTableActionBarSelection<TData>({
 }
 
 export {
-  DataTableActionBar,
-  DataTableActionBarAction,
-  DataTableActionBarSelection,
+  DataViewActionBar,
+  DataViewActionBarAction,
+  DataViewActionBarSelection,
 };

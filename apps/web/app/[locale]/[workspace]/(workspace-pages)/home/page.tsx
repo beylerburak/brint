@@ -30,7 +30,9 @@ export default function HomePage() {
           <p>Plan: <strong>{currentWorkspace.plan}</strong></p>
           <p>Timezone: <strong>{currentWorkspace.timezone}</strong></p>
           <p>Currency: <strong>{currentWorkspace.baseCurrency}</strong></p>
-          <p>Members: <strong>{currentWorkspace.memberCount}</strong></p>
+          {/* memberCount is only available after full workspace details are loaded */}
+          {/* For now, we skip showing it to avoid unnecessary API call */}
+          {/* If needed, it can be loaded lazily or shown when available */}
         </div>
       )}
     </div>

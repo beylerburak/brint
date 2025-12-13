@@ -31,6 +31,8 @@ import { requireWorkspaceRoleFor } from '../../core/auth/workspace-guard.js';
 import { getMediaVariantUrlAsync } from '../../core/storage/s3-url.js';
 import { prisma } from '../../lib/prisma.js';
 import { getCache, setCache, deleteCachePattern } from '../../lib/redis.js';
+import { logger } from '../../lib/logger.js';
+import { CacheKeys } from '../../core/cache/cache.service.js';
 
 export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
   // POST /workspaces/:workspaceId/brands - Create brand
@@ -127,13 +129,20 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
       offset?: string;
     };
 
-    // Build cache key
-    const cacheKey = `brands:workspace:${workspaceId}:status:${status || 'all'}:limit:${limit || 'all'}:offset:${offset || '0'}`;
+    // Build cache key - only cache if no pagination (limit/offset)
+    // Paginated requests should not be cached as they are less common
+    const shouldCache = !limit && !offset;
+    const cacheKey = shouldCache 
+      ? CacheKeys.brandsList(workspaceId, status)
+      : `brands:workspace:${workspaceId}:status:${status || 'all'}:limit:${limit || 'all'}:offset:${offset || '0'}`;
 
-    // Try to get from cache first
-    const cached = await getCache<{ success: true; brands: any[]; total: number }>(cacheKey);
-    if (cached) {
-      return reply.status(200).send(cached);
+    // Try to get from cache first (only for non-paginated requests)
+    if (shouldCache) {
+      const cached = await getCache<{ success: true; brands: any[]; total: number }>(cacheKey);
+      if (cached) {
+        logger.debug({ workspaceId, status }, 'Brands list loaded from Redis cache');
+        return reply.status(200).send(cached);
+      }
     }
 
     const brands = await prisma.brand.findMany({
@@ -204,8 +213,12 @@ export async function registerBrandRoutes(app: FastifyInstance): Promise<void> {
       total: brandsWithUrls.length,
     };
 
-    // Cache for 60 seconds (presigned URLs are typically valid for a few minutes)
-    await setCache(cacheKey, response, 60);
+    // Cache for 5 minutes (180 seconds) - only cache non-paginated requests
+    // Presigned URLs are typically valid for a few minutes, so we cache for a reasonable duration
+    if (shouldCache) {
+      await setCache(cacheKey, response, 300);
+      logger.debug({ workspaceId, status }, 'Brands list cached in Redis for 5 minutes');
+    }
 
     return reply.status(200).send(response);
   });

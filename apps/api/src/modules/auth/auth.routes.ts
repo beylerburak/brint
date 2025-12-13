@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { redis } from '../../lib/redis.js';
+import { getCache, setCache, deleteCache } from '../../lib/redis.js';
 import { oauthConfig, authConfig, appUrlConfig } from '../../config/index.js';
 import { loginOrRegisterWithGoogle, type GoogleProfile } from './google-oauth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../../core/auth/auth.cookies.js';
@@ -135,6 +136,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const userId = request.auth.tokenPayload.sub;
+    const cacheKey = `user:me:${userId}`;
+
+    // Try to get from cache first
+    const cached = await getCache<{ success: true; user: any; workspaces: any[] }>(cacheKey);
+    if (cached) {
+      logger.debug({ userId }, 'User /me data loaded from Redis cache');
+      return reply.status(200).send(cached);
+    }
 
     // Fetch user details
     const user = await prisma.user.findUnique({
@@ -282,6 +291,11 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       workspaces,
     };
 
+    // Cache for 5 minutes (300 seconds)
+    // Note: Presigned avatar URLs are valid for a few minutes, so cache is safe
+    await setCache(cacheKey, responseData, 300);
+    logger.debug({ userId }, 'User /me data cached in Redis for 5 minutes');
+
     return reply.status(200).send(responseData);
   });
 
@@ -349,6 +363,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     });
 
     logger.info({ userId }, 'User completed onboarding');
+
+    // Invalidate /me cache when onboarding is completed
+    await deleteCache(`user:me:${userId}`);
 
     return reply.status(200).send({
       success: true,

@@ -12,6 +12,7 @@ export { ApiError, apiCache } from './api/http';
 export type { UserProfile, MeResponse } from './api/auth';
 export type { WorkspaceRole, WorkspacePlan, WorkspaceSummary, WorkspaceDetails, WorkspaceDetailsResponse } from './api/workspaces';
 export type { SocialPlatform, SocialAccountStatus, SocialAccountDto } from './api/social';
+export type { UserPreferenceDto } from './api/preferences';
 
 // Import domain modules
 import { authApi } from './api/auth';
@@ -23,6 +24,8 @@ import { mediaApi } from './api/media';
 import { socialApi } from './api/social';
 import { integrationsApi } from './api/integrations';
 import { tagsApi } from './api/tags';
+import { preferencesApi } from './api/preferences';
+import { projectsApi } from './api/projects';
 import { apiCache } from './api/http';
 
 // Re-export brand types
@@ -116,6 +119,21 @@ export const apiClient = {
   listTaskActivityLogs: tasksApi.listTaskActivityLogs,
   createTaskComment: tasksApi.createTaskComment,
   listTaskStatuses: tasksApi.listTaskStatuses,
+
+  // ============================================================================
+  // Preferences API
+  // ============================================================================
+  listPreferences: preferencesApi.listPreferences,
+  upsertPreference: preferencesApi.upsertPreference,
+  batchUpsertPreferences: preferencesApi.batchUpsertPreferences,
+
+  // ============================================================================
+  // Projects API
+  // ============================================================================
+  listProjects: projectsApi.listProjects,
+  getProject: projectsApi.getProject,
+  createProject: projectsApi.createProject,
+  clearProjectsCache: projectsApi.clearProjectsCache,
 
   // ============================================================================
   // Media API

@@ -60,6 +60,7 @@ import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
 
+import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -132,12 +133,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { apiClient } from "@/lib/api-client"
 import {
-  DataTableActionBar,
-  DataTableActionBarAction,
-  DataTableActionBarSelection,
-} from "@/components/data-table/data-table-action-bar"
-import { useTranslations } from "next-intl"
-import { useWorkspace } from "@/contexts/workspace-context"
+  DataViewActionBar,
+  DataViewActionBarAction,
+  DataViewActionBarSelection,
+} from "./data-view-action-bar"
 
 export const schema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -317,22 +316,13 @@ function SortableHeader({ column, children }: { column: any; children: React.Rea
 }
 
 // Actions cell component with delete dialog
-function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: any }) {
-  const onDeleteTask = (table.options.meta as any)?.onDeleteTask
+function ActionsCell<TData extends { id: string | number }>({ row, table }: { row: Row<TData>; table: any }) {
+  const onDeleteRow = (table.options.meta as any)?.onDeleteRow
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
-  const { currentWorkspace } = useWorkspace()
-
-  // Check if user can delete task (requires ADMIN or OWNER role)
-  // Backend requires ADMIN for task:delete, but OWNER bypasses all checks
-  const canDeleteTask = () => {
-    if (!currentWorkspace?.userRole) return false
-    const role = currentWorkspace.userRole
-    return role === 'OWNER' || role === 'ADMIN'
-  }
 
   const handleDelete = () => {
-    if (onDeleteTask) {
-      onDeleteTask(row.original.id)
+    if (onDeleteRow) {
+      onDeleteRow(row.original.id)
     }
     setIsDeleteDialogOpen(false)
   }
@@ -351,45 +341,50 @@ function ActionsCell({ row, table }: { row: Row<z.infer<typeof schema>>; table: 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            disabled={!canDeleteTask()}
-          >
-            Delete
-          </DropdownMenuItem>
+          {onDeleteRow && (
+            <>
+              <DropdownMenuItem>Edit</DropdownMenuItem>
+              <DropdownMenuItem>Make a copy</DropdownMenuItem>
+              <DropdownMenuItem>Favorite</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setIsDeleteDialogOpen(true)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Task'ı sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu task'ı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {onDeleteRow && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete item</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this item? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   )
 }
 
-// Create columns function that uses translations
-function createColumns(t: (key: string) => string, availableStatuses?: Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>): ColumnDef<z.infer<typeof schema>>[] {
+// Create task-specific columns function (exported for tasks page)
+export function createTaskColumns(t: (key: string) => string, availableStatuses?: Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>): ColumnDef<z.infer<typeof schema>>[] {
   return [
   {
     id: "select",
@@ -778,12 +773,12 @@ function createColumns(t: (key: string) => string, availableStatuses?: Array<{ i
   ]
 }
 
-function DraggableRow({
+function DraggableRow<TData extends { id: string | number }>({
   row,
   onRowClick
 }: {
-  row: Row<z.infer<typeof schema>>
-  onRowClick?: (row: z.infer<typeof schema>) => void
+  row: Row<TData>
+  onRowClick?: (row: TData) => void
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
@@ -816,7 +811,10 @@ function DraggableRow({
       }}
     >
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
+        <TableCell key={cell.id} className={cn(
+          // Match header padding: checkbox column gets px-2, others get px-4, with increased left padding
+          cell.column.id === "select" ? "!px-2 !pl-4 !py-2" : "!px-4 !pl-6 !py-2"
+        )}>
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </TableCell>
       ))}
@@ -824,73 +822,30 @@ function DraggableRow({
   )
 }
 
-export function DataTable({
+export function DataTable<TData extends { id: string | number }>({
   data: initialData,
+  columns: providedColumns,
   onLoadMore,
   hasMore = false,
   isLoading = false,
   onRowClick,
-  onDeleteTask,
+  onDeleteRow,
   onStatusChange,
-  workspaceId,
-  brandId,
-  taskStatuses,
   ...props
 }: {
-  data: z.infer<typeof schema>[]
+  data: TData[]
+  columns: ColumnDef<TData>[] // Required - must be provided
   onLoadMore?: () => void
   hasMore?: boolean
   isLoading?: boolean
-  onRowClick?: (row: z.infer<typeof schema>) => void
-  onDeleteTask?: (taskId: string | number) => void
-  onStatusChange?: (taskId: string | number, newStatus: string) => void
-  workspaceId?: string
-  brandId?: string
-  taskStatuses?: {
-    TODO: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
-    IN_PROGRESS: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
-    DONE: Array<{ id: string; label: string; color: string | null; isDefault: boolean }>;
-  }
+  onRowClick?: (row: TData) => void
+  onDeleteRow?: (rowId: string | number) => void | Promise<void>
+  onStatusChange?: (rowId: string | number, newStatus: string) => void
 }) {
-  const t = useTranslations("tasks")
   const [data, setData] = React.useState(() => initialData)
-  const [availableStatuses, setAvailableStatuses] = React.useState<Array<{ id: string; label: string; color: string | null; isDefault: boolean; group?: 'TODO' | 'IN_PROGRESS' | 'DONE' }>>([])
   
-  // Use provided taskStatuses or fetch from API
-  React.useEffect(() => {
-    async function fetchStatuses() {
-      if (!workspaceId) return
-      
-      // If taskStatuses prop is provided, use it instead of fetching
-      if (taskStatuses) {
-        const statusesWithGroup = [
-          ...taskStatuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
-          ...taskStatuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
-          ...taskStatuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
-        ]
-        setAvailableStatuses(statusesWithGroup)
-        return
-      }
-      
-      try {
-        const response = await apiClient.listTaskStatuses(workspaceId, brandId)
-        const statusesWithGroup = [
-          ...response.statuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
-          ...response.statuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
-          ...response.statuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
-        ]
-        setAvailableStatuses(statusesWithGroup)
-      } catch (error) {
-        console.error("Failed to fetch task statuses:", error)
-        // Keep empty array, will fall back to hardcoded statuses
-      }
-    }
-    if (workspaceId) {
-      fetchStatuses()
-    }
-  }, [workspaceId, brandId, taskStatuses])
-  
-  const columns = React.useMemo(() => createColumns(t, availableStatuses), [t, availableStatuses])
+  // Columns must be provided - no fallback to task-specific columns
+  const columns = providedColumns
 
   // Update data when initialData prop changes
   React.useEffect(() => {
@@ -958,14 +913,14 @@ export function DataTable({
   const tableMeta = React.useMemo(() => ({
     userPrefs: userPrefs || { dateFormat: "DMY", timeFormat: "H24" },
     updateStatus,
-    onDeleteTask,
-    onStatusChange: (taskId: string | number, newStatus: string) => {
+    onDeleteRow,
+    onStatusChange: (rowId: string | number, newStatus: string) => {
       // Also update local state for immediate feedback
-      updateStatus(taskId, newStatus)
+      updateStatus(rowId, newStatus)
       // Call external handler
-      onStatusChange?.(taskId, newStatus)
+      onStatusChange?.(rowId, newStatus)
     }
-  }), [userPrefs, updateStatus, onDeleteTask, onStatusChange])
+  }), [userPrefs, updateStatus, onDeleteRow, onStatusChange])
 
   const table = useReactTable({
     data,
@@ -1053,7 +1008,7 @@ export function DataTable({
   }, [isLoading])
 
   return (
-    <div className="w-full py-6 flex flex-col min-h-0 flex-1">
+    <div className="w-full flex flex-col min-h-0 flex-1">
       <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
         <DndContext
           collisionDetection={closestCenter}
@@ -1062,33 +1017,38 @@ export function DataTable({
           sensors={sensors}
           id={sortableId}
         >
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody className="**:data-[slot=table-cell]:first:w-8">
+          <div className="border rounded-lg overflow-hidden bg-background">
+            <Table className="border-separate border-spacing-0">
+              <TableHeader className="[&_tr]:border-b [&_tr]:border-border">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-b border-border">
+                    {headerGroup.headers.map((header) => {
+                      return (
+                        <TableHead key={header.id} colSpan={header.colSpan} className={cn(
+                          "bg-muted/50 !text-muted-foreground !text-sm font-medium !py-2 !h-auto border-b border-border",
+                          // Checkbox column (first column) gets less padding to align with rows
+                          header.id === "select" ? "!px-2 !pl-4" : "!px-4 !pl-6"
+                        )}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                        </TableHead>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+            <TableBody className="**:data-[slot=table-cell]:first:w-8 bg-background">
               {rows?.length ? (
                 <SortableContext
                   items={dataIds}
                   strategy={verticalListSortingStrategy}
                 >
                   {rows.map((row) => (
-                    <DraggableRow key={row.id} row={row} onRowClick={onRowClick} />
+                    <DraggableRow<TData> key={row.id} row={row} onRowClick={onRowClick} />
                   ))}
                   {isLoading && (
                     <TableRow>
@@ -1114,15 +1074,16 @@ export function DataTable({
               )}
             </TableBody>
           </Table>
+          </div>
         </DndContext>
       </div>
-      <DataTableActionBar table={table}>
-        <DataTableActionBarSelection table={table} />
-        <DataTableActionBarAction tooltip="Delete selected">
+      <DataViewActionBar table={table}>
+        <DataViewActionBarSelection table={table} />
+        <DataViewActionBarAction tooltip="Delete selected">
           <IconDotsVertical className="h-3.5 w-3.5" />
           Delete
-        </DataTableActionBarAction>
-      </DataTableActionBar>
+        </DataViewActionBarAction>
+      </DataViewActionBar>
     </div>
   )
 }

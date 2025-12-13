@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { apiClient } from "@/lib/api-client"
+import { usePreference, PreferenceKeys } from "@/lib/preferences"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
@@ -13,6 +14,8 @@ import {
   IconAlertCircle,
   IconCheck,
   IconPlus,
+  IconFlagFilled,
+  IconList,
 } from "@tabler/icons-react"
 import {
   DataViewPage,
@@ -27,6 +30,8 @@ import {
   SummaryStats,
   BaseTask,
   CalendarViewMode,
+  createTaskColumns,
+  SummaryChartConfig,
 } from "@/components/data-view"
 import { useKanbanColumns } from "@/components/data-view/hooks/use-kanban-columns"
 import { TaskDetailModal } from "@/features/tasks/components/task-detail"
@@ -41,12 +46,25 @@ export default function BrandTasksPage() {
   // State
   const [brandId, setBrandId] = useState<string | null>(null)
   const [brandInfo, setBrandInfo] = useState<{ name: string; slug: string; logoUrl?: string | null } | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>("table")
+  const [viewMode, setViewMode] = usePreference<ViewMode>(PreferenceKeys.TASKS_VIEW_MODE, {
+    defaultValue: "table",
+    storage: "url",
+    urlParam: "view",
+    scope: "workspace",
+  })
   const [filterTab, setFilterTab] = useState<FilterTab>("all")
   const [selectedTask, setSelectedTask] = useState<BaseTask | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [calendarCurrentDate, setCalendarCurrentDate] = useState<Date>(new Date())
-  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("monthly")
+  const [calendarViewMode, setCalendarViewMode] = usePreference<CalendarViewMode>(
+    PreferenceKeys.TASKS_CALENDAR_MODE,
+    {
+      defaultValue: "monthly",
+      storage: "url",
+      urlParam: "cal",
+      scope: "workspace",
+    }
+  )
 
   // Handle view mode change - set filter to "all" when switching to kanban
   const handleViewModeChange = useCallback((mode: ViewMode) => {
@@ -54,8 +72,19 @@ export default function BrandTasksPage() {
     if (mode === "kanban") {
       setFilterTab("all")
     }
-  }, [])
-  const [showCompleted, setShowCompleted] = useState<boolean>(true)
+  }, [setViewMode, setFilterTab])
+  const [showCompleted, setShowCompleted] = usePreference<boolean>(PreferenceKeys.TASKS_SHOW_COMPLETED, {
+    defaultValue: true,
+    storage: "local",
+    scope: "workspace",
+    urlParam: "completed",
+  })
+  const [showSummary, setShowSummary] = usePreference<boolean>(PreferenceKeys.TASKS_SHOW_SUMMARY, {
+    defaultValue: true,
+    storage: "local",
+    scope: "workspace",
+    urlParam: "summary",
+  })
   const [searchValue, setSearchValue] = useState("")
   // Track locally updated tasks to ignore WebSocket events for them
   const locallyUpdatedTasksRef = useRef<Set<string>>(new Set())
@@ -173,6 +202,16 @@ export default function BrandTasksPage() {
       } as TableTask
     })
   }, [filteredTasks, t])
+
+  // Create table columns using task-specific column creator
+  const tableColumns = useMemo(() => {
+    const availableStatuses = taskStatuses ? [
+      ...taskStatuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
+      ...taskStatuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
+      ...taskStatuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
+    ] : undefined
+    return createTaskColumns(t, availableStatuses)
+  }, [t, taskStatuses])
 
   // Helper function to format relative time (same as table view)
   const getRelativeTime = useCallback((dateString: string): string => {
@@ -300,8 +339,9 @@ export default function BrandTasksPage() {
     return { todo, inProgress, overdue, completed }
   }, [filteredTasks, t, getRelativeTime])
 
-  // Summary stats
-  const summaryStats: SummaryStats = useMemo(() => {
+  // Calculate summary stats and convert to SummaryChartConfig
+  const summaryConfig: SummaryChartConfig = useMemo(() => {
+    // Calculate stats
     const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
       LOW: t("priority.Low"),
       MEDIUM: t("priority.Medium"),
@@ -332,13 +372,42 @@ export default function BrandTasksPage() {
       if (dueDate && dueDate < now && task.status.group !== 'DONE') overdue++
     })
 
+    // Convert to SummaryChartConfig
     return {
-      lowPriority,
-      mediumPriority,
-      highPriority,
-      totalTasks: filteredTasks.length,
-      totalDone,
-      overdue,
+      leftSection: [
+        {
+          label: t("chart.lowPriority"),
+          value: lowPriority,
+          icon: <IconFlagFilled className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />,
+        },
+        {
+          label: t("chart.mediumPriority"),
+          value: mediumPriority,
+          icon: <IconFlagFilled className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500" />,
+        },
+        {
+          label: t("chart.highPriority"),
+          value: highPriority,
+          icon: <IconFlagFilled className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />,
+        },
+      ],
+      rightSection: [
+        {
+          label: t("chart.totalTasks"),
+          value: filteredTasks.length,
+          icon: <IconList className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />,
+        },
+        {
+          label: t("chart.totalDone"),
+          value: totalDone,
+          icon: <IconCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />,
+        },
+        {
+          label: t("chart.overdue"),
+          value: overdue,
+          icon: <IconAlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />,
+        },
+      ],
     }
   }, [filteredTasks, t])
 
@@ -722,10 +791,12 @@ export default function BrandTasksPage() {
     <>
       <DataViewPage
       title={t("title")}
-      summaryStats={summaryStats}
+        summaryConfig={summaryConfig}
       viewMode={viewMode}
-      shouldShowCompleted={showCompleted}
+      showCompleted={showCompleted}
+      showSummary={showSummary}
       onCompletedFilterChange={setShowCompleted}
+      onSummaryVisibilityChange={setShowSummary}
       headerRight={
         <DataViewToolbar
           viewMode={viewMode}
@@ -734,13 +805,13 @@ export default function BrandTasksPage() {
           onViewModeChange={handleViewModeChange}
           onFilterChange={setFilterTab}
           onSearchChange={setSearchValue}
-          onNewTask={() => {
+          onCreate={() => {
             setSelectedTask(null)
             setIsCreateMode(true)
             setIsTaskModalOpen(true)
           }}
+          createLabel={t("newTask")}
           searchPlaceholder={t("toolbar.searchPlaceholder")}
-          newTaskLabel={t("newTask")}
           filterLabels={{
             filter: t("toolbar.filter"),
             assignee: t("toolbar.assignee"),
@@ -777,13 +848,13 @@ export default function BrandTasksPage() {
           onViewModeChange={handleViewModeChange}
           onFilterChange={setFilterTab}
           onSearchChange={setSearchValue}
-          onNewTask={() => {
+          onCreate={() => {
             setSelectedTask(null)
             setIsCreateMode(true)
             setIsTaskModalOpen(true)
           }}
+          createLabel={t("newTask")}
           searchPlaceholder={t("toolbar.searchPlaceholder")}
-          newTaskLabel={t("newTask")}
           filterLabels={{
             filter: t("toolbar.filter"),
             assignee: t("toolbar.assignee"),
@@ -810,19 +881,17 @@ export default function BrandTasksPage() {
       ) : viewMode === "table" ? (
           <DataViewTable
             data={tasksData}
+            columns={tableColumns}
             filterTab={filterTab}
             onLoadMore={loadMoreTableData}
             hasMore={pagination.page < pagination.totalPages}
             isLoading={isLoadingMore}
-            workspaceId={currentWorkspace?.id}
-            brandId={brandId || undefined}
-            taskStatuses={taskStatuses || undefined}
-            onTaskClick={(task) => {
+            onRowClick={(task) => {
               // Just select the task and open modal - hook handles fetching
-              setSelectedTask(task)
+              setSelectedTask(task as BaseTask)
               setIsTaskModalOpen(true)
             }}
-            onDeleteTask={async (taskId) => {
+            onDeleteRow={async (taskId) => {
               if (!currentWorkspace) return
 
               try {

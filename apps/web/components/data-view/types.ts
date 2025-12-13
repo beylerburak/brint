@@ -1,5 +1,5 @@
 // Generic data view types
-export type ViewMode = "table" | "kanban"
+export type ViewMode = "table" | "kanban" | "calendar"
 
 export type FilterTab = "all" | "todo" | "inProgress" | "overdue" | "completed"
 
@@ -10,6 +10,7 @@ export interface BaseTask {
   description?: string | null
   priority: "High" | "Medium" | "Low"
   status: string
+  statusGroup?: 'TODO' | 'IN_PROGRESS' | 'DONE' // Status group for color mapping (language-independent)
   dueDate: string
   assigneeUserId?: string | null
   assignedTo?: Array<{

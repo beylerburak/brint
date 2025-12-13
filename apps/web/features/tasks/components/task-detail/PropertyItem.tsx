@@ -52,9 +52,13 @@ export function PropertyItem({
     const renderValue = () => {
         switch (type) {
             case 'status': {
+                // Extract status value and group if available
                 const statusValue = typeof value === 'object' && value !== null && 'label' in value
                     ? (value as any).label
                     : String(value)
+                const statusGroupFromValue = typeof value === 'object' && value !== null && 'group' in value
+                    ? (value as any).group as 'TODO' | 'IN_PROGRESS' | 'DONE' | undefined
+                    : undefined
 
                 // Use available statuses from API if provided, otherwise fall back to AVAILABLE_STATUSES
                 const statusesToUse = availableStatuses && availableStatuses.length > 0
@@ -103,61 +107,63 @@ export function PropertyItem({
                     displayStatus = AVAILABLE_STATUSES.includes(statusValue as any) ? t(`status.${statusValue}`) : statusValue
                 }
 
-                // Determine status color based on status group
-                const getStatusColor = (label: string, group?: 'TODO' | 'IN_PROGRESS' | 'DONE'): "online" | "offline" | "maintenance" | "degraded" => {
-                    // If group is available, use it directly
-                    if (group) {
-                        const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
-                            TODO: "offline",
-                            IN_PROGRESS: "maintenance",
-                            DONE: "online",
-                        }
-                        return groupColorMap[group]
-                    }
-                    
-                    // Map label to English key if it's a translation
-                    const translatedNotStarted = t("status.Not Started")
-                    const translatedInProgress = t("status.In Progress")
-                    const translatedDone = t("status.Done")
-                    
-                    // Try to map from label (supports both English and translated values)
-                    const statusGroupMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
-                        // Translated values
-                        [translatedNotStarted]: "offline",
-                        [translatedInProgress]: "maintenance",
-                        [translatedDone]: "online",
-                        // English keys
-                        "Not Started": "offline",
-                        "In Progress": "maintenance",
-                        "Done": "online",
-                    }
-                    
-                    // Check if label matches any translation or English key
-                    if (statusGroupMap[label]) {
-                        return statusGroupMap[label]
-                    }
-                    
-                    // Fallback: try to match with statusValue
-                    if (statusGroupMap[statusValue]) {
-                        return statusGroupMap[statusValue]
-                    }
-                    
-                    // Default fallback
-                    return "offline"
-                }
+                // Get status color from API (if available)
+                let statusColor: string | undefined = undefined
+                let status: "online" | "offline" | "maintenance" | "degraded" = "offline"
                 
                 // Find status group for current status value
-                const currentStatusObj = availableStatuses?.find(s => s.label === statusValue)
-                const currentStatusGroup = currentStatusObj?.group
-
-                const status = getStatusColor(statusValue, currentStatusGroup)
+                // Priority: 1. Use group from value object (if available), 2. Find in availableStatuses, 3. Map from translation key
+                let currentStatusGroup = statusGroupFromValue
+                
+                if (!currentStatusGroup && availableStatuses && availableStatuses.length > 0) {
+                    // Try to find in availableStatuses by label
+                    const currentStatusObj = availableStatuses.find(s => s.label === statusValue)
+                    currentStatusGroup = currentStatusObj?.group
+                    if (currentStatusObj?.color) {
+                        statusColor = currentStatusObj.color
+                    }
+                }
+                
+                if (!currentStatusGroup) {
+                    // Fallback: map from translation key
+                    const statusGroupMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+                        "Not Started": "TODO",
+                        "In Progress": "IN_PROGRESS",
+                        "Done": "DONE",
+                        [t("status.Not Started")]: "TODO",
+                        [t("status.In Progress")]: "IN_PROGRESS",
+                        [t("status.Done")]: "DONE",
+                    }
+                    currentStatusGroup = statusGroupMap[statusValue]
+                }
+                
+                // If still no color found and we have group, try to find by group
+                if (!statusColor && currentStatusGroup && availableStatuses && availableStatuses.length > 0) {
+                    const foundStatus = availableStatuses.find(s => s.group === currentStatusGroup)
+                    if (foundStatus?.color) {
+                        statusColor = foundStatus.color
+                    }
+                }
+                
+                // Fallback to default status for backwards compatibility (when no API colors available)
+                if (!statusColor) {
+                    const statusDisplayMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+                        "Not Started": "degraded",
+                        "In Progress": "maintenance",
+                        "Done": "offline",
+                        [t("status.Not Started")]: "degraded",
+                        [t("status.In Progress")]: "maintenance",
+                        [t("status.Done")]: "offline",
+                    }
+                    status = statusDisplayMap[statusValue] || "degraded"
+                }
 
                 return (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                 <Status status={status}>
-                                    <StatusIndicator />
+                                    <StatusIndicator color={statusColor} />
                                     <StatusLabel>{displayStatus}</StatusLabel>
                                 </Status>
                             </button>
@@ -170,10 +176,49 @@ export function PropertyItem({
                                     ? statusOption  // Direct API label (e.g., "Completed")
                                     : t(`status.${statusOption}`)  // Translate standard statuses
                                 
-                                // Find status group for this option
-                                const statusOptionObj = availableStatuses?.find(s => s.label === statusOption)
-                                const statusOptionGroup = statusOptionObj?.group
-                                const statusColor = getStatusColor(statusOption, statusOptionGroup)
+                                // Get color from API status
+                                let optionStatusColor: string | undefined = undefined
+                                let optionStatus: "online" | "offline" | "maintenance" | "degraded" = "offline"
+                                
+                                // Try to find in availableStatuses
+                                if (availableStatuses && availableStatuses.length > 0) {
+                                    const statusOptionObj = availableStatuses.find(s => s.label === statusOption)
+                                    if (statusOptionObj?.color) {
+                                        optionStatusColor = statusOptionObj.color
+                                    }
+                                    if (statusOptionObj?.group) {
+                                        // If no color found but we have group, try to find default status in group
+                                        if (!optionStatusColor) {
+                                            const groupStatuses = availableStatuses.filter(s => s.group === statusOptionObj.group)
+                                            const defaultStatus = groupStatuses.find(s => s.isDefault) || groupStatuses[0]
+                                            if (defaultStatus?.color) {
+                                                optionStatusColor = defaultStatus.color
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Fallback to default status for backwards compatibility
+                                if (!optionStatusColor) {
+                                    const statusGroupMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'DONE'> = {
+                                        "Not Started": "TODO",
+                                        "In Progress": "IN_PROGRESS",
+                                        "Done": "DONE",
+                                        [t("status.Not Started")]: "TODO",
+                                        [t("status.In Progress")]: "IN_PROGRESS",
+                                        [t("status.Done")]: "DONE",
+                                    }
+                                    const statusGroup = statusGroupMap[statusOption]
+                                    const statusDisplayMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+                                        "Not Started": "degraded",
+                                        "In Progress": "maintenance",
+                                        "Done": "offline",
+                                        [t("status.Not Started")]: "degraded",
+                                        [t("status.In Progress")]: "maintenance",
+                                        [t("status.Done")]: "offline",
+                                    }
+                                    optionStatus = statusDisplayMap[statusOption] || "degraded"
+                                }
                                 
                                 return (
                                     <DropdownMenuItem
@@ -181,8 +226,8 @@ export function PropertyItem({
                                         onClick={() => onStatusChange?.(statusOption)}
                                         className={statusValue === statusOption ? "bg-muted" : ""}
                                     >
-                                        <Status status={statusColor}>
-                                            <StatusIndicator />
+                                        <Status status={optionStatus}>
+                                            <StatusIndicator color={optionStatusColor} />
                                             <StatusLabel>{displayLabel}</StatusLabel>
                                         </Status>
                                     </DropdownMenuItem>

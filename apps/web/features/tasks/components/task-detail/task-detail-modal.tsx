@@ -120,13 +120,13 @@ export function TaskDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full h-full max-w-full max-h-full md:w-[80vw] md:h-[90vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none md:rounded-lg top-0 left-0 translate-x-0 translate-y-0 md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]"
+        className="w-full h-full max-w-full max-h-full sm:w-[85vw] sm:h-[95vh] lg:w-[80vw] lg:h-[90vh] md:max-w-none md:max-h-none flex flex-col p-0 overflow-hidden rounded-none sm:rounded-lg top-0 left-0 translate-x-0 translate-y-0 sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] gap-0"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Task Details</DialogTitle>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-3 flex-shrink-0 border-b border-border">
           {/* Left side */}
           <div className="flex items-center gap-2 flex-1">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-medium hover:bg-accent transition-colors cursor-default">
@@ -143,6 +143,27 @@ export function TaskDetailModal({
                     ? `TAS-${createdTaskId.slice(-4)}`
                     : `TAS-${task?.id || ""}`}
             </div>
+            {brandSlug && (
+              <>
+                <div className="h-5 w-px bg-border"></div>
+                <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-md text-sm font-medium border border-border hover:bg-accent transition-colors cursor-default">
+                  <div className="h-5 w-5 flex-shrink-0 rounded-full bg-muted flex items-center justify-center">
+                    {brandLogoUrl ? (
+                      <img
+                        src={brandLogoUrl}
+                        alt={brandName || brandSlug}
+                        className="h-5 w-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[10px] font-semibold">
+                        {brandName?.substring(0, 2).toUpperCase() || brandSlug.substring(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  @{brandSlug}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right side */}
@@ -168,103 +189,214 @@ export function TaskDetailModal({
           </div>
         </div>
 
-        {/* Brand Info */}
-        <div className="flex items-center justify-between px-4 py-0 flex-shrink-0">
-          {/* Left side */}
-          <div className="flex items-center gap-2 flex-1">
-            {brandSlug && (
-              <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-md text-sm font-medium border border-border hover:bg-accent transition-colors cursor-default">
-                <div className="h-5 w-5 flex-shrink-0 rounded-full bg-muted flex items-center justify-center">
-                  {brandLogoUrl ? (
-                    <img
-                      src={brandLogoUrl}
-                      alt={brandName || brandSlug}
-                      className="h-5 w-5 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-[10px] font-semibold">
-                      {brandName?.substring(0, 2).toUpperCase() || brandSlug.substring(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                @{brandSlug}
+        {/* Main Content Area - Two Columns */}
+        <div className="flex-1 min-h-0 overflow-hidden lg:overflow-hidden flex flex-col lg:flex-row">
+          {/* Mobile: Single scroll container */}
+          <div className="flex-1 min-h-0 overflow-y-auto lg:hidden">
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* Task Title and Description - Mobile */}
+              <div className="flex flex-col gap-2">
+                {isEditingTitle ? (
+                  <Textarea
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onBlur={handleSaveTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setEditedTitle(task?.title || "")
+                        setIsEditingTitle(false)
+                      }
+                    }}
+                    className="!text-xl font-semibold min-h-0 h-auto py-0.5 px-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none break-words"
+                    autoFocus
+                    rows={1}
+                  />
+                ) : (
+                  <h2
+                    className="text-xl font-semibold break-words cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1 py-0.5"
+                    onClick={() => {
+                      setEditedTitle(task?.title || "")
+                      setIsEditingTitle(true)
+                    }}
+                  >
+                    {editedTitle || task?.title || t("detail.untitled")}
+                  </h2>
+                )}
+                {isEditingDescription ? (
+                  <Textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    onBlur={handleSaveDescription}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setEditedDescription(task?.description || "")
+                        setIsEditingDescription(false)
+                      }
+                    }}
+                    className="text-sm text-muted-foreground min-h-[60px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none"
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    className={`text-sm text-muted-foreground break-words cursor-pointer w-full hover:bg-accent/50 rounded px-1 -mx-1 py-0.5 whitespace-pre-wrap ${isDescriptionExpanded ? "" : "line-clamp-2"
+                      }`}
+                    onClick={() => {
+                      if (!isDescriptionExpanded) {
+                        setIsDescriptionExpanded(true)
+                      } else {
+                        setEditedDescription(task?.description || "")
+                        setIsEditingDescription(true)
+                      }
+                    }}
+                  >
+                    {editedDescription || task?.description || t("detail.noDescription")}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Right side */}
-          <div className="flex-shrink-0">
-            {/* Empty for now */}
-          </div>
-        </div>
+              {/* Checklist */}
+              <TaskChecklist
+                task={task}
+                workspaceId={workspaceId}
+                checklistItems={checklistItems}
+                onChecklistUpdate={setChecklistItems}
+                onTaskUpdate={onTaskUpdate}
+              />
 
-        {/* Task Title and Description - Mobile */}
-        <div className="px-6 py-2 flex-shrink-0 md:hidden">
-          <div className="flex flex-col gap-2">
-            {isEditingTitle ? (
-              <Textarea
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onBlur={handleSaveTitle}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setEditedTitle(task?.title || "")
-                    setIsEditingTitle(false)
-                  }
-                }}
-                className="!text-xl font-semibold min-h-0 h-auto py-0.5 px-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none break-words"
-                autoFocus
-                rows={1}
-              />
-            ) : (
-              <h2
-                className="text-xl font-semibold break-words cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1 py-0.5"
-                onClick={() => {
-                  setEditedTitle(task?.title || "")
-                  setIsEditingTitle(true)
-                }}
-              >
-                {editedTitle || task?.title || t("detail.untitled")}
-              </h2>
-            )}
-            {isEditingDescription ? (
-              <Textarea
-                value={editedDescription}
-                onChange={(e) => setEditedDescription(e.target.value)}
-                onBlur={handleSaveDescription}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setEditedDescription(task?.description || "")
-                    setIsEditingDescription(false)
-                  }
-                }}
-                className="text-sm text-muted-foreground min-h-[60px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none"
-                autoFocus
-              />
-            ) : (
-              <div
-                className={`text-sm text-muted-foreground break-words cursor-pointer w-full hover:bg-accent/50 rounded px-1 -mx-1 py-0.5 whitespace-pre-wrap ${isDescriptionExpanded ? "" : "line-clamp-2"
-                  }`}
-                onClick={() => {
-                  if (!isDescriptionExpanded) {
-                    setIsDescriptionExpanded(true)
-                  } else {
-                    setEditedDescription(task?.description || "")
-                    setIsEditingDescription(true)
-                  }
-                }}
-              >
-                {editedDescription || task?.description || t("detail.noDescription")}
+              {/* Properties - Mobile */}
+              <div className="border-t pt-6">
+                <TaskProperties
+                  task={task}
+                  workspaceId={workspaceId}
+                  brandId={brandId}
+                  taskStatuses={taskStatuses}
+                  currentStatus={currentStatus}
+                  currentPriority={currentPriority}
+                  currentDueDate={currentDueDate}
+                  currentAssigneeName={currentAssigneeName}
+                  workspaceMembers={workspaceMembers}
+                  onStatusChange={handleStatusChange}
+                  onPriorityChange={handlePriorityChange}
+                  onDateChange={handleDateChange}
+                  onAssigneeChange={handleAssigneeChange}
+                />
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Main Content Area */}
-        <div className="px-6 py-0 flex-1 min-h-0 overflow-visible flex flex-col md:flex-row h-full">
-          <div className="flex items-stretch flex-1 min-h-0 overflow-visible md:flex-row flex-col-reverse md:flex-row h-full">
-            {/* Right side - Properties and Attachments (Mobile: shown first) */}
-            <div className="w-full md:w-[40%] border-t md:border-t-0 md:border-l border-muted-foreground/20 min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pl-0 md:pl-2 pt-4 md:pt-0 order-1 md:order-2">
+              {/* Attachments - Mobile */}
+              <div className="border-t pt-6">
+                <TaskAttachments
+                  task={task}
+                  workspaceId={workspaceId}
+                  attachments={attachments}
+                  attachmentDetails={attachmentDetails}
+                  onAttachmentsUpdate={setAttachments}
+                  onAttachmentDetailsUpdate={setAttachmentDetails}
+                />
+              </div>
+
+              {/* Activity Tabs - Mobile */}
+              <div className="border-t pt-6">
+                <TaskActivityTabs
+                  task={task}
+                  workspaceId={workspaceId}
+                  comments={comments}
+                  onCommentsUpdate={setComments}
+                  activities={activities}
+                  onActivitiesUpdate={setActivities}
+                  onTaskUpdate={onTaskUpdate}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop: Left Side - Title, Description, Checklist, Activity Tabs */}
+          <div className="hidden lg:flex lg:w-[60%] xl:w-[65%] lg:border-r border-border overflow-y-auto min-h-0">
+            <div className="p-4 sm:p-6 space-y-6 w-full">
+              {/* Task Title and Description - Desktop */}
+              <div className="flex flex-col gap-2">
+                {isEditingTitle ? (
+                  <Textarea
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onBlur={handleSaveTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setEditedTitle(task?.title || "")
+                        setIsEditingTitle(false)
+                      }
+                    }}
+                    className="!text-xl font-semibold min-h-0 h-auto py-0.5 px-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none break-words"
+                    autoFocus
+                    rows={1}
+                  />
+                ) : (
+                  <h2
+                    className="text-xl font-semibold break-words cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1 py-0.5"
+                    onClick={() => {
+                      setEditedTitle(task?.title || "")
+                      setIsEditingTitle(true)
+                    }}
+                  >
+                    {editedTitle || task?.title || t("detail.untitled")}
+                  </h2>
+                )}
+                {isEditingDescription ? (
+                  <Textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    onBlur={handleSaveDescription}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setEditedDescription(task?.description || "")
+                        setIsEditingDescription(false)
+                      }
+                    }}
+                    className="text-sm text-muted-foreground min-h-[60px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none"
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    className={`text-sm text-muted-foreground break-words cursor-pointer w-full hover:bg-accent/50 rounded px-1 -mx-1 py-0.5 whitespace-pre-wrap ${isDescriptionExpanded ? "" : "line-clamp-2"
+                      }`}
+                    onClick={() => {
+                      if (!isDescriptionExpanded) {
+                        setIsDescriptionExpanded(true)
+                      } else {
+                        setEditedDescription(task?.description || "")
+                        setIsEditingDescription(true)
+                      }
+                    }}
+                  >
+                    {editedDescription || task?.description || t("detail.noDescription")}
+                  </div>
+                )}
+              </div>
+
+              {/* Checklist */}
+              <TaskChecklist
+                task={task}
+                workspaceId={workspaceId}
+                checklistItems={checklistItems}
+                onChecklistUpdate={setChecklistItems}
+                onTaskUpdate={onTaskUpdate}
+              />
+
+              {/* Activity Tabs - Desktop */}
+              <TaskActivityTabs
+                task={task}
+                workspaceId={workspaceId}
+                comments={comments}
+                onCommentsUpdate={setComments}
+                activities={activities}
+                onActivitiesUpdate={setActivities}
+                onTaskUpdate={onTaskUpdate}
+              />
+            </div>
+          </div>
+
+          {/* Desktop: Right Side - Properties and Attachments */}
+          <div className="hidden lg:flex lg:w-[40%] xl:w-[35%] lg:flex-shrink-0 bg-muted/30 overflow-y-auto min-h-0">
+            <div className="p-4 sm:p-6 space-y-6 w-full">
               <TaskProperties
                 task={task}
                 workspaceId={workspaceId}
@@ -289,106 +421,6 @@ export function TaskDetailModal({
                 onAttachmentsUpdate={setAttachments}
                 onAttachmentDetailsUpdate={setAttachmentDetails}
               />
-
-              {/* Activity Tabs - Mobile only (shown after attachments) */}
-              <div className="md:hidden mt-4">
-                <TaskActivityTabs
-                  task={task}
-                  workspaceId={workspaceId}
-                  comments={comments}
-                  onCommentsUpdate={setComments}
-                  activities={activities}
-                  onActivitiesUpdate={setActivities}
-                  onTaskUpdate={onTaskUpdate}
-                />
-              </div>
-            </div>
-
-            {/* Left side - Title and Description (Desktop) / Checklist */}
-            <div className="flex-1 w-full md:w-[70%] min-h-0 h-full overflow-y-auto overflow-x-visible scrollbar-hide pr-2 md:pr-4 order-2 md:order-1">
-              <div className="flex flex-col gap-2">
-                {/* Title and Description - Desktop only */}
-                <div className="hidden md:flex flex-col gap-2">
-                  {isEditingTitle ? (
-                    <Textarea
-                      value={editedTitle}
-                      onChange={(e) => setEditedTitle(e.target.value)}
-                      onBlur={handleSaveTitle}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          setEditedTitle(task?.title || "")
-                          setIsEditingTitle(false)
-                        }
-                      }}
-                      className="!text-xl font-semibold min-h-0 h-auto py-0.5 px-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none break-words"
-                      autoFocus
-                      rows={1}
-                    />
-                  ) : (
-                    <h2
-                      className="text-xl font-semibold break-words cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1 py-0.5"
-                      onClick={() => {
-                        setEditedTitle(task?.title || "")
-                        setIsEditingTitle(true)
-                      }}
-                    >
-                      {editedTitle || task?.title || t("detail.untitled")}
-                    </h2>
-                  )}
-                  {isEditingDescription ? (
-                    <Textarea
-                      value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      onBlur={handleSaveDescription}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          setEditedDescription(task?.description || "")
-                          setIsEditingDescription(false)
-                        }
-                      }}
-                      className="text-sm text-muted-foreground min-h-[60px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none resize-none"
-                      autoFocus
-                    />
-                  ) : (
-                    <div
-                      className={`text-sm text-muted-foreground break-words cursor-pointer w-full hover:bg-accent/50 rounded px-1 -mx-1 py-0.5 whitespace-pre-wrap ${isDescriptionExpanded ? "" : "line-clamp-2"
-                        }`}
-                      onClick={() => {
-                        if (!isDescriptionExpanded) {
-                          setIsDescriptionExpanded(true)
-                        } else {
-                          setEditedDescription(task?.description || "")
-                          setIsEditingDescription(true)
-                        }
-                      }}
-                    >
-                      {editedDescription || task?.description || t("detail.noDescription")}
-                    </div>
-                  )}
-                </div>
-
-                {/* Checklist */}
-                <TaskChecklist
-                  task={task}
-                  workspaceId={workspaceId}
-                  checklistItems={checklistItems}
-                  onChecklistUpdate={setChecklistItems}
-                  onTaskUpdate={onTaskUpdate}
-                />
-
-                {/* Activity Tabs (Comments, Activity, Work Log) - Desktop only */}
-                <div className="hidden md:block">
-                  <TaskActivityTabs
-                    task={task}
-                    workspaceId={workspaceId}
-                    comments={comments}
-                    onCommentsUpdate={setComments}
-                    activities={activities}
-                    onActivitiesUpdate={setActivities}
-                    onTaskUpdate={onTaskUpdate}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </div>

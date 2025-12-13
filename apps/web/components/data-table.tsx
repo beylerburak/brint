@@ -628,23 +628,37 @@ function createColumns(t: (key: string) => string, availableStatuses?: Array<{ i
         }
       }
       
-      // Determine status color - prefer group-based mapping if available
-      let status: "online" | "offline" | "maintenance" | "degraded" = "offline"
-      if (isUsingApiStatuses) {
-        const foundStatus = availableStatuses.find(s => s.label === currentStatusDisplay)
-        if (foundStatus?.group) {
-          const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
-            TODO: "offline",
-            IN_PROGRESS: "maintenance",
-            DONE: "online",
-          }
-          status = groupColorMap[foundStatus.group]
-        } else {
-          // Try to map from display text (supports both English and translated values)
-          status = statusDisplayMap[currentStatusDisplay] || statusDisplayMap[rawStatus] || "offline"
+      // Get status color from API (if available)
+      const statusGroup = (row.original as any).statusGroup as 'TODO' | 'IN_PROGRESS' | 'DONE' | undefined
+      let statusColor: string | undefined = undefined
+      
+      // Try to find color from availableStatuses
+      if (availableStatuses && availableStatuses.length > 0 && statusGroup) {
+        const foundStatus = availableStatuses.find(s => s.group === statusGroup)
+        if (foundStatus?.color) {
+          statusColor = foundStatus.color
         }
-      } else {
-        // Fallback: use statusDisplayMap which includes translations
+      }
+      
+      // If not found by group, try to find by label
+      if (!statusColor && availableStatuses && availableStatuses.length > 0) {
+        const foundStatus = availableStatuses.find(s => s.label === currentStatusDisplay || s.label === rawStatus)
+        if (foundStatus?.color) {
+          statusColor = foundStatus.color
+        }
+      }
+      
+      // Fallback to default status for backwards compatibility (when no API colors available)
+      let status: "online" | "offline" | "maintenance" | "degraded" = "offline"
+      if (!statusColor) {
+        const statusDisplayMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+          [t("status.Done")]: "offline",
+          [t("status.In Progress")]: "maintenance",
+          [t("status.Not Started")]: "degraded",
+          "Done": "offline",
+          "In Progress": "maintenance",
+          "Not Started": "degraded",
+        }
         status = statusDisplayMap[currentStatusDisplay] || statusDisplayMap[rawStatus] || "offline"
       }
 
@@ -662,7 +676,7 @@ function createColumns(t: (key: string) => string, availableStatuses?: Array<{ i
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
               <Status status={status}>
-                <StatusIndicator />
+                <StatusIndicator color={statusColor} />
                 <StatusLabel>{currentStatusDisplay}</StatusLabel>
               </Status>
               <IconChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -677,20 +691,31 @@ function createColumns(t: (key: string) => string, availableStatuses?: Array<{ i
                 ? undefined 
                 : statusOption.group
               
-              // Determine status color
-              const getStatusColor = (group?: 'TODO' | 'IN_PROGRESS' | 'DONE'): "online" | "offline" | "maintenance" | "degraded" => {
-                if (group) {
-                  const groupColorMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', "online" | "offline" | "maintenance" | "degraded"> = {
-                    TODO: "offline",
-                    IN_PROGRESS: "maintenance",
-                    DONE: "online",
-                  }
-                  return groupColorMap[group]
+              // Get color from API status
+              let optionStatusColor: string | undefined = undefined
+              let optionStatus: "online" | "offline" | "maintenance" | "degraded" = "offline"
+              
+              if (typeof statusOption === 'object' && statusOption.color) {
+                optionStatusColor = statusOption.color
+              } else if (availableStatuses && availableStatuses.length > 0) {
+                const foundStatus = availableStatuses.find(s => s.label === statusLabel)
+                if (foundStatus?.color) {
+                  optionStatusColor = foundStatus.color
                 }
-                return statusDisplayMap[statusLabel] || "offline"
               }
               
-              const statusColor = getStatusColor(statusGroup)
+              // Fallback to default status for backwards compatibility
+              if (!optionStatusColor) {
+                const statusDisplayMap: Record<string, "online" | "offline" | "maintenance" | "degraded"> = {
+                  [t("status.Done")]: "offline",
+                  [t("status.In Progress")]: "maintenance",
+                  [t("status.Not Started")]: "degraded",
+                  "Done": "offline",
+                  "In Progress": "maintenance",
+                  "Not Started": "degraded",
+                }
+                optionStatus = statusDisplayMap[statusLabel] || "offline"
+              }
               
               return (
                 <DropdownMenuItem
@@ -702,8 +727,8 @@ function createColumns(t: (key: string) => string, availableStatuses?: Array<{ i
                   }}
                   className={currentStatusDisplay === statusLabel ? "bg-muted" : ""}
                 >
-                  <Status status={statusColor}>
-                    <StatusIndicator />
+                  <Status status={optionStatus}>
+                    <StatusIndicator color={optionStatusColor} />
                     <StatusLabel>{statusLabel}</StatusLabel>
                   </Status>
                 </DropdownMenuItem>

@@ -271,6 +271,10 @@
       "show": "Show Summary",
       "hide": "Hide Summary"
     },
+    "completed": {
+      "show": "Show Completed",
+      "hide": "Hide Completed"
+    },
     "errors": {
       "deleteTask": "Failed to delete task",
       "statusIdNotFound": "Status ID not found",
@@ -1378,5 +1382,27 @@
     "timeFormatDescription": "How times are displayed throughout the application.",
     "timeFormat24Hour": "24-hour (23:45)",
     "timeFormat12Hour": "12-hour (11:45 PM)"
+  },
+  "calendar": {
+    "weekdays": {
+      "monday": "Mon",
+      "tuesday": "Tue",
+      "wednesday": "Wed",
+      "thursday": "Thu",
+      "friday": "Fri",
+      "saturday": "Sat",
+      "sunday": "Sun"
+    },
+    "today": "Today",
+    "views": {
+      "monthly": "Monthly",
+      "weekly": "Weekly",
+      "agenda": "Agenda"
+    },
+    "agenda": {
+      "noUpcomingTasks": "No upcoming tasks",
+      "task": "task",
+      "tasks": "tasks"
+    }
   }
 }

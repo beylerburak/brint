@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,8 @@ import {
   IconSearch,
   IconTable,
   IconLayoutKanban,
+  IconCalendar,
+  IconCalendarWeek,
   IconFilter,
   IconListCheck,
   IconClock,
@@ -32,9 +35,15 @@ import {
   IconCheck,
   IconList,
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconPlus,
 } from "@tabler/icons-react"
 import { ViewMode, FilterTab } from "./types"
+import { CalendarViewMode } from "./data-view-calendar"
+import { format, addMonths, subMonths, addWeeks, subWeeks } from "date-fns"
+import { useLocale } from "next-intl"
+import { enUS, tr } from "date-fns/locale"
 
 interface DataViewToolbarProps {
   viewMode: ViewMode
@@ -65,6 +74,11 @@ interface DataViewToolbarProps {
     completed: number
     all: number
   }
+  // Calendar props
+  calendarCurrentDate?: Date
+  calendarViewMode?: CalendarViewMode
+  onCalendarDateChange?: (date: Date) => void
+  onCalendarViewModeChange?: (mode: CalendarViewMode) => void
 }
 
 export function DataViewToolbar({
@@ -90,9 +104,51 @@ export function DataViewToolbar({
     all: "All",
   },
   tabCounts,
+  calendarCurrentDate,
+  calendarViewMode = "monthly",
+  onCalendarDateChange,
+  onCalendarViewModeChange,
 }: DataViewToolbarProps) {
+  const t = useTranslations("calendar")
+  const locale = useLocale()
+  const dateLocale = locale === "tr" ? tr : enUS
   const isMobile = useIsMobile()
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+
+  // Calendar navigation handlers
+  const handleCalendarPrev = () => {
+    if (!calendarCurrentDate || !onCalendarDateChange) return
+    if (calendarViewMode === "monthly") {
+      onCalendarDateChange(subMonths(calendarCurrentDate, 1))
+    } else if (calendarViewMode === "weekly") {
+      onCalendarDateChange(subWeeks(calendarCurrentDate, 1))
+    }
+  }
+
+  const handleCalendarNext = () => {
+    if (!calendarCurrentDate || !onCalendarDateChange) return
+    if (calendarViewMode === "monthly") {
+      onCalendarDateChange(addMonths(calendarCurrentDate, 1))
+    } else if (calendarViewMode === "weekly") {
+      onCalendarDateChange(addWeeks(calendarCurrentDate, 1))
+    }
+  }
+
+  const handleCalendarToday = () => {
+    if (!onCalendarDateChange) return
+    onCalendarDateChange(new Date())
+  }
+
+  const getCalendarTitle = () => {
+    if (!calendarCurrentDate) return ""
+    if (calendarViewMode === "monthly") {
+      return format(calendarCurrentDate, "MMMM yyyy", { locale: dateLocale })
+    } else if (calendarViewMode === "weekly") {
+      return `${t("views.weekly")} - ${format(calendarCurrentDate, "d MMM yyyy", { locale: dateLocale })}`
+    } else {
+      return t("views.agenda")
+    }
+  }
 
   return (
     <>
@@ -131,10 +187,38 @@ export function DataViewToolbar({
             >
               <IconLayoutKanban className="h-4 w-4" />
             </InputGroupButton>
+            <InputGroupButton
+              size="sm"
+              variant={viewMode === "calendar" ? "default" : "ghost"}
+              onClick={() => onViewModeChange("calendar")}
+            >
+              <IconCalendar className="h-4 w-4" />
+            </InputGroupButton>
           </InputGroup>
 
+          {/* Calendar navigation - only show when calendar view is active and not in agenda mode */}
+          {viewMode === "calendar" && calendarViewMode !== "agenda" && calendarCurrentDate && onCalendarDateChange && (
+            <>
+              <div className="h-6 w-px bg-border flex-shrink-0"></div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button variant="outline" size="sm" onClick={handleCalendarPrev}>
+                  <IconChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCalendarToday}>
+                  {t("today")}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCalendarNext}>
+                  <IconChevronRight className="h-4 w-4" />
+                </Button>
+                <div className="text-sm font-semibold">
+                  {getCalendarTitle()}
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Filter tabs - hidden on smaller screens, shown on xl+ */}
-          <Tabs value={filterTab} onValueChange={(value) => onFilterChange(value as FilterTab)} className="flex-1 min-w-0 hidden xl:block">
+          {/* <Tabs value={filterTab} onValueChange={(value) => onFilterChange(value as FilterTab)} className="flex-1 min-w-0 hidden xl:block">
             <div className="overflow-x-auto scrollbar-hide">
               <TabsList className="relative inline-flex items-center gap-1 rounded-lg bg-muted p-1 min-w-max">
                 <TabsHighlight className="bg-background shadow-sm rounded-md">
@@ -187,10 +271,10 @@ export function DataViewToolbar({
                 </TabsHighlight>
               </TabsList>
             </div>
-          </Tabs>
+          </Tabs> */}
 
           {/* Filter tabs dropdown for smaller screens */}
-          <DropdownMenu>
+          {/* <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="xl:hidden gap-2 flex-shrink-0">
                 <IconList className="h-4 w-4" />
@@ -237,11 +321,40 @@ export function DataViewToolbar({
                 <span>{tabLabels.completed}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu> */}
         </div>
 
-        {/* Right side: Filter button and New Task */}
+        {/* Right side: Calendar view switcher (when calendar is active), Filter button and New Task */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Calendar view mode switcher - only show when calendar view is active */}
+          {viewMode === "calendar" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  {calendarViewMode === "monthly" && <IconCalendar className="h-4 w-4" />}
+                  {calendarViewMode === "weekly" && <IconCalendarWeek className="h-4 w-4" />}
+                  {calendarViewMode === "agenda" && <IconList className="h-4 w-4" />}
+                  <span>{t(`views.${calendarViewMode}` as any)}</span>
+                  <IconChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("monthly")}>
+                  <IconCalendar className="h-4 w-4 mr-2" />
+                  <span>{t("views.monthly")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("weekly")}>
+                  <IconCalendarWeek className="h-4 w-4 mr-2" />
+                  <span>{t("views.weekly")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("agenda")}>
+                  <IconList className="h-4 w-4 mr-2" />
+                  <span>{t("views.agenda")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Filter button */}
           <Button variant="outline" size="sm" className="gap-2">
             <IconFilter className="h-4 w-4" />
@@ -260,7 +373,7 @@ export function DataViewToolbar({
       {/* Mobile layout */}
       <div className="sm:hidden flex flex-col gap-3">
         {/* Top row: Tabs + Chevron */}
-        <div className="flex items-center justify-between gap-0">
+        {/* <div className="flex items-center justify-between gap-0">
           <Tabs value={filterTab} onValueChange={(value) => onFilterChange(value as FilterTab)} className="flex-1 min-w-0 w-full">
             <TabsList className="relative flex items-center gap-0 rounded-lg bg-muted p-1 w-full">
               <TabsHighlight className="bg-background shadow-sm rounded-md w-full flex">
@@ -322,7 +435,7 @@ export function DataViewToolbar({
           >
             <IconChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
           </Button>
-        </div>
+        </div> */}
 
         {/* Expandable filters */}
         {showMobileFilters && (
@@ -357,7 +470,61 @@ export function DataViewToolbar({
                 <IconLayoutKanban className="h-4 w-4" />
                 <span className="text-sm">Kanban</span>
               </InputGroupButton>
+              <InputGroupButton
+                size="sm"
+                variant={viewMode === "calendar" ? "default" : "ghost"}
+                onClick={() => onViewModeChange("calendar")}
+                className="flex-1"
+              >
+                <IconCalendar className="h-4 w-4" />
+                <span className="text-sm">Calendar</span>
+              </InputGroupButton>
             </InputGroup>
+
+            {/* Calendar navigation - mobile - hide in agenda mode */}
+            {viewMode === "calendar" && calendarViewMode !== "agenda" && calendarCurrentDate && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCalendarPrev} className="flex-1">
+                    <IconChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCalendarToday} className="flex-1">
+                    {t("today")}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCalendarNext} className="flex-1">
+                    <IconChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-sm font-semibold text-center">
+                  {getCalendarTitle()}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
+                      {calendarViewMode === "monthly" && <IconCalendar className="h-4 w-4" />}
+                      {calendarViewMode === "weekly" && <IconCalendarWeek className="h-4 w-4" />}
+                      {calendarViewMode === "agenda" && <IconList className="h-4 w-4" />}
+                      <span>{t(`views.${calendarViewMode}` as any)}</span>
+                      <IconChevronDown className="h-4 w-4 ml-auto" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-full">
+                      <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("monthly")}>
+                        <IconCalendar className="h-4 w-4 mr-2" />
+                        <span>{t("views.monthly")}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("weekly")}>
+                        <IconCalendarWeek className="h-4 w-4 mr-2" />
+                        <span>{t("views.weekly")}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onCalendarViewModeChange?.("agenda")}>
+                        <IconList className="h-4 w-4 mr-2" />
+                        <span>{t("views.agenda")}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="gap-2 justify-start">

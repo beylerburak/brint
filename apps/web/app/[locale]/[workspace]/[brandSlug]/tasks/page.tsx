@@ -8,13 +8,6 @@ import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  IconDots,
   IconListCheck,
   IconClock,
   IconAlertCircle,
@@ -22,16 +15,18 @@ import {
   IconPlus,
 } from "@tabler/icons-react"
 import {
+  DataViewPage,
   DataViewToolbar,
-  DataSummaryChart,
   DataViewTable,
   DataViewKanban,
+  DataViewCalendar,
   ViewMode,
   FilterTab,
   TableTask,
   KanbanTask,
   SummaryStats,
   BaseTask,
+  CalendarViewMode,
 } from "@/components/data-view"
 import { useKanbanColumns } from "@/components/data-view/hooks/use-kanban-columns"
 import { TaskDetailModal } from "@/features/tasks/components/task-detail"
@@ -50,6 +45,8 @@ export default function BrandTasksPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("all")
   const [selectedTask, setSelectedTask] = useState<BaseTask | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [calendarCurrentDate, setCalendarCurrentDate] = useState<Date>(new Date())
+  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("monthly")
 
   // Handle view mode change - set filter to "all" when switching to kanban
   const handleViewModeChange = useCallback((mode: ViewMode) => {
@@ -58,7 +55,7 @@ export default function BrandTasksPage() {
       setFilterTab("all")
     }
   }, [])
-  const [showSummary, setShowSummary] = useState<boolean>(true)
+  const [showCompleted, setShowCompleted] = useState<boolean>(true)
   const [searchValue, setSearchValue] = useState("")
   // Track locally updated tasks to ignore WebSocket events for them
   const locallyUpdatedTasksRef = useRef<Set<string>>(new Set())
@@ -123,16 +120,26 @@ export default function BrandTasksPage() {
     },
   })
 
-  // Filter tasks by search value
+  // Filter tasks by search value and showCompleted setting
   const filteredTasks = useMemo(() => {
-    if (!searchValue.trim()) return tasks
-
-    const searchLower = searchValue.toLowerCase().trim()
-    return tasks.filter((task) =>
-      task.title.toLowerCase().includes(searchLower) ||
-      task.description?.toLowerCase().includes(searchLower)
-    )
-  }, [tasks, searchValue])
+    let result = tasks
+    
+    // Filter out completed tasks if showCompleted is false
+    if (!showCompleted) {
+      result = result.filter((task) => task.status.group !== 'DONE')
+    }
+    
+    // Filter by search value
+    if (searchValue.trim()) {
+      const searchLower = searchValue.toLowerCase().trim()
+      result = result.filter((task) =>
+        task.title.toLowerCase().includes(searchLower) ||
+        task.description?.toLowerCase().includes(searchLower)
+      )
+    }
+    
+    return result
+  }, [tasks, searchValue, showCompleted])
 
   // Transform API tasks to TableTask format
   const tasksData = useMemo(() => {
@@ -159,12 +166,74 @@ export default function BrandTasksPage() {
         type: t("type.task"),
         priority: priorityMap[task.priority] || t("priority.Medium"),
         status: statusMap[task.status.group] || task.status.label,
+        statusGroup: task.status.group, // Keep group for color mapping (language-independent)
         dueDate: task.dueDate || new Date().toISOString(),
         assignedTo: (task as any).assignedTo || [], // Use assignedTo from API or empty array
         commentCount: (task as any)._count?.comments || 0,
       } as TableTask
     })
   }, [filteredTasks, t])
+
+  // Helper function to format relative time (same as table view)
+  const getRelativeTime = useCallback((dateString: string): string => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000)
+    
+    const seconds = Math.abs(diffInSeconds)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+    const weeks = Math.floor(days / 7)
+    const months = Math.floor(days / 30)
+    const years = Math.floor(days / 365)
+    
+    const isPast = diffInSeconds < 0
+    const inText = t("table.time.in")
+    const agoText = t("table.time.ago")
+    
+    // Check if "in" text is "içinde" (Turkish) - it should come after the number
+    const isTurkishFormat = inText === "içinde"
+    
+    const formatTime = (count: number, unit: string) => {
+      if (isPast) {
+        return `${count} ${unit} ${agoText}`
+      } else {
+        if (isTurkishFormat) {
+          // Turkish: "2 hafta içinde"
+          return `${count} ${unit} ${inText}`
+        } else {
+          // English: "in 2 weeks"
+          return `${inText} ${count} ${unit}`
+        }
+      }
+    }
+    
+    if (years > 0) {
+      const unit = years > 1 ? t("table.time.years") : t("table.time.year")
+      return formatTime(years, unit)
+    } else if (months > 0) {
+      const unit = months > 1 ? t("table.time.months") : t("table.time.month")
+      return formatTime(months, unit)
+    } else if (weeks > 0) {
+      const unit = weeks > 1 ? t("table.time.weeks") : t("table.time.week")
+      return formatTime(weeks, unit)
+    } else if (days > 0) {
+      const unit = days > 1 ? t("table.time.days") : t("table.time.day")
+      return formatTime(days, unit)
+    } else if (hours > 0) {
+      const unit = hours > 1 ? t("table.time.hours") : t("table.time.hour")
+      return formatTime(hours, unit)
+    } else if (minutes > 0) {
+      const unit = minutes > 1 ? t("table.time.minutes") : t("table.time.minute")
+      return formatTime(minutes, unit)
+    } else if (seconds > 10) {
+      const unit = seconds > 1 ? t("table.time.seconds") : t("table.time.second")
+      return formatTime(seconds, unit)
+    } else {
+      return isPast ? t("table.time.justNow") : t("table.time.now")
+    }
+  }, [t])
 
   // Transform API tasks to KanbanTask format
   const kanbanTasks = useMemo(() => {
@@ -195,9 +264,9 @@ export default function BrandTasksPage() {
       const dueDate = task.dueDate ? new Date(task.dueDate) : null
       const isOverdue = dueDate && dueDate < now && task.status.group !== 'DONE'
 
-      const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null
-      const dueDateDisplay = daysUntilDue !== null 
-        ? t("dueDate.inDays", { count: daysUntilDue })
+      // Format due date display using relative time (same as table view)
+      const dueDateDisplay = task.dueDate 
+        ? getRelativeTime(task.dueDate)
         : t("dueDate.noDueDate")
 
       const kanbanTask: KanbanTask = {
@@ -208,6 +277,7 @@ export default function BrandTasksPage() {
         priority: priority as "High" | "Medium" | "Low",
         priorityColor,
         status: task.status.label,
+        statusGroup: task.status.group, // Keep group for color mapping (language-independent)
         dueDate: task.dueDate || '', // Keep raw ISO date for modal
         dueDateDisplay,
         commentCount: (task as any)._count?.comments || 0,
@@ -228,7 +298,7 @@ export default function BrandTasksPage() {
     })
 
     return { todo, inProgress, overdue, completed }
-  }, [filteredTasks, t])
+  }, [filteredTasks, t, getRelativeTime])
 
   // Summary stats
   const summaryStats: SummaryStats = useMemo(() => {
@@ -649,71 +719,14 @@ export default function BrandTasksPage() {
   }, [currentWorkspace, tasks, brandId, pagination, taskStatuses, t])
 
   return (
-    <div className="w-full flex flex-col min-h-0" style={{ height: "100vh" }}>
-      {/* Header */}
-      <div className="flex items-center px-6 pt-6 pb-0 gap-4">
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <IconDots className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setShowSummary(!showSummary)}>
-                {showSummary ? t("summary.hide") : t("summary.show")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Mobile Add Task Button */}
-        <div className="sm:hidden ml-auto">
-          <Button size="sm" onClick={() => {
-            setSelectedTask(null)
-            setIsCreateMode(true)
-            setIsTaskModalOpen(true)
-          }}>
-            <IconPlus className="h-4 w-4" />
-            {t("newTask")}
-          </Button>
-        </div>
-
-        {/* Desktop Toolbar */}
-        <div className="hidden sm:flex flex-1 min-w-0">
-          <DataViewToolbar
-            viewMode={viewMode}
-            filterTab={filterTab}
-            searchValue={searchValue}
-            onViewModeChange={handleViewModeChange}
-            onFilterChange={setFilterTab}
-            onSearchChange={setSearchValue}
-            onNewTask={() => {
-              setSelectedTask(null)
-              setIsCreateMode(true)
-              setIsTaskModalOpen(true)
-            }}
-            searchPlaceholder={t("toolbar.searchPlaceholder")}
-            newTaskLabel={t("newTask")}
-            filterLabels={{
-              filter: t("toolbar.filter"),
-              assignee: t("toolbar.assignee"),
-              priority: t("toolbar.priority"),
-            }}
-            tabLabels={{
-              todo: t("toolbar.tabs.todo"),
-              inProgress: t("toolbar.tabs.inProgress"),
-              overdue: t("toolbar.tabs.overdue"),
-              completed: t("toolbar.tabs.completed"),
-              all: t("toolbar.tabs.all"),
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Mobile Toolbar */}
-      <div className="sm:hidden px-6 mt-3">
+    <>
+      <DataViewPage
+      title={t("title")}
+      summaryStats={summaryStats}
+      viewMode={viewMode}
+      shouldShowCompleted={showCompleted}
+      onCompletedFilterChange={setShowCompleted}
+      headerRight={
         <DataViewToolbar
           viewMode={viewMode}
           filterTab={filterTab}
@@ -722,7 +735,9 @@ export default function BrandTasksPage() {
           onFilterChange={setFilterTab}
           onSearchChange={setSearchValue}
           onNewTask={() => {
-            // Handle new task
+            setSelectedTask(null)
+            setIsCreateMode(true)
+            setIsTaskModalOpen(true)
           }}
           searchPlaceholder={t("toolbar.searchPlaceholder")}
           newTaskLabel={t("newTask")}
@@ -738,24 +753,61 @@ export default function BrandTasksPage() {
             completed: t("toolbar.tabs.completed"),
             all: t("toolbar.tabs.all"),
           }}
+          calendarCurrentDate={calendarCurrentDate}
+          calendarViewMode={calendarViewMode}
+          onCalendarDateChange={setCalendarCurrentDate}
+          onCalendarViewModeChange={setCalendarViewMode}
         />
-      </div>
-
-      {/* Summary Chart */}
-      {showSummary && (
-        <DataSummaryChart
-          stats={summaryStats}
-          className={viewMode === "table" ? "pb-0" : "pb-1"}
+      }
+      headerRightMobile={
+        <Button size="sm" onClick={() => {
+          setSelectedTask(null)
+          setIsCreateMode(true)
+          setIsTaskModalOpen(true)
+        }}>
+          <IconPlus className="h-4 w-4" />
+          {t("newTask")}
+        </Button>
+      }
+      toolbar={
+        <DataViewToolbar
+          viewMode={viewMode}
+          filterTab={filterTab}
+          searchValue={searchValue}
+          onViewModeChange={handleViewModeChange}
+          onFilterChange={setFilterTab}
+          onSearchChange={setSearchValue}
+          onNewTask={() => {
+            setSelectedTask(null)
+            setIsCreateMode(true)
+            setIsTaskModalOpen(true)
+          }}
+          searchPlaceholder={t("toolbar.searchPlaceholder")}
+          newTaskLabel={t("newTask")}
+          filterLabels={{
+            filter: t("toolbar.filter"),
+            assignee: t("toolbar.assignee"),
+            priority: t("toolbar.priority"),
+          }}
+          tabLabels={{
+            todo: t("toolbar.tabs.todo"),
+            inProgress: t("toolbar.tabs.inProgress"),
+            overdue: t("toolbar.tabs.overdue"),
+            completed: t("toolbar.tabs.completed"),
+            all: t("toolbar.tabs.all"),
+          }}
+          calendarCurrentDate={calendarCurrentDate}
+          calendarViewMode={calendarViewMode}
+          onCalendarDateChange={setCalendarCurrentDate}
+          onCalendarViewModeChange={setCalendarViewMode}
         />
-      )}
-
-      {/* Data View */}
-      <div className={`w-full sm:px-6 ${viewMode === "kanban" ? "px-6" : "px-0"} flex-1 min-h-0 flex flex-col`}>
-        {isLoadingTasks ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">{t("loading")}</div>
-          </div>
-        ) : viewMode === "table" ? (
+      }
+    >
+      {isLoadingTasks ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">{t("loading")}</div>
+        </div>
+      ) : viewMode === "table" ? (
           <DataViewTable
             data={tasksData}
             filterTab={filterTab}
@@ -798,6 +850,71 @@ export default function BrandTasksPage() {
             }}
             onStatusChange={handleStatusChange}
           />
+        ) : viewMode === "calendar" ? (
+          <DataViewCalendar
+            tasks={filteredTasks.map((task): BaseTask => {
+              const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+                LOW: t("priority.Low"),
+                MEDIUM: t("priority.Medium"),
+                HIGH: t("priority.High"),
+                CRITICAL: t("priority.High"),
+              }
+
+              const statusMap: Record<'TODO' | 'IN_PROGRESS' | 'DONE', string> = {
+                TODO: t("status.Not Started"),
+                IN_PROGRESS: t("status.In Progress"),
+                DONE: t("status.Done"),
+              }
+
+              return {
+                id: task.id,
+                taskNumber: task.taskNumber,
+                title: task.title,
+                description: task.description,
+                priority: (priorityMap[task.priority] || t("priority.Medium")) as "High" | "Medium" | "Low",
+                status: statusMap[task.status.group] || task.status.label,
+                statusGroup: task.status.group, // Keep group for color mapping (language-independent)
+                dueDate: task.dueDate || new Date().toISOString(),
+                assignedTo: (task as any).assignedTo || [],
+                commentCount: (task as any)._count?.comments || 0,
+              }
+            })}
+            currentDate={calendarCurrentDate}
+            calendarViewMode={calendarViewMode}
+            onDateChange={setCalendarCurrentDate}
+            onCalendarViewModeChange={setCalendarViewMode}
+            availableStatuses={taskStatuses ? [
+              ...taskStatuses.TODO.map(s => ({ ...s, group: 'TODO' as const })),
+              ...taskStatuses.IN_PROGRESS.map(s => ({ ...s, group: 'IN_PROGRESS' as const })),
+              ...taskStatuses.DONE.map(s => ({ ...s, group: 'DONE' as const })),
+            ] : undefined}
+            onTaskClick={(task) => {
+              // Find the original task from filteredTasks
+              const originalTask = filteredTasks.find(t => String(t.id) === String(task.id))
+              if (originalTask) {
+                // Convert to BaseTask format for modal
+                const priorityMap: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', string> = {
+                  LOW: t("priority.Low"),
+                  MEDIUM: t("priority.Medium"),
+                  HIGH: t("priority.High"),
+                  CRITICAL: t("priority.High"),
+                }
+                
+                setSelectedTask({
+                  id: originalTask.id,
+                  taskNumber: originalTask.taskNumber,
+                  title: originalTask.title,
+                  description: originalTask.description,
+                  priority: (priorityMap[originalTask.priority] || t("priority.Medium")) as "High" | "Medium" | "Low",
+                  status: originalTask.status.label,
+                  dueDate: originalTask.dueDate || new Date().toISOString(),
+                  assignedTo: (originalTask as any).assignedTo || [],
+                  commentCount: (originalTask as any)._count?.comments || 0,
+                } as BaseTask)
+                setIsTaskModalOpen(true)
+              }
+            }}
+          />
         ) : (
           <DataViewKanban
             columns={kanbanColumns}
@@ -813,10 +930,10 @@ export default function BrandTasksPage() {
               // Just select the task and open modal - hook handles fetching
               setSelectedTask(task)
               setIsTaskModalOpen(true)
-            }}
-          />
+          }}
+        />
         )}
-      </div>
+      </DataViewPage>
 
       {/* Task Detail Modal */}
       {currentWorkspace && (
@@ -992,6 +1109,6 @@ export default function BrandTasksPage() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }

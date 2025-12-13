@@ -1,9 +1,12 @@
 // Main exports
+export { DataViewPage } from "./data-view-page"
 export { DataViewToolbar } from "./data-view-toolbar"
 export { DataSummaryChart } from "./data-summary-chart"
 export { DataViewTable } from "./data-view-table"
 export { DataViewKanban } from "./data-view-kanban"
+export { DataViewCalendar } from "./data-view-calendar"
 export type { KanbanColumn } from "./data-view-kanban"
+export type { CalendarViewMode } from "./data-view-calendar"
 export * from "./types"
 export * from "./hooks/use-kanban-columns"
 export * from "./utils/filter-data"
